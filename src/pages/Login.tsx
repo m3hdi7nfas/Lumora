@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft, Crown } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft, Crown, AlertTriangle, Info } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { supabase } from '@/integrations/supabase/client';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
@@ -26,6 +27,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [showSetupInstructions, setShowSetupInstructions] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -76,11 +78,22 @@ export default function Login() {
       }
 
       console.error('Demo login failed:', signInError.message);
-      toast({
-        title: 'Demo login failed',
-        description: `Could not log in with demo ${account.role} account. The demo accounts need to be created manually in Supabase.`,
-        variant: 'destructive',
-      });
+
+      // Show helpful error message
+      if (signInError.message.includes('Email not confirmed') || signInError.message.includes('Invalid login credentials')) {
+        toast({
+          title: 'Demo account not found',
+          description: `The demo ${account.role} account needs to be created in Supabase first. Click the info button below for setup instructions.`,
+          variant: 'destructive',
+        });
+        setShowSetupInstructions(true);
+      } else {
+        toast({
+          title: 'Demo login failed',
+          description: signInError.message,
+          variant: 'destructive',
+        });
+      }
 
     } catch (err) {
       console.error('Demo login exception:', err);
@@ -155,6 +168,16 @@ export default function Login() {
               </div>
             </div>
 
+            {showSetupInstructions && (
+              <Alert variant="destructive" className="text-xs">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Demo accounts need setup</AlertTitle>
+                <AlertDescription>
+                  The demo accounts need to be created in your Supabase database. Click the button below for detailed instructions.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="relative py-1">
               <Separator />
               <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-[10px] text-muted-foreground">
@@ -213,6 +236,37 @@ export default function Login() {
                 )}
               </Button>
             </form>
+
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs h-8"
+                onClick={() => setShowSetupInstructions(!showSetupInstructions)}
+              >
+                <Info className="w-3 h-3 mr-2" />
+                {showSetupInstructions ? 'Hide Setup Instructions' : 'Show Setup Instructions'}
+              </Button>
+
+              {showSetupInstructions && (
+                <div className="text-xs text-muted-foreground space-y-2 p-3 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium text-foreground">How to set up demo accounts:</h4>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Go to your Supabase dashboard (app.supabase.com)</li>
+                    <li>Navigate to Authentication → Users</li>
+                    <li>Click "Add User" and create accounts with these emails:</li>
+                    <ul className="list-disc list-inside ml-3 space-y-1">
+                      <li>demo.admin@lumora.com (password: Demo123!)</li>
+                      <li>demo.moderator@lumora.com (password: Demo123!)</li>
+                      <li>demo.teacher@lumora.com (password: Demo123!)</li>
+                      <li>demo.student@lumora.com (password: Demo123!)</li>
+                    </ul>
+                    <li>Go to SQL Editor and run the SQL commands to create profiles</li>
+                    <li>Refresh this page and try the demo buttons again</li>
+                  </ol>
+                </div>
+              )}
+            </div>
 
             <p className="text-center text-xs text-muted-foreground">
               Don't have an account?{' '}

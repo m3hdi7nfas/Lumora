@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
-import { futureConfig } from "./main";
+import { futureConfig } from "./routerConfig";
 
 const queryClient = new QueryClient();
 

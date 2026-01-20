@@ -85,7 +85,7 @@ export default function Login() {
     try {
       console.log('Creating admin demo account...');
 
-      // First, try to sign up the admin user
+      // First, try to sign up the admin user using regular signup
       const { error: signUpError } = await signUp('demo.admin@lumora.com', 'Demo123!', 'admin');
 
       if (signUpError) {

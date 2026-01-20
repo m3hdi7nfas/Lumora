@@ -35,10 +35,19 @@ export default function Login() {
   useEffect(() => {
     const checkAdminAccount = async () => {
       try {
-        const { data, error } = await supabase.auth.admin.getUserByEmail('demo.admin@lumora.com');
-        if (error && !error.message.includes('User not found')) {
+        // Check if admin profile exists in the profiles table
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', 'demo.admin@lumora.com')
+          .maybeSingle();
+
+        if (error) {
           console.error('Error checking admin account:', error);
+          setAdminAccountReady(false);
+          return;
         }
+
         setAdminAccountReady(!!data);
       } catch (error) {
         console.error('Error checking admin account:', error);
@@ -76,45 +85,61 @@ export default function Login() {
     try {
       console.log('Creating admin demo account...');
 
-      // Create the admin user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: 'demo.admin@lumora.com',
-        password: 'Demo123!',
-        email_confirm: true,
-        user_metadata: {
-          role: 'admin',
-          display_name: 'Demo Admin'
-        }
-      });
+      // First, try to sign up the admin user
+      const { error: signUpError } = await signUp('demo.admin@lumora.com', 'Demo123!', 'admin');
 
-      if (authError) {
-        console.error('Error creating admin user:', authError);
-        throw authError;
+      if (signUpError) {
+        console.error('Error signing up admin user:', signUpError);
+        throw signUpError;
       }
 
-      console.log('Admin user created:', authData.user.id);
+      console.log('Admin user signed up successfully');
 
-      // Create the profile in the profiles table
-      const { error: profileError } = await supabase
+      // Wait a bit for the profile to be created by the trigger
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Verify the profile was created
+      const { data, error: checkError } = await supabase
         .from('profiles')
-        .insert({
-          user_id: authData.user.id,
-          email: 'demo.admin@lumora.com',
-          role: 'admin',
-          display_name: 'Demo Admin',
-          is_active: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        .select('*')
+        .eq('email', 'demo.admin@lumora.com')
+        .maybeSingle();
 
-      if (profileError) {
-        console.error('Error creating admin profile:', profileError);
-        throw profileError;
+      if (checkError) {
+        console.error('Error checking admin profile:', checkError);
+        throw checkError;
+      }
+
+      if (!data) {
+        // If profile wasn't created by trigger, create it manually
+        console.log('Profile not created by trigger, creating manually');
+
+        const session = await supabase.auth.getSession();
+        if (session.data.session?.user) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: session.data.session.user.id,
+              email: 'demo.admin@lumora.com',
+              role: 'admin',
+              display_name: 'Demo Admin',
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (profileError) {
+            console.error('Error creating admin profile manually:', profileError);
+            throw profileError;
+          }
+        } else {
+          throw new Error('No user session available to create profile');
+        }
       }
 
       console.log('Admin profile created successfully');
       setAdminAccountReady(true);
-      return authData.user;
+      return true;
 
     } catch (error) {
       console.error('Error in createAdminDemoAccount:', error);
@@ -163,20 +188,13 @@ export default function Login() {
       if (role === 'admin' && !adminAccountReady) {
         try {
           await createAdminDemoAccount();
-          console.log('Admin account created successfully');
+          console.log('Admin account creation attempted');
         } catch (adminError) {
-          console.error('Failed to create admin account:', adminError.message);
-          toast({
-            title: 'Admin account creation failed',
-            description: 'Could not create admin demo account',
-            variant: 'destructive',
-          });
-          setDemoLoading(null);
-          return;
+          console.warn('Admin account creation failed, but continuing with login:', adminError.message);
         }
       }
 
-      // Try to sign in
+      // Try to sign in first
       const { error: signInError } = await signIn(account.email, account.password);
 
       if (!signInError) {
@@ -222,14 +240,14 @@ export default function Login() {
         if (retryError) {
           console.log('Retry sign in failed, trying manual profile creation:', retryError.message);
 
-          // Manual profile creation fallback
+          // If still failing, try to create profile manually
           const session = await supabase.auth.getSession();
           if (session.data.session?.user) {
             try {
               await createProfileManually(session.data.session.user.id, account.email, role);
-              console.log('Manual profile creation successful');
+              console.log('Manual profile creation successful, trying sign in again');
 
-              // Final sign in attempt
+              // Try sign in one more time
               const { error: finalError } = await signIn(account.email, account.password);
               if (finalError) {
                 throw finalError;

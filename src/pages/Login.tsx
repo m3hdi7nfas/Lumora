@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,79 +53,14 @@ export default function Login() {
     setLoading(false);
   };
 
-  const createDemoAccount = async (email: string, password: string, role: string) => {
-    try {
-      console.log(`Creating demo account: ${email} with role ${role}`);
-
-      // First try to sign up
-      const { error: signUpError } = await signUp(email, password, role);
-
-      if (signUpError) {
-        console.error('Sign up error:', signUpError);
-        throw signUpError;
-      }
-
-      console.log('Sign up successful, waiting for profile creation...');
-
-      // Wait for profile to be created by trigger
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Check if profile was created
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Profile check error:', profileError);
-        throw profileError;
-      }
-
-      if (!profile) {
-        // If profile wasn't created by trigger, create it manually
-        console.log('Profile not created by trigger, creating manually');
-
-        const session = await supabase.auth.getSession();
-        if (session.data.session?.user) {
-          const { error: manualError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: session.data.session.user.id,
-              email: email,
-              role: role,
-              display_name: `Demo ${role}`,
-              is_active: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-
-          if (manualError) {
-            console.error('Manual profile creation error:', manualError);
-            throw manualError;
-          }
-        } else {
-          throw new Error('No user session available');
-        }
-      }
-
-      console.log('Demo account creation successful');
-      return true;
-
-    } catch (error) {
-      console.error('Demo account creation failed:', error);
-      throw error;
-    }
-  };
-
   const handleDemoLogin = async (role: keyof typeof DEMO_ACCOUNTS) => {
     const account = DEMO_ACCOUNTS[role];
     setDemoLoading(role);
 
     try {
-      console.log(`Starting demo login for ${role}:`, account.email);
+      console.log(`Attempting demo login for ${role}:`, account.email);
 
-      // First try to sign in
+      // Try to sign in first
       const { error: signInError } = await signIn(account.email, account.password);
 
       if (!signInError) {
@@ -140,36 +75,48 @@ export default function Login() {
         return;
       }
 
-      console.log('Sign in failed, creating demo account:', signInError.message);
+      console.log('Sign in failed, creating account:', signInError.message);
 
-      // If sign in fails, create the demo account
-      try {
-        await createDemoAccount(account.email, account.password, account.role);
+      // If sign in fails, create the account
+      const { error: signUpError } = await signUp(account.email, account.password, role);
 
-        // Try to sign in again after account creation
-        const { error: retryError } = await signIn(account.email, account.password);
-
-        if (retryError) {
-          console.error('Retry sign in failed:', retryError);
-          throw retryError;
-        }
-
-        console.log('Demo login successful after account creation');
-        toast({
-          title: `Welcome, Demo ${account.role}!`,
-          description: 'Account created and logged in.',
-        });
-        await new Promise(resolve => setTimeout(resolve, 300));
-        navigate('/dashboard');
-
-      } catch (creationError) {
-        console.error('Demo account creation failed:', creationError);
+      if (signUpError) {
+        console.error('Sign up error:', signUpError);
         toast({
           title: 'Demo login failed',
-          description: `Could not create demo ${account.role} account. ${creationError.message}`,
+          description: signUpError.message || 'Failed to create demo account',
           variant: 'destructive',
         });
+        setDemoLoading(null);
+        return;
       }
+
+      console.log('Account created, waiting for profile...');
+
+      // Wait for profile creation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Try to sign in again
+      const { error: retryError } = await signIn(account.email, account.password);
+
+      if (retryError) {
+        console.error('Retry sign in failed:', retryError);
+        toast({
+          title: 'Demo login failed',
+          description: retryError.message || 'Failed to sign in after account creation',
+          variant: 'destructive',
+        });
+        setDemoLoading(null);
+        return;
+      }
+
+      console.log('Demo login successful after account creation');
+      toast({
+        title: `Welcome, Demo ${account.role}!`,
+        description: 'Account created and logged in.',
+      });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      navigate('/dashboard');
 
     } catch (err) {
       console.error('Demo login exception:', err);

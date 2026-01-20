@@ -64,6 +64,8 @@ export default function Dashboard() {
 
   // Debug log to see what role we're getting
   console.log('Effective role:', effectiveRole);
+  console.log('Profile role:', profile.role);
+  console.log('Current view:', currentView);
 
   switch (effectiveRole) {
     case 'admin':

@@ -142,6 +142,19 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
   const [showAds, setShowAds] = useState(true);
   const [allowQuestionRepetition, setAllowQuestionRepetition] = useState(true);
 
+  // Load settings from localStorage on component mount
+  useEffect(() => {
+    const savedShowAds = localStorage.getItem('showAds');
+    if (savedShowAds !== null) {
+      setShowAds(savedShowAds === 'true');
+    }
+
+    const savedQuestionRepetition = localStorage.getItem('allowQuestionRepetition');
+    if (savedQuestionRepetition !== null) {
+      setAllowQuestionRepetition(savedQuestionRepetition === 'true');
+    }
+  }, []);
+
   // Data will be loaded from API
   const stats = {
     totalUsers: 0,
@@ -161,6 +174,12 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
 
   const handleAdsToggle = async (checked: boolean) => {
     setShowAds(checked);
+    // Save to localStorage
+    localStorage.setItem('showAds', checked.toString());
+
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('adsSettingChanged', { detail: { showAds: checked } }));
+
     try {
       // API call to update ad settings
       const { error } = await supabase.from('settings').upsert({
@@ -185,6 +204,9 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
 
   const handleQuestionRepetitionToggle = async (checked: boolean) => {
     setAllowQuestionRepetition(checked);
+    // Save to localStorage
+    localStorage.setItem('allowQuestionRepetition', checked.toString());
+
     try {
       // API call to update question repetition settings
       const { error } = await supabase.from('settings').upsert({

@@ -5,7 +5,27 @@ export function AdBanner() {
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [showAds, setShowAds] = useState(true);
     const bannerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        // Load initial ad setting from localStorage
+        const savedShowAds = localStorage.getItem('showAds');
+        if (savedShowAds !== null) {
+            setShowAds(savedShowAds === 'true');
+        }
+
+        // Listen for ads setting changes
+        const handleAdsSettingChange = (event: CustomEvent) => {
+            setShowAds(event.detail.showAds);
+        };
+
+        window.addEventListener('adsSettingChanged', handleAdsSettingChange as EventListener);
+
+        return () => {
+            window.removeEventListener('adsSettingChanged', handleAdsSettingChange as EventListener);
+        };
+    }, []);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
@@ -108,6 +128,10 @@ export function AdBanner() {
         const touch = e.touches[0];
         setDragStart({ x: touch.clientX, y: touch.clientY });
     };
+
+    if (!showAds) {
+        return null;
+    }
 
     return (
         <div

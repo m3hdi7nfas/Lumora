@@ -17,7 +17,11 @@ import {
   X,
   Bell,
   Mail,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  User as UserIcon,
+  Shield,
+  BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -33,11 +37,11 @@ interface DashboardLayoutProps {
   children: ReactNode;
   sidebar: ReactNode;
   title: string;
-  onNavItemClick?: () => void; // Add callback for navigation clicks
+  onNavItemClick?: () => void;
 }
 
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, currentView, setCurrentView, isAdminOrModerator } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -100,6 +104,16 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
     }
     // Call the optional callback if provided
     onNavItemClick?.();
+  };
+
+  const handleViewChange = (role: 'student' | 'teacher') => {
+    setCurrentView(role);
+    navigate('/dashboard');
+  };
+
+  const handleResetView = () => {
+    setCurrentView(null);
+    navigate('/dashboard');
   };
 
   return (
@@ -222,8 +236,35 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                   <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-primary/10 text-primary capitalize">
                     {profile?.role}
                   </span>
+                  {currentView && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <Eye className="w-3 h-3 text-primary" />
+                      <span className="text-xs text-primary">Viewing as: {currentView}</span>
+                    </div>
+                  )}
                 </div>
                 <DropdownMenuSeparator />
+
+                {isAdminOrModerator && (
+                  <>
+                    <DropdownMenuItem onClick={() => handleViewChange('student')}>
+                      <UserIcon className="w-4 h-4 mr-2" />
+                      View as Student
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleViewChange('teacher')}>
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      View as Teacher
+                    </DropdownMenuItem>
+                    {currentView && (
+                      <DropdownMenuItem onClick={handleResetView}>
+                        <Shield className="w-4 h-4 mr-2" />
+                        Back to {profile?.role} View
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
                 <DropdownMenuItem onClick={() => setProfileOpen(true)}>
                   <User className="w-4 h-4 mr-2" />
                   Profile

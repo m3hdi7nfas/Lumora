@@ -32,7 +32,9 @@ import {
   BarChart3,
   CheckSquare,
   Square,
-  RefreshCw
+  RefreshCw,
+  User,
+  LogOut
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -191,7 +193,8 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
 
       toast({
         title: 'Ad settings updated',
-        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`
+        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`,
+        variant: 'success'
       });
     } catch (error) {
       toast({
@@ -218,7 +221,8 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
 
       toast({
         title: 'Question repetition settings updated',
-        description: `Users can ${checked ? 'now' : 'no longer'} repeat question sections`
+        description: `Users can ${checked ? 'now' : 'no longer'} repeat question sections`,
+        variant: 'success'
       });
     } catch (error) {
       toast({
@@ -391,4 +395,1050 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
   );
 }
 
-// Rest of the file remains the same...
+// Profile Tab Component
+function ProfileTab() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your moderator account</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Users Managed</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Created</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Questions Approved</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Schools Tab Component
+function SchoolsTab() {
+  const [schools, setSchools] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newSchool, setNewSchool] = useState({ name: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const filteredSchools = schools.filter(school =>
+    school.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleCreateSchool = async () => {
+    if (!newSchool.name || !newSchool.password) {
+      toast({ title: 'Please fill all fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('schools').insert({
+        name: newSchool.name,
+        password: newSchool.password,
+        created_by: profile?.id
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'School created successfully!' });
+      setNewSchool({ name: '', password: '' });
+      // Refresh schools list
+      fetchSchools();
+    } catch (error) {
+      toast({ title: 'Error creating school', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
+  const fetchSchools = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setSchools(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching schools', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  useEffect(() => {
+    fetchSchools();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">School Management</h1>
+        <p className="text-muted-foreground">Create and manage schools</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create New School</CardTitle>
+          <CardDescription>Add a new school to the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>School Name</Label>
+              <Input
+                value={newSchool.name}
+                onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
+                placeholder="Enter school name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Access Password</Label>
+              <Input
+                type="password"
+                value={newSchool.password}
+                onChange={(e) => setNewSchool({ ...newSchool, password: e.target.value })}
+                placeholder="Enter access password"
+              />
+            </div>
+
+            <Button
+              onClick={handleCreateSchool}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create School'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Schools List</CardTitle>
+          <CardDescription>All registered schools</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search schools..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-3">
+              {filteredSchools.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No schools found</p>
+              ) : (
+                filteredSchools.map((school) => (
+                  <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium">{school.name}</h3>
+                        <p className="text-xs text-muted-foreground">Created: {school.created_at}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete School</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this school? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Users Tab Component
+function UsersTab() {
+  const [users, setUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const roles = ['all', 'moderator', 'teacher', 'student', 'admin'];
+
+  const filteredUsers = users.filter(user =>
+    (user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedRole === 'all' || user.role === selectedRole)
+  );
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching users', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">User Management</h1>
+        <p className="text-muted-foreground">View and manage all users</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Users List</CardTitle>
+          <CardDescription>All platform users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map(role => (
+                    <SelectItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No users found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Name</th>
+                      <th className="p-3 text-left font-medium">Email</th>
+                      <th className="p-3 text-left font-medium">Role</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                              {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span>{user.display_name || 'No name'}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{user.email}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'moderator' || user.role === 'admin' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this user? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Competitions Tab Component
+function CompetitionsTab() {
+  const [competitions, setCompetitions] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const filteredCompetitions = competitions.filter(comp =>
+    comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    comp.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Competitions</h1>
+        <p className="text-muted-foreground">Manage all competitions</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Competitions List</CardTitle>
+          <CardDescription>All platform competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search competitions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : filteredCompetitions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No competitions found</p>
+              ) : (
+                filteredCompetitions.map((competition) => (
+                  <Card key={competition.id}>
+                    <CardHeader>
+                      <CardTitle>{competition.name}</CardTitle>
+                      <CardDescription>{competition.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{competition.start_date} - {competition.end_date}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span>{competition.participants} participants</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Trophy className="w-4 h-4 text-muted-foreground" />
+                          <span>{competition.prize}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" className="flex-1">
+                            <Edit className="w-3 h-3 mr-2" />
+                            Edit
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="flex-1">
+                                <Trash2 className="w-3 h-3 mr-2" />
+                                Delete
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Competition</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this competition? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Questions Tab Component
+function QuestionsTab() {
+  const [questions, setQuestions] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const filteredQuestions = questions.filter(q =>
+    q.question_text.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('questions').select('*');
+      if (error) throw error;
+      setQuestions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Questions</h1>
+        <p className="text-muted-foreground">Manage all questions</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions List</CardTitle>
+          <CardDescription>All platform questions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search questions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-3">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : filteredQuestions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No questions found</p>
+              ) : (
+                filteredQuestions.map((question) => (
+                  <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h3 className="font-medium mb-2">{question.question_text}</h3>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>Points: {question.points}</span>
+                          <span>Type: {question.question_type}</span>
+                          <span>Section: {question.section_id}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this question? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Leaderboard Tab Component
+function LeaderboardTab() {
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchLeaderboard = async () => {
+    setLoading(true);
+    try {
+      // This would be a more complex query in a real app
+      const { data, error } = await supabase.from('profiles').select('*').order('score', { ascending: false }).limit(50);
+      if (error) throw error;
+      setLeaderboard(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
+        <p className="text-muted-foreground">View top performers</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Global Leaderboard</CardTitle>
+          <CardDescription>Top 50 users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : leaderboard.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">User</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboard.map((user, index) => (
+                    <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{index + 1}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span>{user.display_name || 'No name'}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-bold">{user.score || 0}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'moderator' || user.role === 'admin' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Badges Tab Component
+function BadgesTab() {
+  const [badges, setBadges] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchBadges = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('badges').select('*');
+      if (error) throw error;
+      setBadges(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching badges', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchBadges();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Badges</h1>
+        <p className="text-muted-foreground">Manage achievement badges</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Badges List</CardTitle>
+          <CardDescription>All platform badges</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : badges.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No badges found</p>
+            ) : (
+              badges.map((badge) => (
+                <div key={badge.id} className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-medium text-sm">{badge.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Badge</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this badge? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                  <div className="w-16 h-16 mx-auto mb-2 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                    <Award className="w-8 h-8 text-gold" />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">{badge.description}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Avatars Tab Component
+function AvatarsTab() {
+  const [avatars, setAvatars] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchAvatars = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('avatars').select('*');
+      if (error) throw error;
+      setAvatars(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching avatars', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchAvatars();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Avatars</h1>
+        <p className="text-muted-foreground">Manage user avatars</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Avatars List</CardTitle>
+          <CardDescription>All platform avatars</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : avatars.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No avatars found</p>
+            ) : (
+              avatars.map((avatar) => (
+                <div key={avatar.id} className="p-2 rounded-lg bg-muted/50 border border-border/50 hover:bg-muted transition-colors">
+                  <img
+                    src={avatar.image_url}
+                    alt={avatar.name}
+                    className="w-full h-16 object-cover rounded-lg mb-2"
+                  />
+                  <p className="text-xs text-center truncate">{avatar.name}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Messages Tab Component
+function MessagesTab() {
+  const [messages, setMessages] = useState([]);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const filteredMessages = messages.filter(message =>
+    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('messages').select('*').eq('receiver_id', profile?.id);
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  const handleSendReply = async () => {
+    if (!replyContent || !selectedMessage) return;
+
+    setSendingReply(true);
+
+    try {
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: profile?.email,
+        subject: `Re: ${selectedMessage.subject}`
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Reply sent successfully!' });
+      setReplyContent('');
+    } catch (error) {
+      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
+    }
+
+    setSendingReply(false);
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">Your communications</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbox</CardTitle>
+              <CardDescription>Your messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    </div>
+                  ) : filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedMessage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedMessage.subject}</CardTitle>
+                <CardDescription>
+                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{selectedMessage.content}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent}
+                      className="gradient-hero"
+                    >
+                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reply
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <p>Select a message to view details</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

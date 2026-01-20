@@ -7,7 +7,7 @@ import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
 
 export default function Dashboard() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, currentView } = useAuth();
   const navigate = useNavigate();
   const [profileTimeout, setProfileTimeout] = useState(false);
 
@@ -58,8 +58,12 @@ export default function Dashboard() {
     );
   }
 
-  switch (profile.role) {
+  // Determine which dashboard to show based on currentView or profile role
+  const effectiveRole = currentView || profile.role;
+
+  switch (effectiveRole) {
     case 'moderator':
+    case 'admin':
       return <ModeratorDashboard />;
     case 'teacher':
       return <TeacherDashboard />;

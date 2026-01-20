@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-type UserRole = 'moderator' | 'teacher' | 'student';
+type UserRole = 'moderator' | 'teacher' | 'student' | 'admin';
 
 interface Profile {
   id: string;
@@ -22,6 +22,9 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, role?: UserRole) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  currentView: UserRole | null;
+  setCurrentView: (role: UserRole | null) => void;
+  isAdminOrModerator: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentView, setCurrentView] = useState<UserRole | null>(null);
+
+  const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
 
   const fetchProfile = async (userId: string, retries = 3): Promise<void> => {
     for (let i = 0; i < retries; i++) {
@@ -107,10 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setCurrentView(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, currentView, setCurrentView, isAdminOrModerator }}>
       {children}
     </AuthContext.Provider>
   );

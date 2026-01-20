@@ -294,7 +294,7 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
           <CardDescription>Common moderator tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {quickActions.map((action) => (
               <button
                 key={action.id}
@@ -1374,6 +1374,7 @@ function QuestionsTab() {
 function LeaderboardTab() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [leaderboardType, setLeaderboardType] = useState('schools');
   const { toast } = useToast();
 
   const fetchLeaderboard = async () => {
@@ -1400,55 +1401,174 @@ function LeaderboardTab() {
         <p className="text-muted-foreground">View top performers</p>
       </div>
 
+      {/* Leaderboard Type Selector */}
       <Card>
         <CardHeader>
-          <CardTitle>Global Leaderboard</CardTitle>
-          <CardDescription>Top 50 users</CardDescription>
+          <CardTitle>Leaderboard Type</CardTitle>
+          <CardDescription>Select which leaderboard to view</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : leaderboard.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No leaderboard data</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Rank</th>
-                    <th className="p-3 text-left font-medium">User</th>
-                    <th className="p-3 text-left font-medium">Score</th>
-                    <th className="p-3 text-left font-medium">Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((user, index) => (
-                    <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{index + 1}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span>{user.display_name || 'No name'}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 font-bold">{user.score || 0}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'moderator' || user.role === 'admin' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          <Select value={leaderboardType} onValueChange={setLeaderboardType}>
+            <SelectTrigger className="w-full max-w-sm">
+              <SelectValue placeholder="Select leaderboard type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="schools">School Rankings (Total Points)</SelectItem>
+              <SelectItem value="students">Top Students (Points)</SelectItem>
+              <SelectItem value="classes">Top Students by Class</SelectItem>
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
+
+      {/* School Rankings Leaderboard */}
+      {leaderboardType === 'schools' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>School Rankings</CardTitle>
+            <CardDescription>Top schools by total points</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No school ranking data</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Rank</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Total Points</th>
+                      <th className="p-3 text-left font-medium">Students</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((school, index) => (
+                      <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{index + 1}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                              {school.name?.substring(0, 2).toUpperCase() || 'S'}
+                            </div>
+                            <span>{school.name || 'Unknown School'}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 font-bold">{school.total_points || 0}</td>
+                        <td className="p-3 text-muted-foreground">{school.student_count || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Students Leaderboard */}
+      {leaderboardType === 'students' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Students</CardTitle>
+            <CardDescription>Highest scoring students across all schools</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No student leaderboard data</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Rank</th>
+                      <th className="p-3 text-left font-medium">Student</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((student, index) => (
+                      <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{index + 1}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                              {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span>{student.display_name || 'No name'}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                        <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Students by Class Leaderboard */}
+      {leaderboardType === 'classes' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Students by Class</CardTitle>
+            <CardDescription>Highest scoring students within their classes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : leaderboard.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No class leaderboard data</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Rank</th>
+                      <th className="p-3 text-left font-medium">Student</th>
+                      <th className="p-3 text-left font-medium">Class</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((student, index) => (
+                      <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{index + 1}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                              {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span>{student.display_name || 'No name'}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{student.class || 'N/A'}</td>
+                        <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                        <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -19,7 +19,7 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Users // Added Users import
+  Users
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,4 +28,16 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 
-// ... rest of the file remains unchanged
+// ... rest of the component code ...
+
+export default function StudentDashboard() {
+  // Component implementation
+  return (
+    <DashboardLayout
+      title="Student Dashboard"
+      sidebar={<StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+    >
+      {/* Tab content */}
+    </DashboardLayout>
+  );
+}

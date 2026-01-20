@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,9 +26,28 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [adminAccountReady, setAdminAccountReady] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Check if admin account exists on component mount
+  useEffect(() => {
+    const checkAdminAccount = async () => {
+      try {
+        const { data, error } = await supabase.auth.admin.getUserByEmail('demo.admin@lumora.com');
+        if (error && !error.message.includes('User not found')) {
+          console.error('Error checking admin account:', error);
+        }
+        setAdminAccountReady(!!data);
+      } catch (error) {
+        console.error('Error checking admin account:', error);
+        setAdminAccountReady(false);
+      }
+    };
+
+    checkAdminAccount();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,19 +75,6 @@ export default function Login() {
   const createAdminDemoAccount = async () => {
     try {
       console.log('Creating admin demo account...');
-
-      // First, check if the admin account already exists
-      const { data: existingUser, error: checkError } = await supabase.auth.admin.getUserByEmail('demo.admin@lumora.com');
-
-      if (checkError && !checkError.message.includes('User not found')) {
-        console.error('Error checking for existing admin:', checkError);
-        throw checkError;
-      }
-
-      if (existingUser) {
-        console.log('Admin account already exists');
-        return;
-      }
 
       // Create the admin user
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -107,6 +113,7 @@ export default function Login() {
       }
 
       console.log('Admin profile created successfully');
+      setAdminAccountReady(true);
       return authData.user;
 
     } catch (error) {
@@ -152,23 +159,30 @@ export default function Login() {
     try {
       console.log(`Starting demo login for ${role}:`, account.email);
 
-      // Special handling for admin - try to create the account if it doesn't exist
-      if (role === 'admin') {
+      // Special handling for admin - ensure account exists
+      if (role === 'admin' && !adminAccountReady) {
         try {
           await createAdminDemoAccount();
-          console.log('Admin account creation attempted');
+          console.log('Admin account created successfully');
         } catch (adminError) {
-          console.warn('Admin account creation failed, but continuing with login:', adminError.message);
+          console.error('Failed to create admin account:', adminError.message);
+          toast({
+            title: 'Admin account creation failed',
+            description: 'Could not create admin demo account',
+            variant: 'destructive',
+          });
+          setDemoLoading(null);
+          return;
         }
       }
 
-      // Try to sign in first
+      // Try to sign in
       const { error: signInError } = await signIn(account.email, account.password);
 
       if (!signInError) {
         console.log('Sign in successful, navigating to dashboard');
         toast({
-          title: `Welcome back, Demo ${account.role}!`,
+          title: `Welcome, Demo ${account.role}!`,
           description: 'Successfully logged in.',
         });
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -183,7 +197,7 @@ export default function Login() {
       if (signInError.message.includes('Invalid login credentials')) {
         console.log('User does not exist, creating new account');
 
-        // First, try to sign up
+        // Try to sign up
         const { error: signUpError } = await signUp(account.email, account.password, role);
 
         if (signUpError) {
@@ -199,7 +213,7 @@ export default function Login() {
 
         console.log('Sign up successful, waiting for profile creation...');
 
-        // Wait a bit for the trigger to create the profile
+        // Wait for profile creation
         await new Promise(resolve => setTimeout(resolve, 1500));
 
         // Try to sign in again
@@ -208,14 +222,14 @@ export default function Login() {
         if (retryError) {
           console.log('Retry sign in failed, trying manual profile creation:', retryError.message);
 
-          // If still failing, try to create profile manually
+          // Manual profile creation fallback
           const session = await supabase.auth.getSession();
           if (session.data.session?.user) {
             try {
               await createProfileManually(session.data.session.user.id, account.email, role);
-              console.log('Manual profile creation successful, trying sign in again');
+              console.log('Manual profile creation successful');
 
-              // Try sign in one more time
+              // Final sign in attempt
               const { error: finalError } = await signIn(account.email, account.password);
               if (finalError) {
                 throw finalError;
@@ -248,7 +262,6 @@ export default function Login() {
           description: 'Exploring the platform.',
         });
 
-        // Small delay for profile to load
         await new Promise(resolve => setTimeout(resolve, 300));
         navigate('/dashboard');
       } else {

@@ -93,20 +93,16 @@ export default function TeacherDashboard() {
 // Teacher Overview Component
 function TeacherOverview() {
   const { toast } = useToast();
+  const { profile } = useAuth();
 
-  // Mock data - replace with real API calls
+  // Data will be loaded from API
   const stats = {
-    totalStudents: 28,
-    activeStudents: 24,
-    competitions: 3,
-    questionsAnswered: 1245,
-    avgScore: 87,
-    recentActivity: [
-      { id: 1, type: 'competition', title: 'Spring Challenge 2024', action: 'started', time: '2 hours ago' },
-      { id: 2, type: 'student', title: 'Sarah Johnson', action: 'completed section', time: '5 hours ago' },
-      { id: 3, type: 'question', title: 'Math Question #45', action: 'added', time: '1 day ago' },
-      { id: 4, type: 'badge', title: 'Quick Learner', action: 'awarded to 3 students', time: '2 days ago' },
-    ]
+    totalStudents: 0,
+    activeStudents: 0,
+    competitions: 0,
+    questionsAnswered: 0,
+    avgScore: 0,
+    recentActivity: []
   };
 
   const quickActions = [
@@ -187,20 +183,24 @@ function TeacherOverview() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats.recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="p-2 rounded-lg bg-muted">
-                  {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
-                  {activity.type === 'student' && <Users className="w-4 h-4 text-primary" />}
-                  {activity.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
-                  {activity.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
+            {stats.recentActivity.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            ) : (
+              stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                    {activity.type === 'student' && <Users className="w-4 h-4 text-primary" />}
+                    {activity.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
+                    {activity.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{activity.title}</p>
-                  <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -230,21 +230,11 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
 function StudentsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
+  const { toast } = useToast();
 
-  // Mock students data - replace with real API calls
-  const students = [
-    { id: 1, name: 'Sarah Johnson', email: 'sarah.j@springfield.edu', class: '10A', score: 4580, progress: 92, status: 'active' },
-    { id: 2, name: 'Michael Chen', email: 'michael.c@springfield.edu', class: '10A', score: 4230, progress: 88, status: 'active' },
-    { id: 3, name: 'Emily Rodriguez', email: 'emily.r@springfield.edu', class: '10B', score: 3980, progress: 84, status: 'active' },
-    { id: 4, name: 'David Kim', email: 'david.k@springfield.edu', class: '10A', score: 3750, progress: 80, status: 'inactive' },
-    { id: 5, name: 'Jessica Lee', email: 'jessica.l@springfield.edu', class: '10B', score: 3620, progress: 78, status: 'active' },
-  ];
-
-  const classes = [
-    { id: 'all', name: 'All Classes' },
-    { id: '10A', name: 'Class 10A' },
-    { id: '10B', name: 'Class 10B' },
-  ];
+  // Data will be loaded from API
+  const students = [];
+  const classes = [];
 
   const filteredStudents = students.filter(student =>
     (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -290,52 +280,56 @@ function StudentsTab() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="p-3 text-left font-medium">Name</th>
-                  <th className="p-3 text-left font-medium">Class</th>
-                  <th className="p-3 text-left font-medium">Score</th>
-                  <th className="p-3 text-left font-medium">Progress</th>
-                  <th className="p-3 text-left font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map((student) => (
-                  <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div>
-                          <p className="font-medium">{student.name}</p>
-                          <p className="text-xs text-muted-foreground">{student.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-3 text-muted-foreground">{student.class}</td>
-                    <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-full h-2 bg-muted rounded-full">
-                          <div
-                            className="h-2 bg-primary rounded-full"
-                            style={{ width: `${student.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{student.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                        {student.status}
-                      </span>
-                    </td>
+            {filteredStudents.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No students found</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Name</th>
+                    <th className="p-3 text-left font-medium">Class</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div>
+                            <p className="font-medium">{student.name}</p>
+                            <p className="text-xs text-muted-foreground">{student.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.class}</td>
+                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{student.progress}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {student.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -347,31 +341,12 @@ function StudentsTab() {
 function TeacherLeaderboardTab() {
   const [selectedCompetition, setSelectedCompetition] = useState('all');
   const [selectedClass, setSelectedClass] = useState('all');
+  const { toast } = useToast();
 
-  // Mock data - replace with real API calls
-  const competitions = [
-    { id: 'all', name: 'All Competitions' },
-    { id: 'spring-2024', name: 'Spring Challenge 2024' },
-    { id: 'math-olympiad', name: 'Math Olympiad 2024' },
-  ];
-
-  const classes = [
-    { id: 'all', name: 'All Classes' },
-    { id: 'class-10a', name: 'Class 10A' },
-    { id: 'class-10b', name: 'Class 10B' },
-    { id: 'class-11a', name: 'Class 11A' },
-  ];
-
-  const leaderboardData = [
-    { rank: 1, name: 'Sarah Johnson', score: 4580, progress: 92, badge: 'gold' },
-    { rank: 2, name: 'Michael Chen', score: 4230, progress: 88, badge: 'silver' },
-    { rank: 3, name: 'Emily Rodriguez', score: 3980, progress: 84, badge: 'bronze' },
-    { rank: 4, name: 'David Kim', score: 3750, progress: 80, badge: 'none' },
-    { rank: 5, name: 'Jessica Lee', score: 3620, progress: 78, badge: 'none' },
-    { rank: 6, name: 'Ryan Wilson', score: 3480, progress: 75, badge: 'none' },
-    { rank: 7, name: 'Amanda Taylor', score: 3350, progress: 72, badge: 'none' },
-    { rank: 8, name: 'Daniel Brown', score: 3220, progress: 70, badge: 'none' },
-  ];
+  // Data will be loaded from API
+  const competitions = [];
+  const classes = [];
+  const leaderboardData = [];
 
   const badgeColors = {
     gold: 'bg-gold text-gold-foreground',
@@ -420,49 +395,53 @@ function TeacherLeaderboardTab() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="p-3 text-left font-medium">Rank</th>
-                  <th className="p-3 text-left font-medium">Student</th>
-                  <th className="p-3 text-left font-medium">Score</th>
-                  <th className="p-3 text-left font-medium">Progress</th>
-                  <th className="p-3 text-left font-medium">Achievement</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboardData.map((student) => (
-                  <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                    <td className="p-3 font-medium">{student.rank}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <span>{student.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-full h-2 bg-muted rounded-full">
-                          <div
-                            className="h-2 bg-primary rounded-full"
-                            style={{ width: `${student.progress}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground">{student.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
-                        {student.rank}
-                      </div>
-                    </td>
+            {leaderboardData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">Student</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Achievement</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaderboardData.map((student) => (
+                    <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{student.rank}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span>{student.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{student.progress}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
+                          {student.rank}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -473,24 +452,7 @@ function TeacherLeaderboardTab() {
             <CardTitle>Class Statistics</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-muted-foreground text-sm">Total Students</p>
-                <p className="text-2xl font-bold">28</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Active Students</p>
-                <p className="text-2xl font-bold">24</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Avg. Score</p>
-                <p className="text-2xl font-bold">3,845</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Completion Rate</p>
-                <p className="text-2xl font-bold">82%</p>
-              </div>
-            </div>
+            <p className="text-center text-muted-foreground py-4">No class statistics available</p>
           </CardContent>
         </Card>
 
@@ -499,29 +461,7 @@ function TeacherLeaderboardTab() {
             <CardTitle>Top Performers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-xs font-bold text-gold-foreground">1</div>
-                  <span className="font-medium">Sarah Johnson</span>
-                </div>
-                <span className="font-bold">4,580 pts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-silver flex items-center justify-center text-xs font-bold text-silver-foreground">2</div>
-                  <span className="font-medium">Michael Chen</span>
-                </div>
-                <span className="font-bold">4,230 pts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-bronze flex items-center justify-center text-xs font-bold text-bronze-foreground">3</div>
-                  <span className="font-medium">Emily Rodriguez</span>
-                </div>
-                <span className="font-bold">3,980 pts</span>
-              </div>
-            </div>
+            <p className="text-center text-muted-foreground py-4">No top performers data available</p>
           </CardContent>
         </Card>
       </div>
@@ -535,13 +475,8 @@ function MessagesTab() {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-
-  // Mock messages data - replace with real API calls
-  const messages = [
-    { id: 1, subject: 'Question about assignment', content: 'I have a question about the homework assignment...', sender: 'Sarah Johnson', senderEmail: 'sarah.j@springfield.edu', date: '2024-03-15', read: true },
-    { id: 2, subject: 'Technical Issue', content: 'I\'m having trouble submitting my answers...', sender: 'Michael Chen', senderEmail: 'michael.c@springfield.edu', date: '2024-03-14', read: false },
-    { id: 3, subject: 'Grade Inquiry', content: 'Could you explain my score on the last quiz?', sender: 'Emily Rodriguez', senderEmail: 'emily.r@jefferson.edu', date: '2024-03-10', read: true },
-  ];
+  const [messages, setMessages] = useState([]);
+  const { toast } = useToast();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -555,15 +490,15 @@ function MessagesTab() {
     setSendingReply(true);
 
     try {
-      // Replace with actual API call
-      // const { error } = await supabase.from('messages').insert({
-      //   content: replyContent,
-      //   receiver_id: selectedMessage.senderEmail,
-      //   sender_id: 'teacher@lumora.com',
-      //   subject: `Re: ${selectedMessage.subject}`
-      // });
+      // API call to send message
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: profile?.email,
+        subject: `Re: ${selectedMessage.subject}`
+      });
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
@@ -572,6 +507,23 @@ function MessagesTab() {
     }
 
     setSendingReply(false);
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      // API call to delete message
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -601,30 +553,58 @@ function MessagesTab() {
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.map((message) => (
-                    <button
-                      key={message.id}
-                      onClick={() => setSelectedMessage(message)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {message.sender.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium truncate">{message.sender}</p>
-                            <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                  {filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                          <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                          {!message.read && (
-                            <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -724,17 +704,17 @@ function ProfileView() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Students Taught</p>
-              <p className="text-2xl font-bold">28</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Organized</p>
-              <p className="text-2xl font-bold">3</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Avg. Class Score</p>
-              <p className="text-2xl font-bold">87%</p>
+              <p className="text-2xl font-bold">0%</p>
             </div>
           </CardContent>
         </Card>

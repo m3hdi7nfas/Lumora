@@ -31,7 +31,6 @@ import {
   Check,
   BarChart3
 } from 'lucide-react';
-import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -122,19 +121,14 @@ export default function ModeratorDashboard() {
 function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
 
-  // Mock stats data - replace with real API calls
+  // Data will be loaded from API
   const stats = {
-    totalUsers: 1482,
-    activeCompetitions: 12,
-    totalQuestions: 4872,
-    pendingReviews: 8,
-    newMessages: 3,
-    recentActivity: [
-      { id: 1, type: 'competition', title: 'Spring Challenge 2024', action: 'created', time: '2 hours ago' },
-      { id: 2, type: 'user', title: 'Sarah Johnson', action: 'registered', time: '5 hours ago' },
-      { id: 3, type: 'question', title: 'Math Question #45', action: 'approved', time: '1 day ago' },
-      { id: 4, type: 'badge', title: 'Quick Learner', action: 'awarded', time: '2 days ago' },
-    ]
+    totalUsers: 0,
+    activeCompetitions: 0,
+    totalQuestions: 0,
+    pendingReviews: 0,
+    newMessages: 0,
+    recentActivity: []
   };
 
   const quickActions = [
@@ -218,20 +212,24 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats.recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                <div className="p-2 rounded-lg bg-muted">
-                  {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
-                  {activity.type === 'user' && <Users className="w-4 h-4 text-primary" />}
-                  {activity.type === 'question' && <FileQuestion className="w-4 h-4 text-primary" />}
-                  {activity.type === 'badge' && <Award className="w-4 h-4 text-primary" />}
+            {stats.recentActivity.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            ) : (
+              stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                    {activity.type === 'user' && <Users className="w-4 h-4 text-primary" />}
+                    {activity.type === 'question' && <FileQuestion className="w-4 h-4 text-primary" />}
+                    {activity.type === 'badge' && <Award className="w-4 h-4 text-primary" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{activity.title}</p>
-                  <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -299,17 +297,17 @@ function ProfileTab() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Created</p>
-              <p className="text-2xl font-bold">8</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Questions Approved</p>
-              <p className="text-2xl font-bold">1,245</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Users Managed</p>
-              <p className="text-2xl font-bold">487</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
           </CardContent>
         </Card>
@@ -324,14 +322,10 @@ function SchoolsTab() {
   const [newSchoolName, setNewSchoolName] = useState('');
   const [newSchoolPassword, setNewSchoolPassword] = useState('');
   const [creatingSchool, setCreatingSchool] = useState(false);
+  const { toast } = useToast();
 
-  // Mock schools data - replace with real API calls
-  const schools = [
-    { id: 1, name: 'Springfield High School', students: 487, teachers: 28, created: '2023-08-15' },
-    { id: 2, name: 'Jefferson Academy', students: 324, teachers: 18, created: '2023-09-01' },
-    { id: 3, name: 'Lincoln Preparatory', students: 289, teachers: 15, created: '2023-09-15' },
-    { id: 4, name: 'Roosevelt High', students: 198, teachers: 12, created: '2023-10-01' },
-  ];
+  // Data will be loaded from API
+  const schools = [];
 
   const filteredSchools = schools.filter(school =>
     school.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -346,13 +340,13 @@ function SchoolsTab() {
     setCreatingSchool(true);
 
     try {
-      // Replace with actual API call
-      // const { error } = await supabase.from('schools').insert({
-      //   name: newSchoolName,
-      //   password: newSchoolPassword
-      // });
+      // API call to create school
+      const { error } = await supabase.from('schools').insert({
+        name: newSchoolName,
+        password: newSchoolPassword
+      });
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'School created successfully!' });
       setNewSchoolName('');
@@ -362,6 +356,19 @@ function SchoolsTab() {
     }
 
     setCreatingSchool(false);
+  };
+
+  const handleDeleteSchool = async (schoolId: number) => {
+    try {
+      // API call to delete school
+      const { error } = await supabase.from('schools').delete().eq('id', schoolId);
+
+      if (error) throw error;
+
+      toast({ title: 'School deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting school', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -430,55 +437,62 @@ function SchoolsTab() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">School Name</th>
-                    <th className="p-3 text-left font-medium">Students</th>
-                    <th className="p-3 text-left font-medium">Teachers</th>
-                    <th className="p-3 text-left font-medium">Created</th>
-                    <th className="p-3 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSchools.map((school) => (
-                    <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{school.name}</td>
-                      <td className="p-3">{school.students}</td>
-                      <td className="p-3">{school.teachers}</td>
-                      <td className="p-3 text-muted-foreground">{school.created}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete School</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete {school.name}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
+              {filteredSchools.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No schools found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">School Name</th>
+                      <th className="p-3 text-left font-medium">Students</th>
+                      <th className="p-3 text-left font-medium">Teachers</th>
+                      <th className="p-3 text-left font-medium">Created</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredSchools.map((school) => (
+                      <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{school.name}</td>
+                        <td className="p-3">{school.students}</td>
+                        <td className="p-3">{school.teachers}</td>
+                        <td className="p-3 text-muted-foreground">{school.created}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete School</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {school.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteSchool(school.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </CardContent>
@@ -491,21 +505,29 @@ function SchoolsTab() {
 function UsersTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
+  const { toast } = useToast();
 
-  // Mock users data - replace with real API calls
-  const users = [
-    { id: 1, name: 'Sarah Johnson', email: 'sarah.j@springfield.edu', role: 'student', school: 'Springfield High', joined: '2023-08-15' },
-    { id: 2, name: 'Michael Chen', email: 'michael.c@springfield.edu', role: 'student', school: 'Springfield High', joined: '2023-08-20' },
-    { id: 3, name: 'Emily Rodriguez', email: 'emily.r@jefferson.edu', role: 'student', school: 'Jefferson Academy', joined: '2023-09-01' },
-    { id: 4, name: 'David Kim', email: 'david.k@lincoln.edu', role: 'teacher', school: 'Lincoln Prep', joined: '2023-09-10' },
-    { id: 5, name: 'Jessica Lee', email: 'jessica.l@springfield.edu', role: 'teacher', school: 'Springfield High', joined: '2023-09-15' },
-  ];
+  // Data will be loaded from API
+  const users = [];
 
   const filteredUsers = users.filter(user =>
     (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
      user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedRole === 'all' || user.role === selectedRole)
   );
+
+  const handleDeleteUser = async (userId: number) => {
+    try {
+      // API call to delete user
+      const { error } = await supabase.from('profiles').delete().eq('id', userId);
+
+      if (error) throw error;
+
+      toast({ title: 'User deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -545,61 +567,68 @@ function UsersTab() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Name</th>
-                    <th className="p-3 text-left font-medium">Email</th>
-                    <th className="p-3 text-left font-medium">Role</th>
-                    <th className="p-3 text-left font-medium">School</th>
-                    <th className="p-3 text-left font-medium">Joined</th>
-                    <th className="p-3 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{user.name}</td>
-                      <td className="p-3 text-muted-foreground">{user.email}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'student' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{user.school}</td>
-                      <td className="p-3 text-muted-foreground">{user.joined}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete {user.name}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
+              {filteredUsers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No users found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Name</th>
+                      <th className="p-3 text-left font-medium">Email</th>
+                      <th className="p-3 text-left font-medium">Role</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Joined</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{user.name}</td>
+                        <td className="p-3 text-muted-foreground">{user.email}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'student' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{user.school}</td>
+                        <td className="p-3 text-muted-foreground">{user.joined}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteUser(user.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </CardContent>
@@ -614,13 +643,10 @@ function CompetitionsTab() {
   const [newCompetitionName, setNewCompetitionName] = useState('');
   const [newCompetitionDescription, setNewCompetitionDescription] = useState('');
   const [creatingCompetition, setCreatingCompetition] = useState(false);
+  const { toast } = useToast();
 
-  // Mock competitions data - replace with real API calls
-  const competitions = [
-    { id: 1, name: 'Spring Challenge 2024', description: 'Annual spring competition', status: 'active', participants: 487, startDate: '2024-03-01', endDate: '2024-05-31' },
-    { id: 2, name: 'Math Olympiad 2024', description: 'Advanced mathematics competition', status: 'upcoming', participants: 0, startDate: '2024-06-15', endDate: '2024-08-15' },
-    { id: 3, name: 'Science Fair 2024', description: 'Inter-school science competition', status: 'completed', participants: 324, startDate: '2023-11-01', endDate: '2023-12-15' },
-  ];
+  // Data will be loaded from API
+  const competitions = [];
 
   const filteredCompetitions = competitions.filter(comp =>
     comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -636,14 +662,14 @@ function CompetitionsTab() {
     setCreatingCompetition(true);
 
     try {
-      // Replace with actual API call
-      // const { error } = await supabase.from('competitions').insert({
-      //   name: newCompetitionName,
-      //   description: newCompetitionDescription,
-      //   is_practice: false
-      // });
+      // API call to create competition
+      const { error } = await supabase.from('competitions').insert({
+        name: newCompetitionName,
+        description: newCompetitionDescription,
+        is_practice: false
+      });
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'Competition created successfully!' });
       setNewCompetitionName('');
@@ -653,6 +679,19 @@ function CompetitionsTab() {
     }
 
     setCreatingCompetition(false);
+  };
+
+  const handleDeleteCompetition = async (competitionId: number) => {
+    try {
+      // API call to delete competition
+      const { error } = await supabase.from('competitions').delete().eq('id', competitionId);
+
+      if (error) throw error;
+
+      toast({ title: 'Competition deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting competition', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -721,64 +760,71 @@ function CompetitionsTab() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Name</th>
-                    <th className="p-3 text-left font-medium">Status</th>
-                    <th className="p-3 text-left font-medium">Participants</th>
-                    <th className="p-3 text-left font-medium">Dates</th>
-                    <th className="p-3 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredCompetitions.map((comp) => (
-                    <tr key={comp.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3">
-                        <div className="font-medium">{comp.name}</div>
-                        <div className="text-xs text-muted-foreground">{comp.description}</div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${comp.status === 'active' ? 'bg-success/10 text-success' : comp.status === 'upcoming' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}`}>
-                          {comp.status}
-                        </span>
-                      </td>
-                      <td className="p-3">{comp.participants}</td>
-                      <td className="p-3 text-muted-foreground text-xs">
-                        {comp.startDate} - {comp.endDate}
-                      </td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Competition</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete {comp.name}? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </td>
+              {filteredCompetitions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No competitions found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Name</th>
+                      <th className="p-3 text-left font-medium">Status</th>
+                      <th className="p-3 text-left font-medium">Participants</th>
+                      <th className="p-3 text-left font-medium">Dates</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredCompetitions.map((comp) => (
+                      <tr key={comp.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3">
+                          <div className="font-medium">{comp.name}</div>
+                          <div className="text-xs text-muted-foreground">{comp.description}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${comp.status === 'active' ? 'bg-success/10 text-success' : comp.status === 'upcoming' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground'}`}>
+                            {comp.status}
+                          </span>
+                        </td>
+                        <td className="p-3">{comp.participants}</td>
+                        <td className="p-3 text-muted-foreground text-xs">
+                          {comp.startDate} - {comp.endDate}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Competition</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {comp.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteCompetition(comp.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </CardContent>
@@ -791,21 +837,29 @@ function CompetitionsTab() {
 function QuestionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const { toast } = useToast();
 
-  // Mock questions data - replace with real API calls
-  const questions = [
-    { id: 1, text: 'What is the capital of France?', subject: 'Geography', status: 'approved', createdBy: 'Sarah Johnson', createdAt: '2024-03-15' },
-    { id: 2, text: 'Solve for x: 2x + 5 = 15', subject: 'Mathematics', status: 'pending', createdBy: 'Michael Chen', createdAt: '2024-03-14' },
-    { id: 3, text: 'Who wrote "To Kill a Mockingbird"?', subject: 'Literature', status: 'approved', createdBy: 'Emily Rodriguez', createdAt: '2024-03-10' },
-    { id: 4, text: 'What is the chemical symbol for gold?', subject: 'Chemistry', status: 'rejected', createdBy: 'David Kim', createdAt: '2024-03-08' },
-    { id: 5, text: 'Explain the theory of relativity', subject: 'Physics', status: 'pending', createdBy: 'Jessica Lee', createdAt: '2024-03-05' },
-  ];
+  // Data will be loaded from API
+  const questions = [];
 
   const filteredQuestions = questions.filter(question =>
     (question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
      question.subject.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedStatus === 'all' || question.status === selectedStatus)
   );
+
+  const handleDeleteQuestion = async (questionId: number) => {
+    try {
+      // API call to delete question
+      const { error } = await supabase.from('questions').delete().eq('id', questionId);
+
+      if (error) throw error;
+
+      toast({ title: 'Question deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -845,50 +899,78 @@ function QuestionsTab() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Question</th>
-                    <th className="p-3 text-left font-medium">Subject</th>
-                    <th className="p-3 text-left font-medium">Status</th>
-                    <th className="p-3 text-left font-medium">Created By</th>
-                    <th className="p-3 text-left font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredQuestions.map((question) => (
-                    <tr key={question.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3">
-                        <div className="font-medium">{question.text}</div>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{question.subject}</td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${question.status === 'approved' ? 'bg-success/10 text-success' : question.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>
-                          {question.status}
-                        </span>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{question.createdBy}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                            <Eye className="w-3 h-3" />
-                          </Button>
-                          {question.status === 'pending' && (
-                            <>
-                              <Button variant="success" size="sm" className="h-8 w-8 p-0">
-                                <Check className="w-3 h-3" />
-                              </Button>
-                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
+              {filteredQuestions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No questions found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Question</th>
+                      <th className="p-3 text-left font-medium">Subject</th>
+                      <th className="p-3 text-left font-medium">Status</th>
+                      <th className="p-3 text-left font-medium">Created By</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredQuestions.map((question) => (
+                      <tr key={question.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3">
+                          <div className="font-medium">{question.text}</div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{question.subject}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${question.status === 'approved' ? 'bg-success/10 text-success' : question.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>
+                            {question.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{question.createdBy}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                            {question.status === 'pending' && (
+                              <>
+                                <Button variant="success" size="sm" className="h-8 w-8 p-0">
+                                  <Check className="w-3 h-3" />
+                                </Button>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this question? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteQuestion(question.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </CardContent>
@@ -905,14 +987,10 @@ function BadgesTab() {
   const [newBadgeRequirement, setNewBadgeRequirement] = useState('points');
   const [newBadgeValue, setNewBadgeValue] = useState('100');
   const [creatingBadge, setCreatingBadge] = useState(false);
+  const { toast } = useToast();
 
-  // Mock badges data - replace with real API calls
-  const badges = [
-    { id: 1, name: 'Quick Learner', description: 'Answer 50 questions correctly', requirement: '50 questions', image: '/placeholder.svg?height=64&width=64' },
-    { id: 2, name: 'Competition Champion', description: 'Win a competition', requirement: 'Win competition', image: '/placeholder.svg?height=64&width=64' },
-    { id: 3, name: 'Perfect Score', description: 'Get 100% in a section', requirement: '100% score', image: '/placeholder.svg?height=64&width=64' },
-    { id: 4, name: 'Consistent Performer', description: 'Participate in 5 competitions', requirement: '5 competitions', image: '/placeholder.svg?height=64&width=64' },
-  ];
+  // Data will be loaded from API
+  const badges = [];
 
   const filteredBadges = badges.filter(badge =>
     badge.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -928,15 +1006,15 @@ function BadgesTab() {
     setCreatingBadge(true);
 
     try {
-      // Replace with actual API call
-      // const { error } = await supabase.from('badges').insert({
-      //   name: newBadgeName,
-      //   description: newBadgeDescription,
-      //   requirement_type: newBadgeRequirement,
-      //   requirement_value: parseInt(newBadgeValue)
-      // });
+      // API call to create badge
+      const { error } = await supabase.from('badges').insert({
+        name: newBadgeName,
+        description: newBadgeDescription,
+        requirement_type: newBadgeRequirement,
+        requirement_value: parseInt(newBadgeValue)
+      });
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'Badge created successfully!' });
       setNewBadgeName('');
@@ -948,6 +1026,19 @@ function BadgesTab() {
     }
 
     setCreatingBadge(false);
+  };
+
+  const handleDeleteBadge = async (badgeId: number) => {
+    try {
+      // API call to delete badge
+      const { error } = await supabase.from('badges').delete().eq('id', badgeId);
+
+      if (error) throw error;
+
+      toast({ title: 'Badge deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting badge', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -1041,46 +1132,53 @@ function BadgesTab() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredBadges.map((badge) => (
-                <div key={badge.id} className="p-4 rounded-xl border border-border/50 hover:border-primary/50 transition-all">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                      <img src={badge.image} alt={badge.name} className="w-12 h-12 object-cover rounded-full" />
-                    </div>
-                    <div className="text-center">
-                      <h3 className="font-medium">{badge.name}</h3>
-                      <p className="text-xs text-muted-foreground">{badge.description}</p>
-                      <p className="text-xs text-primary mt-1">{badge.requirement}</p>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Badge</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete {badge.name}? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+              {filteredBadges.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No badges found</p>
+              ) : (
+                filteredBadges.map((badge) => (
+                  <div key={badge.id} className="p-4 rounded-xl border border-border/50 hover:border-primary/50 transition-all">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                        <img src={badge.image} alt={badge.name} className="w-12 h-12 object-cover rounded-full" />
+                      </div>
+                      <div className="text-center">
+                        <h3 className="font-medium">{badge.name}</h3>
+                        <p className="text-xs text-muted-foreground">{badge.description}</p>
+                        <p className="text-xs text-primary mt-1">{badge.requirement}</p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-2">
+                        <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Badge</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {badge.name}? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteBadge(badge.id)}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </CardContent>
@@ -1096,16 +1194,10 @@ function AvatarsTab() {
   const [newAvatarImage, setNewAvatarImage] = useState<File | null>(null);
   const [creatingAvatar, setCreatingAvatar] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const { toast } = useToast();
 
-  // Mock avatars data - replace with real API calls
-  const avatars = [
-    { id: 1, name: 'Astronaut', image: '/placeholder.svg?height=64&width=64' },
-    { id: 2, name: 'Scientist', image: '/placeholder.svg?height=64&width=64' },
-    { id: 3, name: 'Artist', image: '/placeholder.svg?height=64&width=64' },
-    { id: 4, name: 'Athlete', image: '/placeholder.svg?height=64&width=64' },
-    { id: 5, name: 'Musician', image: '/placeholder.svg?height=64&width=64' },
-    { id: 6, name: 'Writer', image: '/placeholder.svg?height=64&width=64' },
-  ];
+  // Data will be loaded from API
+  const avatars = [];
 
   const filteredAvatars = avatars.filter(avatar =>
     avatar.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1128,10 +1220,10 @@ function AvatarsTab() {
     setCreatingAvatar(true);
 
     try {
-      // Replace with actual API call for image upload
-      // const { error } = await supabase.storage.from('avatars').upload(`avatar-${Date.now()}`, newAvatarImage);
+      // API call for image upload
+      const { error } = await supabase.storage.from('avatars').upload(`avatar-${Date.now()}`, newAvatarImage);
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'Avatar created successfully!' });
       setNewAvatarName('');
@@ -1142,6 +1234,19 @@ function AvatarsTab() {
     }
 
     setCreatingAvatar(false);
+  };
+
+  const handleDeleteAvatar = async (avatarId: number) => {
+    try {
+      // API call to delete avatar
+      const { error } = await supabase.from('avatars').delete().eq('id', avatarId);
+
+      if (error) throw error;
+
+      toast({ title: 'Avatar deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -1217,40 +1322,47 @@ function AvatarsTab() {
             </div>
 
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-              {filteredAvatars.map((avatar) => (
-                <div key={avatar.id} className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border">
-                    <img src={avatar.image} alt={avatar.name} className="w-full h-full object-cover" />
-                  </div>
-                  <p className="text-xs text-center font-medium">{avatar.name}</p>
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" size="sm" className="h-6 w-6 p-0">
-                      <Edit className="w-3 h-3" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+              {filteredAvatars.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No avatars found</p>
+              ) : (
+                filteredAvatars.map((avatar) => (
+                  <div key={avatar.id} className="flex flex-col items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-border">
+                      <img src={avatar.image} alt={avatar.name} className="w-full h-full object-cover" />
+                    </div>
+                    <p className="text-xs text-center font-medium">{avatar.name}</p>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" className="h-6 w-6 p-0">
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
                           <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete {avatar.name}? This action cannot be undone.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction className="bg-destructive hover:bg-destructive/90">
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {avatar.name}? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              className="bg-destructive hover:bg-destructive/90"
+                              onClick={() => handleDeleteAvatar(avatar.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </CardContent>
@@ -1265,14 +1377,8 @@ function MessagesTab() {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-
-  // Mock messages data - replace with real API calls
-  const messages = [
-    { id: 1, subject: 'Competition Question', content: 'I have a question about the Spring Challenge rules...', sender: 'Sarah Johnson', senderEmail: 'sarah.j@springfield.edu', date: '2024-03-15', read: true },
-    { id: 2, subject: 'Technical Issue', content: 'I\'m having trouble submitting my answers...', sender: 'Michael Chen', senderEmail: 'michael.c@springfield.edu', date: '2024-03-14', read: false },
-    { id: 3, subject: 'Badge Suggestion', content: 'Could we add a badge for perfect attendance?', sender: 'Emily Rodriguez', senderEmail: 'emily.r@jefferson.edu', date: '2024-03-10', read: true },
-    { id: 4, subject: 'Account Access', content: 'I can\'t log in to my teacher account...', sender: 'David Kim', senderEmail: 'david.k@lincoln.edu', date: '2024-03-08', read: false },
-  ];
+  const [messages, setMessages] = useState([]);
+  const { toast } = useToast();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1286,15 +1392,15 @@ function MessagesTab() {
     setSendingReply(true);
 
     try {
-      // Replace with actual API call
-      // const { error } = await supabase.from('messages').insert({
-      //   content: replyContent,
-      //   receiver_id: selectedMessage.senderEmail,
-      //   sender_id: 'moderator@lumora.com',
-      //   subject: `Re: ${selectedMessage.subject}`
-      // });
+      // API call to send message
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: 'moderator@lumora.com',
+        subject: `Re: ${selectedMessage.subject}`
+      });
 
-      // if (error) throw error;
+      if (error) throw error;
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
@@ -1303,6 +1409,23 @@ function MessagesTab() {
     }
 
     setSendingReply(false);
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      // API call to delete message
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -1332,30 +1455,58 @@ function MessagesTab() {
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.map((message) => (
-                    <button
-                      key={message.id}
-                      onClick={() => setSelectedMessage(message)}
-                      className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {message.sender.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium truncate">{message.sender}</p>
-                            <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                  {filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                          <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                          {!message.read && (
-                            <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -1417,27 +1568,11 @@ function MessagesTab() {
 function LeaderboardTab() {
   const [selectedCompetition, setSelectedCompetition] = useState('all');
   const [timeRange, setTimeRange] = useState('all-time');
+  const { toast } = useToast();
 
-  // Mock data - replace with real API calls
-  const competitions = [
-    { id: 'all', name: 'All Competitions' },
-    { id: 'spring-2024', name: 'Spring Challenge 2024' },
-    { id: 'math-olympiad', name: 'Math Olympiad 2024' },
-    { id: 'science-fair', name: 'Science Fair 2024' },
-  ];
-
-  const leaderboardData = [
-    { rank: 1, name: 'Sarah Johnson', school: 'Springfield High', score: 4580, badge: 'gold' },
-    { rank: 2, name: 'Michael Chen', school: 'Springfield High', score: 4230, badge: 'silver' },
-    { rank: 3, name: 'Emily Rodriguez', school: 'Jefferson Academy', score: 3980, badge: 'bronze' },
-    { rank: 4, name: 'David Kim', school: 'Lincoln Prep', score: 3750, badge: 'none' },
-    { rank: 5, name: 'Jessica Lee', school: 'Springfield High', score: 3620, badge: 'none' },
-    { rank: 6, name: 'Ryan Wilson', school: 'Jefferson Academy', score: 3480, badge: 'none' },
-    { rank: 7, name: 'Amanda Taylor', school: 'Lincoln Prep', score: 3350, badge: 'none' },
-    { rank: 8, name: 'Daniel Brown', school: 'Springfield High', score: 3220, badge: 'none' },
-    { rank: 9, name: 'Olivia Martinez', school: 'Jefferson Academy', score: 3100, badge: 'none' },
-    { rank: 10, name: 'Matthew Anderson', school: 'Lincoln Prep', score: 2980, badge: 'none' },
-  ];
+  // Data will be loaded from API
+  const competitions = [];
+  const leaderboardData = [];
 
   const badgeColors = {
     gold: 'bg-gold text-gold-foreground',
@@ -1487,39 +1622,43 @@ function LeaderboardTab() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="p-3 text-left font-medium">Rank</th>
-                  <th className="p-3 text-left font-medium">Name</th>
-                  <th className="p-3 text-left font-medium">School</th>
-                  <th className="p-3 text-left font-medium">Score</th>
-                  <th className="p-3 text-left font-medium">Achievement</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboardData.map((student) => (
-                  <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                    <td className="p-3 font-medium">{student.rank}</td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                          {student.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                        <span>{student.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-3 text-muted-foreground">{student.school}</td>
-                    <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
-                    <td className="p-3">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
-                        {student.rank}
-                      </div>
-                    </td>
+            {leaderboardData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">Name</th>
+                    <th className="p-3 text-left font-medium">School</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Achievement</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaderboardData.map((student) => (
+                    <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{student.rank}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <span>{student.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.school}</td>
+                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
+                          {student.rank}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1530,29 +1669,7 @@ function LeaderboardTab() {
             <CardTitle>School Rankings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gold flex items-center justify-center text-xs font-bold text-gold-foreground">1</div>
-                  <span className="font-medium">Springfield High</span>
-                </div>
-                <span className="font-bold">12,450 pts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-silver flex items-center justify-center text-xs font-bold text-silver-foreground">2</div>
-                  <span className="font-medium">Jefferson Academy</span>
-                </div>
-                <span className="font-bold">10,230 pts</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-bronze flex items-center justify-center text-xs font-bold text-bronze-foreground">3</div>
-                  <span className="font-medium">Lincoln Prep</span>
-                </div>
-                <span className="font-bold">9,870 pts</span>
-              </div>
-            </div>
+            <p className="text-center text-muted-foreground py-4">No school ranking data available</p>
           </CardContent>
         </Card>
 
@@ -1561,24 +1678,7 @@ function LeaderboardTab() {
             <CardTitle>Competition Stats</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-muted-foreground text-sm">Total Participants</p>
-                <p className="text-2xl font-bold">487</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Questions Answered</p>
-                <p className="text-2xl font-bold">12,458</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Avg. Score</p>
-                <p className="text-2xl font-bold">2,840</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-sm">Completion Rate</p>
-                <p className="text-2xl font-bold">87%</p>
-              </div>
-            </div>
+            <p className="text-center text-muted-foreground py-4">No competition stats available</p>
           </CardContent>
         </Card>
       </div>

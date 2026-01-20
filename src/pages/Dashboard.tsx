@@ -62,16 +62,24 @@ export default function Dashboard() {
   // Determine which dashboard to show based on currentView or profile role
   const effectiveRole = currentView || profile.role;
 
+  // Debug log to see what role we're getting
+  console.log('Effective role:', effectiveRole);
+
   switch (effectiveRole) {
     case 'admin':
+      console.log('Rendering AdminDashboard');
       return <AdminDashboard />;
     case 'moderator':
+      console.log('Rendering ModeratorDashboard');
       return <ModeratorDashboard />;
     case 'teacher':
+      console.log('Rendering TeacherDashboard');
       return <TeacherDashboard />;
     case 'student':
+      console.log('Rendering StudentDashboard');
       return <StudentDashboard />;
     default:
+      console.log('Defaulting to TeacherDashboard');
       return <TeacherDashboard />;
   }
 }

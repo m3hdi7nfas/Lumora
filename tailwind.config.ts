@@ -117,6 +117,11 @@ export default {
         "slide-in-up": "slide-in-up 0.4s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
       },
+      transitionTimingFunction: {
+        // Add the problematic easing function to Tailwind's theme
+        // This prevents the ambiguity warning
+        DEFAULT: "cubic-bezier(0.4, 0, 0.2, 1)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

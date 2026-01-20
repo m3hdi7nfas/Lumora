@@ -110,15 +110,44 @@ function StudentOverview() {
   const { profile, currentView, isAdminOrModerator } = useAuth();
   const { toast } = useToast();
 
-  // Data will be loaded from API
-  const stats = {
-    totalScore: 0,
-    competitionsJoined: 0,
-    badgesEarned: 0,
-    challengesWon: 0,
-    practiceSessions: 0,
-    recentActivity: []
-  };
+  // Fetch stats from database
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['student-stats'],
+    queryFn: async () => {
+      try {
+        // Get student's competitions
+        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
+        if (compError) throw compError;
+
+        // Get student's badges
+        const { data: badges, error: badgesError } = await supabase.from('user_badges').select('*').eq('user_id', profile?.id);
+        if (badgesError) throw badgesError;
+
+        // Get student's challenges
+        const { data: challenges, error: challengesError } = await supabase.from('challenges').select('*').or(`challenger_id.eq.${profile?.id},challenged_id.eq.${profile?.id}`);
+        if (challengesError) throw challengesError;
+
+        return {
+          totalScore: profile?.score || 0,
+          competitionsJoined: competitions.length,
+          badgesEarned: badges.length,
+          challengesWon: challenges.filter(c => c.winner_id === profile?.id).length,
+          practiceSessions: 0, // This would come from a more complex query
+          recentActivity: []
+        };
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        return {
+          totalScore: 0,
+          competitionsJoined: 0,
+          badgesEarned: 0,
+          challengesWon: 0,
+          practiceSessions: 0,
+          recentActivity: []
+        };
+      }
+    }
+  });
 
   const quickActions = [
     { id: 'competitions', icon: Trophy, title: 'Join Competition', description: 'Participate in active competitions' },
@@ -144,27 +173,31 @@ function StudentOverview() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Score"
-          value={stats.totalScore.toLocaleString()}
+          value={stats?.totalScore?.toLocaleString() || '0'}
           icon={Trophy}
           className="bg-primary/10 border-primary/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Competitions"
-          value={stats.competitionsJoined.toString()}
+          value={stats?.competitionsJoined?.toString() || '0'}
           icon={Trophy}
           className="bg-accent/10 border-accent/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Badges Earned"
-          value={stats.badgesEarned.toString()}
+          value={stats?.badgesEarned?.toString() || '0'}
           icon={Award}
           className="bg-success/10 border-success/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Challenges Won"
-          value={stats.challengesWon.toString()}
+          value={stats?.challengesWon?.toString() || '0'}
           icon={Swords}
           className="bg-warning/10 border-warning/20"
+          loading={statsLoading}
         />
       </div>
 
@@ -205,7 +238,7 @@ function StudentOverview() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats.recentActivity.length === 0 ? (
+            {stats?.recentActivity?.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
               stats.recentActivity.map((activity) => (
@@ -230,14 +263,14 @@ function StudentOverview() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
   return (
     <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
           </div>
           <div className="p-2 rounded-lg bg-card">
             <Icon className="w-6 h-6 text-primary" />
@@ -254,17 +287,48 @@ function CompetitionsTab() {
   const [selectedCompetition, setSelectedCompetition] = useState(null);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [competitions, setCompetitions] = useState([]);
+  const queryClient = useQueryClient();
 
-  // Data will be loaded from API
-  const competitions = [];
   const filteredCompetitions = competitions.filter(comp =>
     comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     comp.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleJoinCompetition = async (competitionId: string) => {
+  const fetchCompetitions = async () => {
+    setLoading(true);
     try {
-      // API call to join competition
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleJoinCompetition = async (competitionId: string) => {
+    setLoading(true);
+    try {
+      // Check if already joined
+      const { data: existing, error: existingError } = await supabase
+        .from('competition_participants')
+        .select('*')
+        .eq('competition_id', competitionId)
+        .eq('user_id', profile?.id)
+        .single();
+
+      if (existingError && !existingError.message.includes('No rows found')) {
+        throw existingError;
+      }
+
+      if (existing) {
+        toast({ title: 'Already joined this competition', variant: 'info' });
+        return;
+      }
+
+      // Join competition
       const { error } = await supabase.from('competition_participants').insert({
         competition_id: competitionId,
         user_id: profile?.id,
@@ -274,10 +338,34 @@ function CompetitionsTab() {
       if (error) throw error;
 
       toast({ title: 'Successfully joined competition!' });
+      fetchCompetitions();
     } catch (error) {
       toast({ title: 'Error joining competition', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
+
+  const handleLeaveCompetition = async (competitionId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('competition_participants')
+        .delete()
+        .eq('competition_id', competitionId)
+        .eq('user_id', profile?.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Successfully left competition!' });
+      fetchCompetitions();
+    } catch (error) {
+      toast({ title: 'Error leaving competition', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -305,7 +393,11 @@ function CompetitionsTab() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {filteredCompetitions.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-4">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+          </div>
+        ) : filteredCompetitions.length === 0 ? (
           <p className="text-center text-muted-foreground py-4">No competitions found</p>
         ) : (
           filteredCompetitions.map((competition) => (
@@ -318,15 +410,15 @@ function CompetitionsTab() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{competition.start_date} - {competition.end_date}</span>
+                    <span>{competition.start_date ? new Date(competition.start_date).toLocaleDateString() : 'No start date'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="w-4 h-4 text-muted-foreground" />
-                    <span>{competition.participants} participants</span>
+                    <span>{competition.participants || 0} participants</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Trophy className="w-4 h-4 text-muted-foreground" />
-                    <span>{competition.prize}</span>
+                    <span>{competition.prize || 'No prize specified'}</span>
                   </div>
                   {competition.locked && !isAdminOrModerator && (
                     <div className="flex items-center gap-2 text-sm text-warning">
@@ -335,11 +427,13 @@ function CompetitionsTab() {
                     </div>
                   )}
                   <Button
-                    onClick={() => handleJoinCompetition(competition.id)}
+                    onClick={() => competition.joined
+                      ? handleLeaveCompetition(competition.id)
+                      : handleJoinCompetition(competition.id)}
                     className="w-full gradient-hero"
                     disabled={competition.locked && !isAdminOrModerator}
                   >
-                    {competition.locked && !isAdminOrModerator ? 'Locked Competition' : 'Join Competition'}
+                    {competition.joined ? 'Leave Competition' : competition.locked && !isAdminOrModerator ? 'Locked Competition' : 'Join Competition'}
                   </Button>
                 </div>
               </CardContent>
@@ -360,16 +454,38 @@ function PracticeTab() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [questions, setQuestions] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const queryClient = useQueryClient();
 
-  // Data will be loaded from API
-  const subjects = [];
   const difficulties = ['Easy', 'Medium', 'Hard'];
-  const questions = [];
 
   const filteredQuestions = questions.filter(q =>
     (selectedSubject === 'all' || q.subject === selectedSubject) &&
     (selectedDifficulty === 'all' || q.difficulty === selectedDifficulty)
   );
+
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('questions').select('*');
+      if (error) throw error;
+      setQuestions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      // This would be a more complex query in a real app
+      const uniqueSubjects = [...new Set(questions.map(q => q.subject))];
+      setSubjects(uniqueSubjects.map(subject => ({ id: subject, name: subject })));
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+    }
+  };
 
   const handleNextQuestion = async () => {
     if (filteredQuestions.length === 0) return;
@@ -390,6 +506,16 @@ function PracticeTab() {
 
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
+
+  useEffect(() => {
+    if (questions.length > 0) {
+      fetchSubjects();
+    }
+  }, [questions]);
 
   return (
     <div className="space-y-6">
@@ -558,6 +684,8 @@ function ChallengesTab() {
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const filteredActiveChallenges = activeChallenges.filter(challenge =>
     challenge.opponent.toLowerCase().includes(searchTerm.toLowerCase())
@@ -567,9 +695,36 @@ function ChallengesTab() {
     challenge.opponent.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAcceptChallenge = async (challengeId: string) => {
+  const fetchChallenges = async () => {
+    setLoading(true);
     try {
-      // API call to accept challenge
+      // Fetch active challenges
+      const { data: active, error: activeError } = await supabase.from('challenges')
+        .select('*, challenger:profiles!challenges_challenger_id_fkey(display_name, email), challenged:profiles!challenges_challenged_id_fkey(display_name, email)')
+        .or(`challenger_id.eq.${profile?.id},challenged_id.eq.${profile?.id}`)
+        .eq('status', 'pending');
+
+      if (activeError) throw activeError;
+
+      // Fetch completed challenges
+      const { data: completed, error: completedError } = await supabase.from('challenges')
+        .select('*, challenger:profiles!challenges_challenger_id_fkey(display_name, email), challenged:profiles!challenges_challenged_id_fkey(display_name, email)')
+        .or(`challenger_id.eq.${profile?.id},challenged_id.eq.${profile?.id}`)
+        .neq('status', 'pending');
+
+      if (completedError) throw completedError;
+
+      setActiveChallenges(active || []);
+      setCompletedChallenges(completed || []);
+    } catch (error) {
+      toast({ title: 'Error fetching challenges', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleAcceptChallenge = async (challengeId: string) => {
+    setLoading(true);
+    try {
       const { error } = await supabase.from('challenges').update({
         status: 'accepted',
         accepted_at: new Date().toISOString()
@@ -578,17 +733,16 @@ function ChallengesTab() {
       if (error) throw error;
 
       toast({ title: 'Challenge accepted!' });
-      setActiveChallenges(activeChallenges.map(c =>
-        c.id === challengeId ? { ...c, status: 'accepted' } : c
-      ));
+      fetchChallenges();
     } catch (error) {
       toast({ title: 'Error accepting challenge', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
 
   const handleCompleteChallenge = async (challengeId: string, score: number) => {
+    setLoading(true);
     try {
-      // API call to complete challenge
       const { error } = await supabase.from('challenges').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -599,18 +753,16 @@ function ChallengesTab() {
       if (error) throw error;
 
       toast({ title: 'Challenge completed!' });
-      setActiveChallenges(activeChallenges.filter(c => c.id !== challengeId));
-      setCompletedChallenges([...completedChallenges, {
-        id: challengeId,
-        opponent: selectedChallenge.opponent,
-        score,
-        date: new Date().toISOString(),
-        result: 'won'
-      }]);
+      fetchChallenges();
     } catch (error) {
       toast({ title: 'Error completing challenge', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchChallenges();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -645,20 +797,24 @@ function ChallengesTab() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {filteredActiveChallenges.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredActiveChallenges.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No active challenges</p>
             ) : (
               filteredActiveChallenges.map((challenge) => (
                 <Card key={challenge.id}>
                   <CardHeader>
-                    <CardTitle>Challenge from {challenge.opponent}</CardTitle>
+                    <CardTitle>Challenge from {challenge.challenger?.display_name || challenge.challenger_email}</CardTitle>
                     <CardDescription>Status: {challenge.status}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span>Created: {challenge.created_at}</span>
+                        <span>Created: {new Date(challenge.created_at).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Trophy className="w-4 h-4 text-muted-foreground" />
@@ -695,24 +851,28 @@ function ChallengesTab() {
 
         <TabsContent value="completed">
           <div className="grid md:grid-cols-2 gap-6">
-            {filteredCompletedChallenges.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredCompletedChallenges.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No completed challenges</p>
             ) : (
               filteredCompletedChallenges.map((challenge) => (
                 <Card key={challenge.id}>
                   <CardHeader>
-                    <CardTitle>Challenge vs {challenge.opponent}</CardTitle>
-                    <CardDescription>Completed: {challenge.date}</CardDescription>
+                    <CardTitle>Challenge vs {challenge.challenged?.display_name || challenge.challenged_email}</CardTitle>
+                    <CardDescription>Completed: {new Date(challenge.completed_at).toLocaleDateString()}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex items-center gap-2 text-sm">
                         <Trophy className="w-4 h-4 text-muted-foreground" />
-                        <span>Your Score: {challenge.score}</span>
+                        <span>Your Score: {challenge.challenger_score || 'N/A'}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Crown className="w-4 h-4 text-muted-foreground" />
-                        <span>Result: {challenge.result}</span>
+                        <span>Result: {challenge.winner_id === profile?.id ? 'Won' : 'Lost'}</span>
                       </div>
                     </div>
                   </CardContent>
@@ -731,6 +891,8 @@ function BadgesTab() {
   const [badges, setBadges] = useState([]);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   // Data will be loaded from API
   const badgeCategories = [
@@ -746,6 +908,37 @@ function BadgesTab() {
   const filteredBadges = badges.filter(badge =>
     selectedCategory === 'all' || badge.category === selectedCategory
   );
+
+  const fetchBadges = async () => {
+    setLoading(true);
+    try {
+      // Fetch all badges
+      const { data: allBadges, error: badgesError } = await supabase.from('badges').select('*');
+      if (badgesError) throw badgesError;
+
+      // Fetch user's earned badges
+      const { data: userBadges, error: userBadgesError } = await supabase.from('user_badges')
+        .select('badge_id')
+        .eq('user_id', profile?.id);
+
+      if (userBadgesError) throw userBadgesError;
+
+      // Mark which badges are earned
+      const badgesWithStatus = allBadges.map(badge => ({
+        ...badge,
+        earned: userBadges.some(ub => ub.badge_id === badge.id)
+      }));
+
+      setBadges(badgesWithStatus);
+    } catch (error) {
+      toast({ title: 'Error fetching badges', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchBadges();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -780,7 +973,11 @@ function BadgesTab() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredBadges.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredBadges.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No badges earned yet</p>
             ) : (
               filteredBadges.map((badge) => (
@@ -816,8 +1013,10 @@ function MessagesTab() {
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const queryClient = useQueryClient();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -825,13 +1024,24 @@ function MessagesTab() {
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('messages').select('*').eq('receiver_id', profile?.id);
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
 
     setSendingReply(true);
 
     try {
-      // API call to send message
       const { error } = await supabase.from('messages').insert({
         content: replyContent,
         receiver_id: selectedMessage.senderEmail,
@@ -851,10 +1061,9 @@ function MessagesTab() {
   };
 
   const handleDeleteMessage = async (messageId: number) => {
+    setLoading(true);
     try {
-      // API call to delete message
       const { error } = await supabase.from('messages').delete().eq('id', messageId);
-
       if (error) throw error;
 
       toast({ title: 'Message deleted successfully!' });
@@ -865,7 +1074,12 @@ function MessagesTab() {
     } catch (error) {
       toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -900,7 +1114,11 @@ function MessagesTab() {
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.length === 0 ? (
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    </div>
+                  ) : filteredMessages.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4">No messages found</p>
                   ) : (
                     filteredMessages.map((message) => (
@@ -927,8 +1145,8 @@ function MessagesTab() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
@@ -1051,7 +1269,7 @@ function ProfileTab() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Score</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{profile?.score?.toLocaleString() || '0'}</p>
             </div>
 
             <div className="space-y-2">

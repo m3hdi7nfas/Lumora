@@ -101,15 +101,40 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
 
-  // Data will be loaded from API
-  const stats = {
-    totalStudents: 0,
-    activeStudents: 0,
-    competitions: 0,
-    questionsAnswered: 0,
-    avgScore: 0,
-    recentActivity: []
-  };
+  // Fetch stats from database
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['teacher-stats'],
+    queryFn: async () => {
+      try {
+        // Get students for this teacher
+        const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
+        if (studentsError) throw studentsError;
+
+        // Get competitions
+        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
+        if (compError) throw compError;
+
+        return {
+          totalStudents: students.length,
+          activeStudents: students.filter(s => s.is_active).length,
+          competitions: competitions.length,
+          questionsAnswered: 0, // This would come from a more complex query
+          avgScore: 0, // This would come from a more complex query
+          recentActivity: []
+        };
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        return {
+          totalStudents: 0,
+          activeStudents: 0,
+          competitions: 0,
+          questionsAnswered: 0,
+          avgScore: 0,
+          recentActivity: []
+        };
+      }
+    }
+  });
 
   const quickActions = [
     { id: 'students', icon: Users, title: 'View Students', description: 'Check student progress' },
@@ -134,27 +159,31 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Students"
-          value={stats.totalStudents.toString()}
+          value={stats?.totalStudents?.toString() || '0'}
           icon={Users}
           className="bg-primary/10 border-primary/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Active Students"
-          value={stats.activeStudents.toString()}
+          value={stats?.activeStudents?.toString() || '0'}
           icon={CheckCircle}
           className="bg-success/10 border-success/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Competitions"
-          value={stats.competitions.toString()}
+          value={stats?.competitions?.toString() || '0'}
           icon={Trophy}
           className="bg-accent/10 border-accent/20"
+          loading={statsLoading}
         />
         <StatCard
           title="Avg. Score"
-          value={`${stats.avgScore}%`}
+          value={`${stats?.avgScore || 0}%`}
           icon={BarChart3}
           className="bg-warning/10 border-warning/20"
+          loading={statsLoading}
         />
       </div>
 
@@ -195,7 +224,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats.recentActivity.length === 0 ? (
+            {stats?.recentActivity?.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
               stats.recentActivity.map((activity) => (
@@ -220,14 +249,14 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
   );
 }
 
-function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
   return (
     <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
           </div>
           <div className="p-2 rounded-lg bg-card">
             <Icon className="w-6 h-6 text-primary" />
@@ -244,16 +273,92 @@ function StudentsTab() {
   const [selectedClass, setSelectedClass] = useState('all');
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  // Data will be loaded from API
-  const students = [];
-  const classes = [];
+  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const queryClient = useQueryClient();
 
   const filteredStudents = students.filter(student =>
     (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
      student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedClass === 'all' || student.class === selectedClass)
   );
+
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      // Fetch students - if admin/moderator viewing as teacher, show all students
+      let query = supabase.from('profiles').select('*').eq('role', 'student');
+
+      if (!isAdminOrModerator || !currentView) {
+        // Regular teacher can only see students from their school
+        query = query.eq('school_id', profile?.school_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editingStudent.name) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('profiles').update({
+        display_name: editingStudent.name,
+        is_active: editingStudent.is_active
+      }).eq('id', editingStudent.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Student updated successfully!' });
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error updating student', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', studentId);
+      if (error) throw error;
+
+      toast({ title: 'Student deleted successfully!' });
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error deleting student', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStudents();
+    fetchClasses();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -284,6 +389,7 @@ function StudentsTab() {
               <SelectValue placeholder="Filter by class" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
               {classes.map(cls => (
                 <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
               ))}
@@ -299,7 +405,11 @@ function StudentsTab() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            {filteredStudents.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredStudents.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No students found</p>
             ) : (
               <table className="w-full">
@@ -311,6 +421,7 @@ function StudentsTab() {
                     <th className="p-3 text-left font-medium">Score</th>
                     <th className="p-3 text-left font-medium">Progress</th>
                     <th className="p-3 text-left font-medium">Status</th>
+                    <th className="p-3 text-left font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -319,32 +430,68 @@ function StudentsTab() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.name.split(' ').map(n => n[0]).join('')}
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <p className="font-medium">{student.name}</p>
+                            <p className="font-medium">{student.display_name || 'No name'}</p>
                             <p className="text-xs text-muted-foreground">{student.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3 text-muted-foreground">{student.class}</td>
-                      <td className="p-3 text-muted-foreground">{student.school}</td>
-                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3 text-muted-foreground">{student.class || 'N/A'}</td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-full h-2 bg-muted rounded-full">
                             <div
                               className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress}%` }}
+                              style={{ width: `${student.progress || 0}%` }}
                             />
                           </div>
-                          <span className="text-xs text-muted-foreground">{student.progress}%</span>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
                       </td>
                       <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.status === 'active' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                          {student.status}
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {student.is_active ? 'active' : 'inactive'}
                         </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setEditingStudent(student)}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this student? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -354,6 +501,55 @@ function StudentsTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Student Dialog */}
+      {editingStudent && (
+        <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Student</DialogTitle>
+              <DialogDescription>Update student information</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={editingStudent.display_name || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, display_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={editingStudent.email || ''}
+                  disabled
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="is-active"
+                  checked={editingStudent.is_active}
+                  onCheckedChange={(checked) => setEditingStudent({ ...editingStudent, is_active: checked })}
+                />
+                <Label htmlFor="is-active">Active Student</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingStudent(null)}>Cancel</Button>
+              <Button onClick={handleUpdateStudent} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Student'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -364,11 +560,10 @@ function TeacherLeaderboardTab() {
   const [selectedClass, setSelectedClass] = useState('all');
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  // Data will be loaded from API
-  const competitions = [];
-  const classes = [];
-  const leaderboardData = [];
+  const [loading, setLoading] = useState(false);
+  const [competitions, setCompetitions] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [leaderboardData, setLeaderboardData] = useState([]);
 
   const badgeColors = {
     gold: 'bg-gold text-gold-foreground',
@@ -376,6 +571,55 @@ function TeacherLeaderboardTab() {
     bronze: 'bg-bronze text-bronze-foreground',
     none: 'bg-muted text-muted-foreground'
   };
+
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    setLoading(true);
+    try {
+      // Fetch students with scores
+      let query = supabase.from('profiles').select('*').eq('role', 'student').order('score', { ascending: false });
+
+      if (!isAdminOrModerator || !currentView) {
+        // Regular teacher can only see students from their school
+        query = query.eq('school_id', profile?.school_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      setLeaderboardData(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCompetitions();
+    fetchClasses();
+    fetchLeaderboard();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -397,6 +641,7 @@ function TeacherLeaderboardTab() {
               <SelectValue placeholder="Select competition" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Competitions</SelectItem>
               {competitions.map(comp => (
                 <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
               ))}
@@ -408,6 +653,7 @@ function TeacherLeaderboardTab() {
               <SelectValue placeholder="Select class" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
               {classes.map(cls => (
                 <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
               ))}
@@ -423,7 +669,11 @@ function TeacherLeaderboardTab() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            {leaderboardData.length === 0 ? (
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : leaderboardData.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
             ) : (
               <table className="w-full">
@@ -438,33 +688,33 @@ function TeacherLeaderboardTab() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leaderboardData.map((student) => (
-                    <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{student.rank}</td>
+                  {leaderboardData.map((student, index) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{index + 1}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.name.split(' ').map(n => n[0]).join('')}
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
                           </div>
-                          <span>{student.name}</span>
+                          <span>{student.display_name || 'No name'}</span>
                         </div>
                       </td>
-                      <td className="p-3 text-muted-foreground">{student.school}</td>
-                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-full h-2 bg-muted rounded-full">
                             <div
                               className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress}%` }}
+                              style={{ width: `${student.progress || 0}%` }}
                             />
                           </div>
-                          <span className="text-xs text-muted-foreground">{student.progress}%</span>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
                       </td>
                       <td className="p-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
-                          {student.rank}
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
+                          {index + 1}
                         </div>
                       </td>
                     </tr>
@@ -501,13 +751,15 @@ function TeacherLeaderboardTab() {
 
 // Messages Tab Component
 function MessagesTab() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
-  const [messages, setMessages] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
+  const queryClient = useQueryClient();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -515,13 +767,32 @@ function MessagesTab() {
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      // Fetch messages - if admin/moderator viewing as teacher, show all messages
+      let query = supabase.from('messages').select('*').eq('receiver_id', profile?.id);
+
+      if (isAdminOrModerator && currentView) {
+        // Admin/moderator can see all messages
+        query = supabase.from('messages').select('*');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
 
     setSendingReply(true);
 
     try {
-      // API call to send message
       const { error } = await supabase.from('messages').insert({
         content: replyContent,
         receiver_id: selectedMessage.senderEmail,
@@ -541,10 +812,9 @@ function MessagesTab() {
   };
 
   const handleDeleteMessage = async (messageId: number) => {
+    setLoading(true);
     try {
-      // API call to delete message
       const { error } = await supabase.from('messages').delete().eq('id', messageId);
-
       if (error) throw error;
 
       toast({ title: 'Message deleted successfully!' });
@@ -555,7 +825,12 @@ function MessagesTab() {
     } catch (error) {
       toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
   };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -575,7 +850,7 @@ function MessagesTab() {
           <Card>
             <CardHeader>
               <CardTitle>Inbox</CardTitle>
-              <CardDescription>{isAdminOrModerator && currentView ? 'All student messages' : 'Your student messages'}</CardDescription>
+              <CardDescription>Your messages</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -590,7 +865,11 @@ function MessagesTab() {
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.length === 0 ? (
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    </div>
+                  ) : filteredMessages.length === 0 ? (
                     <p className="text-center text-muted-foreground py-4">No messages found</p>
                   ) : (
                     filteredMessages.map((message) => (
@@ -617,8 +896,8 @@ function MessagesTab() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

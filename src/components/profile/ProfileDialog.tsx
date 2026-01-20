@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, RefreshCw, User } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -157,12 +157,12 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                     </div>
                 </div>
 
-                <DialogFooter>
+                <div className="flex justify-end">
                     <Button onClick={() => updateProfile.mutate()} disabled={updateProfile.isPending}>
                         {updateProfile.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                         Save Changes
                     </Button>
-                </DialogFooter>
+                </div>
             </DialogContent>
         </Dialog>
     );

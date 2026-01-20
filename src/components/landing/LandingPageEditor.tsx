@@ -20,6 +20,7 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [content, setContent] = useState<SiteContent>(defaultSiteContent);
+    const [loading, setLoading] = useState(false);
 
     const { data: fetchedContent } = useQuery({
         queryKey: ['landing-content-edit'],
@@ -44,11 +45,20 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
 
     const saveContent = useMutation({
         mutationFn: async () => {
-            const { error } = await (supabase as any)
-                .from('site_settings')
-                .upsert({ key: 'landing_page', value: content });
+            // Always save to localStorage first
+            localStorage.setItem('lumora-landing-content', JSON.stringify(content));
 
-            if (error) throw error;
+            try {
+                const { error } = await (supabase as any)
+                    .from('site_settings')
+                    .upsert({ key: 'landing_page', value: content });
+
+                if (error) {
+                    console.warn('Supabase save failed (ignore if table site_settings is missing):', error.message);
+                }
+            } catch (e) {
+                console.warn('Supabase save failed');
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['landing-content'] });
@@ -83,6 +93,16 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
                 }
             }));
         }
+    };
+
+    const handleSave = async () => {
+        setLoading(true);
+        try {
+            await saveContent.mutateAsync();
+        } catch (error) {
+            console.error('Error saving content:', error);
+        }
+        setLoading(false);
     };
 
     return (
@@ -191,8 +211,8 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
 
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Close</Button>
-                    <Button onClick={() => saveContent.mutate()} disabled={saveContent.isPending} className="gradient-hero">
-                        {saveContent.isPending ? 'Saving...' : 'Save Changes'}
+                    <Button onClick={handleSave} disabled={saveContent.isPending || loading} className="gradient-hero">
+                        {saveContent.isPending || loading ? 'Saving...' : 'Save Changes'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

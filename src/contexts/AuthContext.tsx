@@ -35,6 +35,78 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Demo accounts for local development
+const DEMO_ACCOUNTS = {
+  'demo.admin@lumora.com': {
+    password: 'Demo123!',
+    profile: {
+      id: 'demo-admin-id',
+      user_id: 'demo-admin-user-id',
+      email: 'demo.admin@lumora.com',
+      role: 'admin' as UserRole,
+      display_name: 'Demo Admin',
+      avatar_url: null,
+      avatar_id: null,
+      school_id: null,
+      score: 1000,
+      class: null,
+      is_active: true,
+      progress: 100
+    }
+  },
+  'demo.moderator@lumora.com': {
+    password: 'Demo123!',
+    profile: {
+      id: 'demo-moderator-id',
+      user_id: 'demo-moderator-user-id',
+      email: 'demo.moderator@lumora.com',
+      role: 'moderator' as UserRole,
+      display_name: 'Demo Moderator',
+      avatar_url: null,
+      avatar_id: null,
+      school_id: null,
+      score: 800,
+      class: null,
+      is_active: true,
+      progress: 80
+    }
+  },
+  'demo.teacher@lumora.com': {
+    password: 'Demo123!',
+    profile: {
+      id: 'demo-teacher-id',
+      user_id: 'demo-teacher-user-id',
+      email: 'demo.teacher@lumora.com',
+      role: 'teacher' as UserRole,
+      display_name: 'Demo Teacher',
+      avatar_url: null,
+      avatar_id: null,
+      school_id: null,
+      score: 600,
+      class: null,
+      is_active: true,
+      progress: 60
+    }
+  },
+  'demo.student@lumora.com': {
+    password: 'Demo123!',
+    profile: {
+      id: 'demo-student-id',
+      user_id: 'demo-student-user-id',
+      email: 'demo.student@lumora.com',
+      role: 'student' as UserRole,
+      display_name: 'Demo Student',
+      avatar_url: null,
+      avatar_id: null,
+      school_id: null,
+      score: 400,
+      class: null,
+      is_active: true,
+      progress: 40
+    }
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -44,6 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
   const isAdmin = profile?.role === 'admin';
+
+  // Check if we're using demo accounts
+  const isDemoAccount = (email: string) => {
+    return DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS] !== undefined;
+  };
 
   const fetchProfile = async (userId: string, retries = 3): Promise<void> => {
     for (let i = 0; i < retries; i++) {
@@ -109,6 +186,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     console.log('Attempting sign in with:', email);
+
+    // Check if this is a demo account
+    if (isDemoAccount(email)) {
+      const demoAccount = DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS];
+
+      if (demoAccount.password === password) {
+        // Set up a mock session for demo accounts
+        const mockUser = {
+          id: demoAccount.profile.user_id,
+          email: demoAccount.profile.email,
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as User;
+
+        const mockSession = {
+          access_token: 'demo-access-token',
+          token_type: 'bearer',
+          user: mockUser,
+          expires_in: 3600,
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          refresh_token: 'demo-refresh-token'
+        } as Session;
+
+        setUser(mockUser);
+        setSession(mockSession);
+        setProfile(demoAccount.profile);
+        setLoading(false);
+
+        return { error: null };
+      } else {
+        return { error: new Error('Invalid login credentials') };
+      }
+    }
+
+    // Regular Supabase sign in for non-demo accounts
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
@@ -124,6 +239,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, role: UserRole = 'student') => {
     console.log('Attempting sign up with:', email, 'role:', role);
+
+    // For demo accounts, we don't need to actually create them
+    if (isDemoAccount(email)) {
+      return { error: null };
+    }
+
     try {
       const { error } = await supabase.auth.signUp({
         email,

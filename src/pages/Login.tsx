@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { AdBanner } from '@/components/ads/AdBanner';
+import { supabase } from '@/integrations/supabase/client';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
@@ -52,18 +53,69 @@ export default function Login() {
     setLoading(false);
   };
 
+  const createProfileManually = async (userId: string, email: string, role: string) => {
+    try {
+      console.log('Creating profile manually for user:', userId, email, role);
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: userId,
+          email: email,
+          role: role,
+          display_name: `Demo ${role}`,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select();
+
+      if (error) {
+        console.error('Manual profile creation error:', error);
+        throw error;
+      }
+
+      console.log('Manual profile creation successful:', data);
+      return data;
+    } catch (error) {
+      console.error('Manual profile creation exception:', error);
+      throw error;
+    }
+  };
+
   const handleDemoLogin = async (role: keyof typeof DEMO_ACCOUNTS) => {
     const account = DEMO_ACCOUNTS[role];
     setDemoLoading(role);
 
     try {
+      console.log(`Starting demo login for ${role}:`, account.email);
+
       // Try to sign in first
       const { error: signInError } = await signIn(account.email, account.password);
 
+      if (!signInError) {
+        console.log('Sign in successful, navigating to dashboard');
+        toast({
+          title: `Welcome back, Demo ${account.role}!`,
+          description: 'Successfully logged in.',
+        });
+        await new Promise(resolve => setTimeout(resolve, 300));
+        navigate('/dashboard');
+        setDemoLoading(null);
+        return;
+      }
+
+      console.log('Sign in failed, attempting to create account:', signInError.message);
+
       // If user doesn't exist, create the demo account
-      if (signInError && signInError.message.includes('Invalid login credentials')) {
+      if (signInError.message.includes('Invalid login credentials')) {
+        console.log('User does not exist, creating new account');
+
+        // First, try to sign up
         const { error: signUpError } = await signUp(account.email, account.password, role);
+
         if (signUpError) {
+          console.error('Sign up error:', signUpError);
           toast({
             title: 'Demo login failed',
             description: signUpError.message || 'Failed to create demo account',
@@ -73,38 +125,70 @@ export default function Login() {
           return;
         }
 
-        // Wait for the profile to be created by trigger, then sign in
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('Sign up successful, waiting for profile creation...');
+
+        // Wait a bit for the trigger to create the profile
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Try to sign in again
         const { error: retryError } = await signIn(account.email, account.password);
+
         if (retryError) {
-          toast({
-            title: 'Demo login failed',
-            description: retryError.message || 'Failed to sign in after account creation',
-            variant: 'destructive',
-          });
-          setDemoLoading(null);
-          return;
+          console.log('Retry sign in failed, trying manual profile creation:', retryError.message);
+
+          // If still failing, try to create profile manually
+          const session = await supabase.auth.getSession();
+          if (session.data.session?.user) {
+            try {
+              await createProfileManually(session.data.session.user.id, account.email, role);
+              console.log('Manual profile creation successful, trying sign in again');
+
+              // Try sign in one more time
+              const { error: finalError } = await signIn(account.email, account.password);
+              if (finalError) {
+                throw finalError;
+              }
+            } catch (manualError) {
+              console.error('Manual profile creation failed:', manualError);
+              toast({
+                title: 'Demo login failed',
+                description: manualError.message || 'Failed to create profile manually',
+                variant: 'destructive',
+              });
+              setDemoLoading(null);
+              return;
+            }
+          } else {
+            console.error('No user session after sign up');
+            toast({
+              title: 'Demo login failed',
+              description: 'No user session found after account creation',
+              variant: 'destructive',
+            });
+            setDemoLoading(null);
+            return;
+          }
         }
-      } else if (signInError) {
+
+        console.log('Demo login successful');
+        toast({
+          title: `Welcome, Demo ${account.role}!`,
+          description: 'Exploring the platform.',
+        });
+
+        // Small delay for profile to load
+        await new Promise(resolve => setTimeout(resolve, 300));
+        navigate('/dashboard');
+      } else {
+        console.error('Unexpected sign in error:', signInError.message);
         toast({
           title: 'Demo login failed',
           description: signInError.message || 'Failed to sign in',
           variant: 'destructive',
         });
-        setDemoLoading(null);
-        return;
       }
-
-      toast({
-        title: `Welcome, Demo ${account.role}!`,
-        description: 'Exploring the platform.',
-      });
-
-      // Small delay for profile to load
-      await new Promise(resolve => setTimeout(resolve, 300));
-      navigate('/dashboard');
     } catch (err) {
-      console.error('Demo login error:', err);
+      console.error('Demo login exception:', err);
       toast({
         title: 'Demo login failed',
         description: err.message || 'An unexpected error occurred',

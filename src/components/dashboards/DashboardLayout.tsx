@@ -15,12 +15,19 @@ import {
   User,
   Menu,
   X,
-  Bell
+  Bell,
+  Mail,
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { ProfileDialog } from '@/components/profile/ProfileDialog';
 import { AdBanner } from '@/components/ads/AdBanner';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -33,6 +40,34 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Mock notifications data - replace with real data from API
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      title: 'New competition announced',
+      message: 'The Spring Challenge 2024 has been announced!',
+      read: false,
+      date: '2024-03-15'
+    },
+    {
+      id: 2,
+      title: 'Your badge achievement',
+      message: 'You earned the "Quick Learner" badge!',
+      read: false,
+      date: '2024-03-14'
+    },
+    {
+      id: 3,
+      title: 'Message from moderator',
+      message: 'Please check the updated competition rules',
+      read: true,
+      date: '2024-03-10'
+    }
+  ]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleSignOut = async () => {
     await signOut();
@@ -42,6 +77,16 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
   const initials = profile?.display_name
     ? profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase()
     : profile?.email?.substring(0, 2).toUpperCase() || 'U';
+
+  const markAsRead = (id: number) => {
+    setNotifications(notifications.map(n =>
+      n.id === id ? { ...n, read: true } : n
+    ));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,10 +114,79 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
           <h1 className="hidden md:block text-lg font-display font-semibold">{title}</h1>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-            </Button>
+            <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-4 border-b border-border">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-sm">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map(notification => (
+                      <div
+                        key={notification.id}
+                        className={cn(
+                          "p-3 border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors",
+                          !notification.read && "bg-primary/5"
+                        )}
+                        onClick={() => markAsRead(notification.id)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <h4 className="text-sm font-medium">{notification.title}</h4>
+                              {!notification.read && (
+                                <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{notification.message}</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">{notification.date}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="p-3 border-t border-border">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-between text-xs"
+                    onClick={() => {
+                      setNotificationsOpen(false);
+                      navigate('/dashboard?tab=messages');
+                    }}
+                  >
+                    Open Inbox
+                    <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

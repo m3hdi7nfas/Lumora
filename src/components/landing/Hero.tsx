@@ -74,7 +74,7 @@ export function Hero({
           <ScrollAnimation delay={0.3}>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Link to="/login">
-                <Button size="lg" className="gradient-hero text-lg px-8 py-6 shadow-glow hover:scale-105 transition-transform">
+                <Button size="lg" className="gradient-hero text-lg px-8 py-6 shadow-glow hover:scale-105 transition-transform w-full sm:w-auto">
                   <EditableText
                     value={content.cta_primary}
                     isEditingGlobal={isEditingGlobal}
@@ -83,7 +83,7 @@ export function Hero({
                   <Zap className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 hover:bg-secondary">
+              <Button size="lg" variant="outline" className="text-lg px-8 py-6 hover:bg-secondary w-full sm:w-auto">
                 <EditableText
                   value={content.cta_secondary}
                   isEditingGlobal={isEditingGlobal}

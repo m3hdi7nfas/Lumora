@@ -43,11 +43,13 @@ export function QuestionRepetitionToggle({
       }));
 
       // API call to update question repetition settings
-      const { error } = await supabase.from('questions').upsert({
-        id: questionId,
-        allow_repetition: checked,
-        updated_at: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          allow_repetition: checked,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', questionId);
 
       if (error) {
         console.warn('Supabase save failed:', error.message);

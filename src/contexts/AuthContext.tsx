@@ -13,6 +13,10 @@ interface Profile {
   avatar_url?: string | null;
   avatar_id: string | null;
   school_id?: string | null;
+  score?: number | null;
+  class?: string | null;
+  is_active?: boolean;
+  progress?: number | null;
 }
 
 interface AuthContextType {

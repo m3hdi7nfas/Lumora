@@ -191,6 +191,11 @@ export type Database = {
           role: string
           updated_at: string
           user_id: string
+          score: number | null
+          school_id: string | null
+          class: string | null
+          is_active: boolean
+          progress: number | null
         }
         Insert: {
           avatar_id?: string | null
@@ -201,6 +206,11 @@ export type Database = {
           role?: string
           updated_at?: string
           user_id: string
+          score?: number | null
+          school_id?: string | null
+          class?: string | null
+          is_active?: boolean
+          progress?: number | null
         }
         Update: {
           avatar_id?: string | null
@@ -211,6 +221,11 @@ export type Database = {
           role?: string
           updated_at?: string
           user_id?: string
+          score?: number | null
+          school_id?: string | null
+          class?: string | null
+          is_active?: boolean
+          progress?: number | null
         }
         Relationships: []
       }
@@ -227,6 +242,7 @@ export type Database = {
           question_text: string
           question_type: string
           section_id: string
+          allow_repetition: boolean
         }
         Insert: {
           correct_answer: string
@@ -240,6 +256,7 @@ export type Database = {
           question_text: string
           question_type?: string
           section_id: string
+          allow_repetition?: boolean
         }
         Update: {
           correct_answer?: string
@@ -253,6 +270,7 @@ export type Database = {
           question_text?: string
           question_type?: string
           section_id?: string
+          allow_repetition?: boolean
         }
         Relationships: [
           {

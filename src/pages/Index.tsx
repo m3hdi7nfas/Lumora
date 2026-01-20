@@ -23,43 +23,18 @@ const Index = () => {
   const { data: content = defaultSiteContent } = useQuery({
     queryKey: ['landing-content'],
     queryFn: async () => {
-      // First try localStorage for local-first persistence
+      // Use localStorage for persistence - no database dependency
       const local = localStorage.getItem('lumora-landing-content');
 
-      try {
-        // Check if site_settings table exists first
-        const { data: tableCheck, error: tableError } = await supabase
-          .from('site_settings')
-          .select('*')
-          .limit(1);
-
-        if (tableError) {
-          console.log('site_settings table does not exist, using local storage');
-          if (local) {
-            return JSON.parse(local) as SiteContent;
-          }
+      if (local) {
+        try {
+          return JSON.parse(local) as SiteContent;
+        } catch (e) {
+          console.error('Error parsing local content, using default:', e);
           return defaultSiteContent;
         }
-
-        // If table exists, try to fetch the landing page content
-        const { data, error } = await supabase
-          .from('site_settings')
-          .select('value')
-          .eq('key', 'landing_page')
-          .single();
-
-        if (data?.value) {
-          const remoteContent = data.value as SiteContent;
-          localStorage.setItem('lumora-landing-content', JSON.stringify(remoteContent));
-          return remoteContent;
-        }
-      } catch (e) {
-        console.log('Database fetch failed, using local storage if available');
       }
 
-      if (local) {
-        return JSON.parse(local) as SiteContent;
-      }
       return defaultSiteContent;
     },
     initialData: () => {
@@ -77,32 +52,8 @@ const Index = () => {
 
   const saveContent = useMutation({
     mutationFn: async (newContent: SiteContent) => {
-      // Always save to localStorage first
+      // Save to localStorage only - no database dependency
       localStorage.setItem('lumora-landing-content', JSON.stringify(newContent));
-
-      try {
-        // Check if site_settings table exists
-        const { data: tableCheck, error: tableError } = await supabase
-          .from('site_settings')
-          .select('*')
-          .limit(1);
-
-        if (tableError) {
-          console.log('site_settings table does not exist, skipping database save');
-          return;
-        }
-
-        // If table exists, try to save
-        const { error } = await supabase
-          .from('site_settings')
-          .upsert({ key: 'landing_page', value: newContent });
-
-        if (error) {
-          console.warn('Supabase save failed:', error.message);
-        }
-      } catch (e) {
-        console.warn('Supabase save failed');
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['landing-content'] });
@@ -133,7 +84,7 @@ const Index = () => {
     // Optimistic update of local state
     queryClient.setQueryData(['landing-content'], updatedContent);
 
-    // Save to database
+    // Save to localStorage
     saveContent.mutate(updatedContent);
   };
 

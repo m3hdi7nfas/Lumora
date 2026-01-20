@@ -13,9 +13,9 @@ import { AdBanner } from '@/components/ads/AdBanner';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
-  moderator: { email: 'demo.moderator@eduquest.com', password: 'Demo123!', role: 'Moderator', icon: Shield },
-  teacher: { email: 'demo.teacher@eduquest.com', password: 'Demo123!', role: 'Teacher', icon: BookOpen },
-  student: { email: 'demo.student@eduquest.com', password: 'Demo123!', role: 'Student', icon: User },
+  moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'Moderator', icon: Shield },
+  teacher: { email: 'demo.teacher@lumora.com', password: 'Demo123!', role: 'Teacher', icon: BookOpen },
+  student: { email: 'demo.student@lumora.com', password: 'Demo123!', role: 'Student', icon: User },
 };
 
 export default function Login() {
@@ -141,7 +141,7 @@ export default function Login() {
                 <GraduationCap className="w-6 h-6 text-primary-foreground" />
               </div>
             </Link>
-            <CardTitle className="text-2xl font-display">Welcome Back</CardTitle>
+            <CardTitle className="text-2xl font-display">Welcome to Lumora</CardTitle>
             <CardDescription className="text-sm">
               Sign in to continue your learning journey
             </CardDescription>

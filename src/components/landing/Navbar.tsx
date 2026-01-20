@@ -13,7 +13,7 @@ export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGl
           </div>
           <span className="text-xl font-display font-bold">
             <EditableText
-              value="EduQuest"
+              value="Lumora"
               isEditingGlobal={isEditingGlobal}
               onSave={(val) => updateContent?.('siteName', val)}
             />

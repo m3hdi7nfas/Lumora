@@ -62,7 +62,7 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
               <div className="p-2 rounded-xl gradient-hero">
                 <GraduationCap className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="font-display font-bold hidden sm:block">EduQuest</span>
+              <span className="font-display font-bold hidden sm:block">Lumora</span>
             </Link>
           </div>
 

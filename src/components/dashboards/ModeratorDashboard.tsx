@@ -44,16 +44,7 @@ import {
   UserCheck,
   Users as UsersIcon,
   FileUp,
-  Image as ImageIcon,
-  Crown,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  FilePlus,
-  FolderPlus,
-  BadgePlus,
-  MailPlus,
-  UserCog
+  Image as ImageIcon
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,7 +53,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 
 function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -77,7 +67,6 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
     { id: 'badges', icon: Award, label: 'Badges' },
     { id: 'avatars', icon: UserPlus, label: 'Avatars' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
-    { id: 'submissions', icon: Clock, label: 'My Submissions' },
   ];
 
   return (
@@ -108,9 +97,6 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
-            {item.id === 'submissions' && (
-              <Badge className="ml-auto bg-warning text-warning-foreground">2</Badge>
-            )}
           </button>
         ))}
       </nav>
@@ -148,23 +134,22 @@ export default function ModeratorDashboard() {
       title="Lumora Moderator Dashboard"
       sidebar={<ModeratorSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} />}
-      {activeTab === 'profile' && <ModeratorProfileTab />}
-      {activeTab === 'schools' && <ModeratorSchoolsTab />}
-      {activeTab === 'users' && <ModeratorUsersTab />}
-      {activeTab === 'competitions' && <ModeratorCompetitionsTab />}
-      {activeTab === 'questions' && <ModeratorQuestionsTab />}
-      {activeTab === 'leaderboard' && <ModeratorLeaderboardTab />}
-      {activeTab === 'badges' && <ModeratorBadgesTab />}
-      {activeTab === 'avatars' && <ModeratorAvatarsTab />}
-      {activeTab === 'messages' && <ModeratorMessagesTab />}
-      {activeTab === 'submissions' && <ModeratorSubmissionsTab />}
+      {activeTab === 'overview' && <OverviewTab setActiveTab={setActiveTab} />}
+      {activeTab === 'profile' && <ProfileTab />}
+      {activeTab === 'schools' && <SchoolsTab />}
+      {activeTab === 'users' && <UsersTab />}
+      {activeTab === 'competitions' && <CompetitionsTab />}
+      {activeTab === 'questions' && <QuestionsTab />}
+      {activeTab === 'leaderboard' && <LeaderboardTab />}
+      {activeTab === 'badges' && <BadgesTab />}
+      {activeTab === 'avatars' && <AvatarsTab />}
+      {activeTab === 'messages' && <MessagesTab />}
     </DashboardLayout>
   );
 }
 
-// Moderator Overview Tab Component
-function ModeratorOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+// Overview Tab Component
+function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
   const [showAds, setShowAds] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -220,389 +205,11 @@ function ModeratorOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) =>
         const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
         if (questionsError) throw questionsError;
 
-        // Get pending submissions
-        const { data: pending, error: pendingError } = await supabase.from('pending_approvals').select('*');
-        if (pendingError) throw pendingError;
-
         return {
           totalUsers: users.length,
           activeCompetitions: competitions.length,
           totalQuestions: questions.length,
-          pendingSubmissions: pending?.length || 0
-        };
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-        return {
-          totalUsers: 0,
-          activeCompetitions: 0,
-          totalQuestions: 0,
-          pendingSubmissions: 0
-        };
-      }
-    }
-  });
-
-  const quickActions = [
-    { id: 'competitions', icon: Trophy, title: 'Create Competitions', description: 'Create new competitions' },
-    { id: 'questions', icon: FileQuestion, title: 'Add Questions', description: 'Create new questions' },
-    { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
-    { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
-    { id: 'submissions', icon: Clock, title: 'My Submissions', description: 'View pending approvals' },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Moderator Dashboard</h1>
-          <p className="text-muted-foreground">Manage content and users with admin approval</p>
-        </div>
-      </div>
-
-      {/* Settings Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Ads Toggle */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Advertisement Settings</CardTitle>
-            <CardDescription>Control whether ads are displayed to users</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <LayoutTemplate className="w-5 h-5 text-primary" />
-                <span>Show Advertisements</span>
-              </div>
-              <Switch
-                checked={showAds}
-                onCheckedChange={handleAdsToggle}
-                id="ads-toggle"
-                disabled={loading}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Users"
-          value={stats?.totalUsers?.toLocaleString() || '0'}
-          icon={Users}
-          className="bg-primary/10 border-primary/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="Active Competitions"
-          value={stats?.activeCompetitions?.toString() || '0'}
-          icon={Trophy}
-          className="bg-accent/10 border-accent/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="Total Questions"
-          value={stats?.totalQuestions?.toLocaleString() || '0'}
-          icon={FileQuestion}
-          className="bg-success/10 border-success/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="My Submissions"
-          value={stats?.pendingSubmissions?.toString() || '0'}
-          icon={Clock}
-          className="bg-warning/10 border-warning/20"
-          loading={statsLoading}
-        />
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common moderator tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => setActiveTab(action.id)}
-                className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-muted">
-                    <action.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{action.title}</h3>
-                    <p className="text-xs text-muted-foreground">{action.description}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest platform events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-center text-muted-foreground py-4">No recent activity</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
-  return (
-    <Card className={className}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{I understand you want to implement a comprehensive admin and moderator system with content creation and approval workflows. Let me create this functionality step by step.
-
-First, let me update the Admin and Moderator dashboards to include all the requested features:
-
-<dyad-write path="src/components/dashboards/AdminDashboard.tsx" description="Enhanced Admin Dashboard with full content management">
-import { useState, useEffect } from 'react';
-import { DashboardLayout } from './DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  School,
-  Users,
-  Trophy,
-  FileQuestion,
-  Award,
-  Settings,
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  UserPlus,
-  BookOpen,
-  Eye,
-  ShieldPlus,
-  MessageSquare,
-  LayoutTemplate,
-  ImagePlus,
-  X,
-  Loader2,
-  Check,
-  BarChart3,
-  CheckSquare,
-  Square,
-  RefreshCw,
-  User,
-  LogOut,
-  Calendar,
-  Upload,
-  FileText,
-  List,
-  Mail,
-  Send,
-  UserCheck,
-  Users as UsersIcon,
-  FileUp,
-  Image as ImageIcon,
-  Crown,
-  CheckCircle,
-  Clock,
-  AlertTriangle,
-  FilePlus,
-  FolderPlus,
-  BadgePlus,
-  MailPlus,
-  UserCog
-} from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Switch } from '@/components/ui/switch';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-
-function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
-  const { profile } = useAuth();
-  const navItems = [
-    { id: 'overview', icon: Settings, label: 'Overview' },
-    { id: 'profile', icon: Users, label: 'My Profile' },
-    { id: 'schools', icon: School, label: 'Schools' },
-    { id: 'users', icon: Users, label: 'Users' },
-    { id: 'competitions', icon: Trophy, label: 'Competitions' },
-    { id: 'questions', icon: FileQuestion, label: 'Questions' },
-    { id: 'leaderboard', icon: BarChart3, label: 'Leaderboard' },
-    { id: 'badges', icon: Award, label: 'Badges' },
-    { id: 'avatars', icon: UserPlus, label: 'Avatars' },
-    { id: 'messages', icon: MessageSquare, label: 'Messages' },
-    { id: 'approvals', icon: CheckCircle, label: 'Approvals' },
-  ];
-
-  return (
-    <div className="flex flex-col h-full">
-      <nav className="flex-1 space-y-2">
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => {
-              setActiveTab(item.id);
-              // Close sidebar on mobile
-              if (window.innerWidth < 1024) {
-                const sidebar = document.querySelector('aside');
-                if (sidebar) {
-                  sidebar.classList.add('-translate-x-full');
-                  sidebar.classList.remove('translate-x-0');
-                }
-                const overlay = document.querySelector('.fixed.inset-0.bg-foreground\\/20');
-                if (overlay) {
-                  (overlay as HTMLElement).style.display = 'none';
-                }
-              }
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-              ? 'bg-primary text-primary-foreground shadow-card'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="font-medium">{item.label}</span>
-            {item.id === 'approvals' && (
-              <Badge className="ml-auto bg-warning text-warning-foreground">3</Badge>
-            )}
-          </button>
-        ))}
-      </nav>
-
-      <div className="mt-auto pt-6 border-t border-border/50">
-        <div className="p-4 rounded-2xl bg-muted/30">
-          <div className="flex items-center gap-3 mb-3">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} className="w-10 h-10 rounded-full object-cover" alt="Profile" />
-            ) : (
-              <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
-                {profile?.display_name?.substring(0, 2).toUpperCase() || profile?.email?.substring(0, 2).toUpperCase() || 'AD'}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate">{profile?.display_name || 'Admin'}</p>
-              <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setActiveTab('profile')}>
-            <Settings className="w-3 h-3 mr-2" />
-            Edit Profile
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
-
-  return (
-    <DashboardLayout
-      title="Lumora Admin Dashboard"
-      sidebar={<AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
-    >
-      {activeTab === 'overview' && <AdminOverviewTab setActiveTab={setActiveTab} />}
-      {activeTab === 'profile' && <AdminProfileTab />}
-      {activeTab === 'schools' && <AdminSchoolsTab />}
-      {activeTab === 'users' && <AdminUsersTab />}
-      {activeTab === 'competitions' && <AdminCompetitionsTab />}
-      {activeTab === 'questions' && <AdminQuestionsTab />}
-      {activeTab === 'leaderboard' && <AdminLeaderboardTab />}
-      {activeTab === 'badges' && <AdminBadgesTab />}
-      {activeTab === 'avatars' && <AdminAvatarsTab />}
-      {activeTab === 'messages' && <AdminMessagesTab />}
-      {activeTab === 'approvals' && <AdminApprovalsTab />}
-    </DashboardLayout>
-  );
-}
-
-// Admin Overview Tab Component
-function AdminOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
-  const { toast } = useToast();
-  const [showAds, setShowAds] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const queryClient = useQueryClient();
-
-  // Load settings from localStorage on component mount
-  useEffect(() => {
-    const savedShowAds = localStorage.getItem('showAds');
-    if (savedShowAds !== null) {
-      setShowAds(savedShowAds === 'true');
-    }
-  }, []);
-
-  const handleAdsToggle = async (checked: boolean) => {
-    setLoading(true);
-    try {
-      setShowAds(checked);
-      // Save to localStorage
-      localStorage.setItem('showAds', checked.toString());
-
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new CustomEvent('adsSettingChanged', { detail: { showAds: checked } }));
-
-      toast({
-        title: 'Ad settings updated',
-        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error updating ad settings',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch stats from database
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['admin-stats'],
-    queryFn: async () => {
-      try {
-        // Get total users
-        const { data: users, error: usersError } = await supabase.from('profiles').select('*');
-        if (usersError) throw usersError;
-
-        // Get active competitions
-        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
-        if (compError) throw compError;
-
-        // Get total questions
-        const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
-        if (questionsError) throw questionsError;
-
-        // Get pending approvals
-        const { data: pending, error: pendingError } = await supabase.from('pending_approvals').select('*');
-        if (pendingError) throw pendingError;
-
-        return {
-          totalUsers: users.length,
-          activeCompetitions: competitions.length,
-          totalQuestions: questions.length,
-          pendingReviews: pending?.length || 0
+          pendingReviews: 0 // This would come from a more complex query
         };
       } catch (error) {
         console.error('Error fetching stats:', error);
@@ -621,15 +228,14 @@ function AdminOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => voi
     { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
-    { id: 'approvals', icon: CheckCircle, title: 'Pending Approvals', description: 'Review moderator submissions' },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Full control over platform activity and settings</p>
+          <h1 className="text-2xl font-display font-bold">Moderator Dashboard</h1>
+          <p className="text-muted-foreground">Overview of platform activity and quick actions</p>
         </div>
       </div>
 
@@ -682,9 +288,9 @@ function AdminOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => voi
           loading={statsLoading}
         />
         <StatCard
-          title="Pending Approvals"
+          title="Pending Reviews"
           value={stats?.pendingReviews?.toString() || '0'}
-          icon={Clock}
+          icon={Eye}
           className="bg-warning/10 border-warning/20"
           loading={statsLoading}
         />
@@ -694,7 +300,7 @@ function AdminOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => voi
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common admin tasks</CardDescription>
+          <CardDescription>Common moderator tasks</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -753,8 +359,8 @@ function StatCard({ title, value, icon: Icon, className, loading = false }: { ti
   );
 }
 
-// Admin Profile Tab Component
-function AdminProfileTab() {
+// Profile Tab Component
+function ProfileTab() {
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -762,7 +368,7 @@ function AdminProfileTab() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold">My Profile</h1>
-        <p className="text-muted-foreground">Manage your admin account</p>
+        <p className="text-muted-foreground">Manage your moderator account</p>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
@@ -779,7 +385,6 @@ function AdminProfileTab() {
             <div className="space-y-2">
               <Label>Role</Label>
               <Input value={profile?.role || ''} disabled className="bg-muted" />
-              <p className="text-xs text-muted-foreground">Admin role cannot be changed</p>
             </div>
 
             <div className="space-y-2">
@@ -815,8 +420,8 @@ function AdminProfileTab() {
   );
 }
 
-// Admin Schools Tab Component
-function AdminSchoolsTab() {
+// Schools Tab Component
+function SchoolsTab() {
   const [schools, setSchools] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [newSchool, setNewSchool] = useState({ name: '', password: '' });
@@ -1216,8 +821,8 @@ function AdminSchoolsTab() {
   );
 }
 
-// Admin Users Tab Component
-function AdminUsersTab() {
+// Users Tab Component
+function UsersTab() {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
@@ -1249,12 +854,6 @@ function AdminUsersTab() {
   const handleUpdateUser = async () => {
     if (!editingUser.email || !editingUser.role) {
       toast({ title: 'Please fill all required fields', variant: 'destructive' });
-      return;
-    }
-
-    // Prevent changing admin role
-    if (editingUser.role === 'admin' && editingUser.originalRole !== 'admin') {
-      toast({ title: 'Cannot change to admin role', description: 'Admin role can only be assigned by system', variant: 'destructive' });
       return;
     }
 
@@ -1292,18 +891,6 @@ function AdminUsersTab() {
     setLoading(false);
   };
 
-  const handleAddModerator = async () => {
-    setLoading(true);
-    try {
-      // This would be a more complex process in a real app
-      // For demo purposes, we'll just show a success message
-      toast({ title: 'Moderator creation', description: 'Moderator creation would be implemented with proper user invitation flow', variant: 'info' });
-    } catch (error) {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -1314,31 +901,6 @@ function AdminUsersTab() {
         <h1 className="text-2xl font-display font-bold">User Management</h1>
         <p className="text-muted-foreground">View and manage all users</p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Moderator</CardTitle>
-          <CardDescription>Invite a new moderator to the platform</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Button
-              onClick={handleAddModerator}
-              disabled={loading}
-              className="gradient-hero"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Add Moderator'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -1409,7 +971,7 @@ function AdminUsersTab() {
                               variant="outline"
                               size="sm"
                               className="h-8 w-8 p-0"
-                              onClick={() => setEditingUser({ ...user, originalRole: user.role })}
+                              onClick={() => setEditingUser(user)}
                             >
                               <Edit className="w-3 h-3" />
                             </Button>
@@ -1478,7 +1040,6 @@ function AdminUsersTab() {
                 <Select
                   value={editingUser.role}
                   onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
-                  disabled={editingUser.originalRole === 'admin'}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
@@ -1487,12 +1048,9 @@ function AdminUsersTab() {
                     <SelectItem value="student">Student</SelectItem>
                     <SelectItem value="teacher">Teacher</SelectItem>
                     <SelectItem value="moderator">Moderator</SelectItem>
-                    <SelectItem value="admin" disabled={editingUser.originalRole !== 'admin'}>Admin</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-                {editingUser.originalRole === 'admin' && (
-                  <p className="text-xs text-muted-foreground">Admin role cannot be changed</p>
-                )}
               </div>
             </div>
             <DialogFooter>
@@ -1515,8 +1073,8 @@ function AdminUsersTab() {
   );
 }
 
-// Admin Competitions Tab Component
-function AdminCompetitionsTab() {
+// Competitions Tab Component
+function CompetitionsTab() {
   const [competitions, setCompetitions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1528,8 +1086,6 @@ function AdminCompetitionsTab() {
     start_date: '',
     end_date: ''
   });
-  const [sections, setSections] = useState([]);
-  const [newSection, setNewSection] = useState({ name: '', description: '', competition_id: '' });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1546,18 +1102,6 @@ function AdminCompetitionsTab() {
       setCompetitions(data || []);
     } catch (error) {
       toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const fetchSections = async (competitionId: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('sections').select('*').eq('competition_id', competitionId);
-      if (error) throw error;
-      setSections(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching sections', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1637,33 +1181,6 @@ function AdminCompetitionsTab() {
     } catch (error) {
       toast({ title: 'Error deleting competition', description: error.message, variant: 'destructive' });
     }
-    setLoading(false);
-  };
-
-  const handleCreateSection = async () => {
-    if (!newSection.name || !newSection.competition_id) {
-      toast({ title: 'Please fill all required fields', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.from('sections').insert({
-        name: newSection.name,
-        description: newSection.description,
-        competition_id: newSection.competition_id
-      });
-
-      if (error) throw error;
-
-      toast({ title: 'Section created successfully!' });
-      setNewSection({ name: '', description: '', competition_id: '' });
-      fetchSections(newSection.competition_id);
-    } catch (error) {
-      toast({ title: 'Error creating section', description: error.message, variant: 'destructive' });
-    }
-
     setLoading(false);
   };
 
@@ -1795,25 +1312,10 @@ function AdminCompetitionsTab() {
                             variant="outline"
                             size="sm"
                             className="flex-1"
-                            onClick={() => {
-                              setEditingCompetition(competition);
-                              fetchSections(competition.id);
-                            }}
+                            onClick={() => setEditingCompetition(competition)}
                           >
                             <Edit className="w-3 h-3 mr-2" />
                             Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => {
-                              setNewSection({ ...newSection, competition_id: competition.id });
-                              fetchSections(competition.id);
-                            }}
-                          >
-                            <FolderPlus className="w-3 h-3 mr-2" />
-                            Add Section
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -1850,49 +1352,6 @@ function AdminCompetitionsTab() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Create Section Dialog */}
-      {newSection.competition_id && (
-        <Dialog open={!!newSection.competition_id} onOpenChange={() => setNewSection({ name: '', description: '', competition_id: '' })}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Section</DialogTitle>
-              <DialogDescription>Create a new section for this competition</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Section Name</Label>
-                <Input
-                  value={newSection.name}
-                  onChange={(e) => setNewSection({ ...newSection, name: e.target.value })}
-                  placeholder="Enter section name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={newSection.description}
-                  onChange={(e) => setNewSection({ ...newSection, description: e.target.value })}
-                  placeholder="Enter section description"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setNewSection({ name: '', description: '', competition_id: '' })}>Cancel</Button>
-              <Button onClick={handleCreateSection} disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Section'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Edit Competition Dialog */}
       {editingCompetition && (
@@ -1964,8 +1423,8 @@ function AdminCompetitionsTab() {
   );
 }
 
-// Admin Questions Tab Component
-function AdminQuestionsTab() {
+// Questions Tab Component
+function QuestionsTab() {
   const [questions, setQuestions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -2469,8 +1928,8 @@ function AdminQuestionsTab() {
   );
 }
 
-// Admin Leaderboard Tab Component
-function AdminLeaderboardTab() {
+// Leaderboard Tab Component
+function LeaderboardTab() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(false);
   const [leaderboardType, setLeaderboardType] = useState('schools');
@@ -2672,8 +2131,8 @@ function AdminLeaderboardTab() {
   );
 }
 
-// Admin Badges Tab Component
-function AdminBadgesTab() {
+// Badges Tab Component
+function BadgesTab() {
   const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingBadge, setEditingBadge] = useState(null);
@@ -3058,8 +2517,8 @@ function AdminBadgesTab() {
   );
 }
 
-// Admin Avatars Tab Component
-function AdminAvatarsTab() {
+// Avatars Tab Component
+function AvatarsTab() {
   const [avatars, setAvatars] = useState([]);
   const [loading, setLoading] = useState(false);
   const [newAvatar, setNewAvatar] = useState({
@@ -3239,8 +2698,8 @@ function AdminAvatarsTab() {
   );
 }
 
-// Admin Messages Tab Component
-function AdminMessagesTab() {
+// Messages Tab Component
+function MessagesTab() {
   const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
@@ -3585,238 +3044,6 @@ function AdminMessagesTab() {
                 <div className="text-center text-muted-foreground">
                   <MessageSquare className="w-12 h-12 mx-auto mb-4" />
                   <p>Select a message to view details</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Admin Approvals Tab Component
-function AdminApprovalsTab() {
-  const [pendingItems, setPendingItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [approvalAction, setApprovalAction] = useState('');
-  const { toast } = useToast();
-
-  // Mock data for pending approvals
-  useEffect(() => {
-    // In a real app, this would fetch from a pending_approvals table
-    const mockPendingItems = [
-      {
-        id: '1',
-        type: 'competition',
-        title: 'Spring Math Challenge',
-        submitted_by: 'Demo Moderator',
-        submitted_at: '2024-03-15',
-        status: 'pending',
-        details: {
-          name: 'Spring Math Challenge',
-          description: 'Annual math competition for high school students',
-          start_date: '2024-04-01',
-          end_date: '2024-04-30'
-        }
-      },
-      {
-        id: '2',
-        type: 'question',
-        title: 'Advanced Algebra Question',
-        submitted_by: 'Demo Teacher',
-        submitted_at: '2024-03-14',
-        status: 'pending',
-        details: {
-          question_text: 'Solve for x: 3x² + 5x - 2 = 0',
-          correct_answer: 'x = [-5 ± √(25 + 24)] / 6',
-          points: 15,
-          question_type: 'short_answer'
-        }
-      },
-      {
-        id: '3',
-        type: 'badge',
-        title: 'Math Master Badge',
-        submitted_by: 'Demo Moderator',
-        submitted_at: '2024-03-13',
-        status: 'pending',
-        details: {
-          name: 'Math Master',
-          description: 'Awarded for solving 100 advanced math problems',
-          requirement_type: 'questions_answered',
-          requirement_value: 100
-        }
-      }
-    ];
-    setPendingItems(mockPendingItems);
-  }, []);
-
-  const handleApprove = async (itemId: string) => {
-    setLoading(true);
-    try {
-      // In a real app, this would update the database
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setPendingItems(pendingItems.filter(item => item.id !== itemId));
-      toast({ title: 'Item approved successfully!' });
-    } catch (error) {
-      toast({ title: 'Error approving item', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleReject = async (itemId: string) => {
-    setLoading(true);
-    try {
-      // In a real app, this would update the database
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setPendingItems(pendingItems.filter(item => item.id !== itemId));
-      toast({ title: 'Item rejected successfully!' });
-    } catch (error) {
-      toast({ title: 'Error rejecting item', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const getTypeInfo = (type: string) => {
-    const types = {
-      competition: { icon: Trophy, color: 'text-accent' },
-      question: { icon: FileQuestion, color: 'text-success' },
-      badge: { icon: Award, color: 'text-warning' },
-      school: { icon: School, color: 'text-primary' },
-      user: { icon: Users, color: 'text-muted-foreground' }
-    };
-    return types[type] || { icon: FileText, color: 'text-muted-foreground' };
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
-        <p className="text-muted-foreground">Review and approve moderator submissions</p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Items</CardTitle>
-              <CardDescription>{pendingItems.length} items waiting for approval</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                {pendingItems.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No pending items</p>
-                ) : (
-                  pendingItems.map((item) => {
-                    const { icon: Icon, color } = getTypeInfo(item.type);
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => setSelectedItem(item)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors border border-border/50 hover:bg-muted/50 ${selectedItem?.id === item.id ? 'bg-primary/10 border-primary' : ''}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-lg ${item.status === 'pending' ? 'bg-warning/10' : 'bg-success/10'}`}>
-                            <Icon className={`w-5 h-5 ${color}`} />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-medium">{item.title}</p>
-                              <span className={`text-xs px-2 py-1 rounded-full ${item.status === 'pending' ? 'bg-warning/20 text-warning' : 'bg-success/20 text-success'}`}>
-                                {item.status}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">Submitted by: {item.submitted_by}</p>
-                            <p className="text-xs text-muted-foreground">{item.submitted_at}</p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-2">
-          {selectedItem ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{selectedItem.title}</CardTitle>
-                <CardDescription>
-                  Submitted by {selectedItem.submitted_by} • {selectedItem.submitted_at}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <div className="flex items-center gap-2">
-                      {getTypeInfo(selectedItem.type).icon({ className: 'w-4 h-4' })}
-                      <span className="capitalize">{selectedItem.type}</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Details</Label>
-                    <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-                      {Object.entries(selectedItem.details).map(([key, value]) => (
-                        <div key={key} className="flex items-start gap-3">
-                          <span className="text-sm font-medium capitalize w-24">{key.replace('_', ' ')}</span>
-                          <span className="text-sm flex-1">{String(value)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-4">
-                    <Label>Action</Label>
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={() => handleApprove(selectedItem.id)}
-                        disabled={loading}
-                        className="flex-1 gradient-success"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Approving...
-                          </>
-                        ) : (
-                          'Approve'
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => handleReject(selectedItem.id)}
-                        disabled={loading}
-                        variant="destructive"
-                        className="flex-1"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Rejecting...
-                          </>
-                        ) : (
-                          'Reject'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-64">
-                <div className="text-center text-muted-foreground">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-4" />
-                  <p>Select an item to review</p>
                 </div>
               </CardContent>
             </Card>

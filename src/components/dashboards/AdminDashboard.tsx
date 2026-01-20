@@ -36,6 +36,15 @@ import {
   User,
   LogOut,
   Calendar,
+  Upload,
+  FileText,
+  List,
+  Mail,
+  Send,
+  UserCheck,
+  Users as UsersIcon,
+  FileUp,
+  Image as ImageIcon,
   Crown
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -420,6 +429,9 @@ function AdminSchoolsTab() {
   const [newSchool, setNewSchool] = useState({ name: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [editingSchool, setEditingSchool] = useState(null);
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [students, setStudents] = useState([]);
+  const [bulkStudents, setBulkStudents] = useState('');
   const { toast } = useToast();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -436,6 +448,18 @@ function AdminSchoolsTab() {
       setSchools(data || []);
     } catch (error) {
       toast({ title: 'Error fetching schools', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchStudentsForSchool = async (schoolId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('school_id', schoolId);
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -504,6 +528,38 @@ function AdminSchoolsTab() {
     } catch (error) {
       toast({ title: 'Error deleting school', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
+  };
+
+  const handleBulkAddStudents = async () => {
+    if (!bulkStudents.trim() || !selectedSchool) {
+      toast({ title: 'Please provide student emails and select a school', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const emails = bulkStudents.split('\n').filter(email => email.trim());
+      const studentData = emails.map(email => ({
+        email: email.trim(),
+        role: 'student',
+        school_id: selectedSchool.id,
+        is_active: true,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase.from('profiles').insert(studentData);
+
+      if (error) throw error;
+
+      toast({ title: `Successfully added ${emails.length} students!` });
+      setBulkStudents('');
+      fetchStudentsForSchool(selectedSchool.id);
+    } catch (error) {
+      toast({ title: 'Error adding students', description: error.message, variant: 'destructive' });
+    }
+
     setLoading(false);
   };
 
@@ -599,6 +655,17 @@ function AdminSchoolsTab() {
                           variant="outline"
                           size="sm"
                           className="h-8 w-8 p-0"
+                          onClick={() => {
+                            setSelectedSchool(school);
+                            fetchStudentsForSchool(school.id);
+                          }}
+                        >
+                          <UsersIcon className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => setEditingSchool(school)}
                         >
                           <Edit className="w-3 h-3" />
@@ -636,6 +703,79 @@ function AdminSchoolsTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* School Students View */}
+      {selectedSchool && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Students in {selectedSchool.name}</CardTitle>
+            <CardDescription>View and manage students for this school</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Bulk Add Students (one email per line)</Label>
+                <Textarea
+                  value={bulkStudents}
+                  onChange={(e) => setBulkStudents(e.target.value)}
+                  placeholder="student1@school.com&#10;student2@school.com&#10;student3@school.com"
+                  rows={5}
+                />
+                <Button
+                  onClick={handleBulkAddStudents}
+                  disabled={loading}
+                  className="gradient-hero"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    'Bulk Add Students'
+                  )}
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto">
+                {students.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No students in this school yet</p>
+                ) : (
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="p-3 text-left font-medium">Name</th>
+                        <th className="p-3 text-left font-medium">Email</th>
+                        <th className="p-3 text-left font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.map((student) => (
+                        <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                                {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                              </div>
+                              <span>{student.display_name || 'No name'}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-muted-foreground">{student.email}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                              {student.is_active ? 'active' : 'inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit School Dialog */}
       {editingSchool && (
@@ -951,6 +1091,13 @@ function AdminCompetitionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingCompetition, setEditingCompetition] = useState(null);
+  const [newCompetition, setNewCompetition] = useState({
+    name: '',
+    description: '',
+    is_active: true,
+    start_date: '',
+    end_date: ''
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -971,6 +1118,41 @@ function AdminCompetitionsTab() {
     setLoading(false);
   };
 
+  const handleCreateCompetition = async () => {
+    if (!newCompetition.name) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('competitions').insert({
+        name: newCompetition.name,
+        description: newCompetition.description,
+        is_active: newCompetition.is_active,
+        start_date: newCompetition.start_date,
+        end_date: newCompetition.end_date
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Competition created successfully!' });
+      setNewCompetition({
+        name: '',
+        description: '',
+        is_active: true,
+        start_date: '',
+        end_date: ''
+      });
+      fetchCompetitions();
+    } catch (error) {
+      toast({ title: 'Error creating competition', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
   const handleUpdateCompetition = async () => {
     if (!editingCompetition.name) {
       toast({ title: 'Please fill all required fields', variant: 'destructive' });
@@ -983,7 +1165,9 @@ function AdminCompetitionsTab() {
       const { error } = await supabase.from('competitions').update({
         name: editingCompetition.name,
         description: editingCompetition.description,
-        is_active: editingCompetition.is_active
+        is_active: editingCompetition.is_active,
+        start_date: editingCompetition.start_date,
+        end_date: editingCompetition.end_date
       }).eq('id', editingCompetition.id);
 
       if (error) throw error;
@@ -1025,6 +1209,77 @@ function AdminCompetitionsTab() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Create New Competition</CardTitle>
+          <CardDescription>Add a new competition to the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Competition Name</Label>
+              <Input
+                value={newCompetition.name}
+                onChange={(e) => setNewCompetition({ ...newCompetition, name: e.target.value })}
+                placeholder="Enter competition name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newCompetition.description}
+                onChange={(e) => setNewCompetition({ ...newCompetition, description: e.target.value })}
+                placeholder="Enter competition description"
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.start_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, start_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.end_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, end_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-active"
+                checked={newCompetition.is_active}
+                onCheckedChange={(checked) => setNewCompetition({ ...newCompetition, is_active: checked })}
+              />
+              <Label htmlFor="is-active">Active Competition</Label>
+            </div>
+
+            <Button
+              onClick={handleCreateCompetition}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Competition'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Competitions List</CardTitle>
           <CardDescription>All platform competitions</CardDescription>
         </CardHeader>
@@ -1061,12 +1316,8 @@ function AdminCompetitionsTab() {
                           <span>{competition.start_date ? new Date(competition.start_date).toLocaleDateString() : 'No start date'}</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm">
-                          <Users className="w-4 h-4 text-muted-foreground" />
-                          <span>{competition.participants || 0} participants</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Trophy className="w-4 h-4 text-muted-foreground" />
-                          <span>{competition.prize || 'No prize specified'}</span>
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>{competition.end_date ? new Date(competition.end_date).toLocaleDateString() : 'No end date'}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -1137,6 +1388,24 @@ function AdminCompetitionsTab() {
                   onChange={(e) => setEditingCompetition({ ...editingCompetition, description: e.target.value })}
                 />
               </div>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input
+                    type="date"
+                    value={editingCompetition.start_date || ''}
+                    onChange={(e) => setEditingCompetition({ ...editingCompetition, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={editingCompetition.end_date || ''}
+                    onChange={(e) => setEditingCompetition({ ...editingCompetition, end_date: e.target.value })}
+                  />
+                </div>
+              </div>
               <div className="flex items-center gap-3">
                 <Checkbox
                   id="is-active"
@@ -1172,6 +1441,20 @@ function AdminQuestionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [newQuestion, setNewQuestion] = useState({
+    question_text: '',
+    correct_answer: '',
+    points: 10,
+    options: [],
+    question_type: 'multiple_choice',
+    section_id: '',
+    image_url: '',
+    allow_repetition: true
+  });
+  const [sections, setSections] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [selectedCompetition, setSelectedCompetition] = useState(null);
+  const [fileUploading, setFileUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1191,6 +1474,100 @@ function AdminQuestionsTab() {
     setLoading(false);
   };
 
+  const fetchSections = async () => {
+    try {
+      const { data, error } = await supabase.from('sections').select('*');
+      if (error) throw error;
+      setSections(data || []);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+    }
+  };
+
+  const fetchCompetitions = async () => {
+    try {
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
+    } catch (error) {
+      console.error('Error fetching competitions:', error);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    setFileUploading(true);
+
+    try {
+      // Generate a unique filename
+      const fileName = `questions/${Date.now()}_${file.name}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('question_images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('question_images')
+        .getPublicUrl(fileName);
+
+      if (urlData.publicUrl) {
+        setNewQuestion({ ...newQuestion, image_url: urlData.publicUrl });
+        toast({ title: 'Image uploaded successfully!' });
+      }
+    } catch (error) {
+      toast({ title: 'Error uploading image', description: error.message, variant: 'destructive' });
+    }
+
+    setFileUploading(false);
+  };
+
+  const handleCreateQuestion = async () => {
+    if (!newQuestion.question_text || !newQuestion.correct_answer) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('questions').insert({
+        question_text: newQuestion.question_text,
+        correct_answer: newQuestion.correct_answer,
+        points: newQuestion.points,
+        options: newQuestion.options,
+        question_type: newQuestion.question_type,
+        section_id: newQuestion.section_id,
+        image_url: newQuestion.image_url,
+        allow_repetition: newQuestion.allow_repetition
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Question created successfully!' });
+      setNewQuestion({
+        question_text: '',
+        correct_answer: '',
+        points: 10,
+        options: [],
+        question_type: 'multiple_choice',
+        section_id: '',
+        image_url: '',
+        allow_repetition: true
+      });
+      fetchQuestions();
+    } catch (error) {
+      toast({ title: 'Error creating question', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
   const handleUpdateQuestion = async () => {
     if (!editingQuestion.question_text || !editingQuestion.correct_answer) {
       toast({ title: 'Please fill all required fields', variant: 'destructive' });
@@ -1204,7 +1581,11 @@ function AdminQuestionsTab() {
         question_text: editingQuestion.question_text,
         correct_answer: editingQuestion.correct_answer,
         points: editingQuestion.points,
-        options: editingQuestion.options
+        options: editingQuestion.options,
+        question_type: editingQuestion.question_type,
+        section_id: editingQuestion.section_id,
+        image_url: editingQuestion.image_url,
+        allow_repetition: editingQuestion.allow_repetition
       }).eq('id', editingQuestion.id);
 
       if (error) throw error;
@@ -1235,6 +1616,8 @@ function AdminQuestionsTab() {
 
   useEffect(() => {
     fetchQuestions();
+    fetchSections();
+    fetchCompetitions();
   }, []);
 
   return (
@@ -1243,6 +1626,131 @@ function AdminQuestionsTab() {
         <h1 className="text-2xl font-display font-bold">Questions</h1>
         <p className="text-muted-foreground">Manage all questions</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create New Question</CardTitle>
+          <CardDescription>Add a new question to the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Question Text</Label>
+              <Textarea
+                value={newQuestion.question_text}
+                onChange={(e) => setNewQuestion({ ...newQuestion, question_text: e.target.value })}
+                placeholder="Enter the question text"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Correct Answer</Label>
+              <Input
+                value={newQuestion.correct_answer}
+                onChange={(e) => setNewQuestion({ ...newQuestion, correct_answer: e.target.value })}
+                placeholder="Enter the correct answer"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                value={newQuestion.points}
+                onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) })}
+                min="1"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Options (comma separated for multiple choice)</Label>
+              <Input
+                value={Array.isArray(newQuestion.options) ? newQuestion.options.join(', ') : ''}
+                onChange={(e) => setNewQuestion({ ...newQuestion, options: e.target.value.split(',').map(o => o.trim()) })}
+                placeholder="Option 1, Option 2, Option 3"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <Select
+                value={newQuestion.question_type}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                  <SelectItem value="true_false">True/False</SelectItem>
+                  <SelectItem value="short_answer">Short Answer</SelectItem>
+                  <SelectItem value="essay">Essay</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Section</Label>
+              <Select
+                value={newQuestion.section_id}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, section_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map(section => (
+                    <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Question Image</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={fileUploading}
+                  className="cursor-pointer"
+                />
+                {fileUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              </div>
+              {newQuestion.image_url && (
+                <div className="mt-2">
+                  <img src={newQuestion.image_url} alt="Question preview" className="max-w-xs max-h-32 object-contain rounded-lg" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="allow-repetition"
+                checked={newQuestion.allow_repetition}
+                onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, allow_repetition: checked })}
+              />
+              <Label htmlFor="allow-repetition">Allow Question Repetition</Label>
+            </div>
+
+            <Button
+              onClick={handleCreateQuestion}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Question'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -1279,6 +1787,9 @@ function AdminQuestionsTab() {
                           <span>Type: {question.question_type}</span>
                           <span>Section: {question.section_id}</span>
                         </div>
+                        {question.image_url && (
+                          <img src={question.image_url} alt="Question" className="mt-2 max-w-xs max-h-20 object-contain rounded-lg" />
+                        )}
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <Button
@@ -1360,6 +1871,53 @@ function AdminQuestionsTab() {
                   value={Array.isArray(editingQuestion.options) ? editingQuestion.options.join(', ') : ''}
                   onChange={(e) => setEditingQuestion({ ...editingQuestion, options: e.target.value.split(',').map(o => o.trim()) })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Question Type</Label>
+                <Select
+                  value={editingQuestion.question_type}
+                  onValueChange={(value) => setEditingQuestion({ ...editingQuestion, question_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select question type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                    <SelectItem value="true_false">True/False</SelectItem>
+                    <SelectItem value="short_answer">Short Answer</SelectItem>
+                    <SelectItem value="essay">Essay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Section</Label>
+                <Select
+                  value={editingQuestion.section_id}
+                  onValueChange={(value) => setEditingQuestion({ ...editingQuestion, section_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select section" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sections.map(section => (
+                      <SelectItem key={section.id} value={section.id}>{section.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Question Image</Label>
+                {editingQuestion.image_url && (
+                  <img src={editingQuestion.image_url} alt="Question preview" className="max-w-xs max-h-32 object-contain rounded-lg" />
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="allow-repetition-edit"
+                  checked={editingQuestion.allow_repetition}
+                  onCheckedChange={(checked) => setEditingQuestion({ ...editingQuestion, allow_repetition: checked })}
+                />
+                <Label htmlFor="allow-repetition-edit">Allow Question Repetition</Label>
               </div>
             </div>
             <DialogFooter>
@@ -1590,6 +2148,14 @@ function AdminBadgesTab() {
   const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingBadge, setEditingBadge] = useState(null);
+  const [newBadge, setNewBadge] = useState({
+    name: '',
+    description: '',
+    requirement_type: 'score',
+    requirement_value: 100,
+    image_url: ''
+  });
+  const [fileUploading, setFileUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -1602,6 +2168,74 @@ function AdminBadgesTab() {
     } catch (error) {
       toast({ title: 'Error fetching badges', description: error.message, variant: 'destructive' });
     }
+    setLoading(false);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    setFileUploading(true);
+
+    try {
+      // Generate a unique filename
+      const fileName = `badges/${Date.now()}_${file.name}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('badge_images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('badge_images')
+        .getPublicUrl(fileName);
+
+      if (urlData.publicUrl) {
+        setNewBadge({ ...newBadge, image_url: urlData.publicUrl });
+        toast({ title: 'Badge image uploaded successfully!' });
+      }
+    } catch (error) {
+      toast({ title: 'Error uploading badge image', description: error.message, variant: 'destructive' });
+    }
+
+    setFileUploading(false);
+  };
+
+  const handleCreateBadge = async () => {
+    if (!newBadge.name || !newBadge.description) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('badges').insert({
+        name: newBadge.name,
+        description: newBadge.description,
+        requirement_type: newBadge.requirement_type,
+        requirement_value: newBadge.requirement_value,
+        image_url: newBadge.image_url
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Badge created successfully!' });
+      setNewBadge({
+        name: '',
+        description: '',
+        requirement_type: 'score',
+        requirement_value: 100,
+        image_url: ''
+      });
+      fetchBadges();
+    } catch (error) {
+      toast({ title: 'Error creating badge', description: error.message, variant: 'destructive' });
+    }
+
     setLoading(false);
   };
 
@@ -1618,7 +2252,8 @@ function AdminBadgesTab() {
         name: editingBadge.name,
         description: editingBadge.description,
         requirement_type: editingBadge.requirement_type,
-        requirement_value: editingBadge.requirement_value
+        requirement_value: editingBadge.requirement_value,
+        image_url: editingBadge.image_url
       }).eq('id', editingBadge.id);
 
       if (error) throw error;
@@ -1657,6 +2292,96 @@ function AdminBadgesTab() {
         <h1 className="text-2xl font-display font-bold">Badges</h1>
         <p className="text-muted-foreground">Manage achievement badges</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Create New Badge</CardTitle>
+          <CardDescription>Add a new badge to the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Badge Name</Label>
+              <Input
+                value={newBadge.name}
+                onChange={(e) => setNewBadge({ ...newBadge, name: e.target.value })}
+                placeholder="Enter badge name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newBadge.description}
+                onChange={(e) => setNewBadge({ ...newBadge, description: e.target.value })}
+                placeholder="Enter badge description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Requirement Type</Label>
+              <Select
+                value={newBadge.requirement_type}
+                onValueChange={(value) => setNewBadge({ ...newBadge, requirement_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select requirement type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="score">Score</SelectItem>
+                  <SelectItem value="questions_answered">Questions Answered</SelectItem>
+                  <SelectItem value="competitions_won">Competitions Won</SelectItem>
+                  <SelectItem value="badges_earned">Badges Earned</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Requirement Value</Label>
+              <Input
+                type="number"
+                value={newBadge.requirement_value}
+                onChange={(e) => setNewBadge({ ...newBadge, requirement_value: parseInt(e.target.value) })}
+                min="1"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Badge Image</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={fileUploading}
+                  className="cursor-pointer"
+                />
+                {fileUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              </div>
+              {newBadge.image_url && (
+                <div className="mt-2">
+                  <img src={newBadge.image_url} alt="Badge preview" className="w-16 h-16 object-contain rounded-lg" />
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={handleCreateBadge}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Badge'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -1712,9 +2437,16 @@ function AdminBadgesTab() {
                     </div>
                   </div>
                   <div className="w-16 h-16 mx-auto mb-2 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                    <Award className="w-8 h-8 text-gold" />
+                    {badge.image_url ? (
+                      <img src={badge.image_url} alt={badge.name} className="w-12 h-12 object-contain" />
+                    ) : (
+                      <Award className="w-8 h-8 text-gold" />
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground text-center">{badge.description}</p>
+                  <p className="text-xs text-muted-foreground text-center mt-1">
+                    {badge.requirement_type}: {badge.requirement_value}
+                  </p>
                 </div>
               ))
             )}
@@ -1747,10 +2479,20 @@ function AdminBadgesTab() {
               </div>
               <div className="space-y-2">
                 <Label>Requirement Type</Label>
-                <Input
-                  value={editingBadge.requirement_type || ''}
-                  onChange={(e) => setEditingBadge({ ...editingBadge, requirement_type: e.target.value })}
-                />
+                <Select
+                  value={editingBadge.requirement_type}
+                  onValueChange={(value) => setEditingBadge({ ...editingBadge, requirement_type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select requirement type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="score">Score</SelectItem>
+                    <SelectItem value="questions_answered">Questions Answered</SelectItem>
+                    <SelectItem value="competitions_won">Competitions Won</SelectItem>
+                    <SelectItem value="badges_earned">Badges Earned</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Requirement Value</Label>
@@ -1759,6 +2501,12 @@ function AdminBadgesTab() {
                   value={editingBadge.requirement_value || ''}
                   onChange={(e) => setEditingBadge({ ...editingBadge, requirement_value: parseInt(e.target.value) })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Badge Image</Label>
+                {editingBadge.image_url && (
+                  <img src={editingBadge.image_url} alt="Badge preview" className="w-16 h-16 object-contain rounded-lg" />
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -1785,6 +2533,11 @@ function AdminBadgesTab() {
 function AdminAvatarsTab() {
   const [avatars, setAvatars] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [newAvatar, setNewAvatar] = useState({
+    name: '',
+    image_url: ''
+  });
+  const [fileUploading, setFileUploading] = useState(false);
   const { toast } = useToast();
 
   const fetchAvatars = async () => {
@@ -1799,6 +2552,68 @@ function AdminAvatarsTab() {
     setLoading(false);
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    const file = e.target.files[0];
+    setFileUploading(true);
+
+    try {
+      // Generate a unique filename
+      const fileName = `avatars/${Date.now()}_${file.name}`;
+
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('avatar_images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from('avatar_images')
+        .getPublicUrl(fileName);
+
+      if (urlData.publicUrl) {
+        setNewAvatar({ ...newAvatar, image_url: urlData.publicUrl });
+        toast({ title: 'Avatar image uploaded successfully!' });
+      }
+    } catch (error) {
+      toast({ title: 'Error uploading avatar image', description: error.message, variant: 'destructive' });
+    }
+
+    setFileUploading(false);
+  };
+
+  const handleCreateAvatar = async () => {
+    if (!newAvatar.name || !newAvatar.image_url) {
+      toast({ title: 'Please fill all fields and upload an image', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('avatars').insert({
+        name: newAvatar.name,
+        image_url: newAvatar.image_url
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Avatar created successfully!' });
+      setNewAvatar({
+        name: '',
+        image_url: ''
+      });
+      fetchAvatars();
+    } catch (error) {
+      toast({ title: 'Error creating avatar', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchAvatars();
   }, []);
@@ -1809,6 +2624,59 @@ function AdminAvatarsTab() {
         <h1 className="text-2xl font-display font-bold">Avatars</h1>
         <p className="text-muted-foreground">Manage user avatars</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Upload New Avatar</CardTitle>
+          <CardDescription>Add a new avatar for users to choose</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Avatar Name</Label>
+              <Input
+                value={newAvatar.name}
+                onChange={(e) => setNewAvatar({ ...newAvatar, name: e.target.value })}
+                placeholder="Enter avatar name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Avatar Image</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  disabled={fileUploading}
+                  className="cursor-pointer"
+                />
+                {fileUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              </div>
+              {newAvatar.image_url && (
+                <div className="mt-2">
+                  <img src={newAvatar.image_url} alt="Avatar preview" className="w-16 h-16 object-contain rounded-lg" />
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={handleCreateAvatar}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Avatar'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -1850,6 +2718,12 @@ function AdminMessagesTab() {
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [newMessage, setNewMessage] = useState({
+    subject: '',
+    content: '',
+    receiver_email: '',
+    receiver_role: 'all'
+  });
   const { toast } = useToast();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -1896,6 +2770,64 @@ function AdminMessagesTab() {
     setSendingReply(false);
   };
 
+  const handleSendNewMessage = async () => {
+    if (!newMessage.subject || !newMessage.content || !newMessage.receiver_email) {
+      toast({ title: 'Please fill all fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let receiverIds = [];
+
+      if (newMessage.receiver_role === 'all') {
+        // Send to all users
+        const { data: users, error: usersError } = await supabase.from('profiles').select('id');
+        if (usersError) throw usersError;
+        receiverIds = users.map(user => user.id);
+      } else {
+        // Send to specific role
+        const { data: users, error: usersError } = await supabase.from('profiles').select('id').eq('role', newMessage.receiver_role);
+        if (usersError) throw usersError;
+        receiverIds = users.map(user => user.id);
+      }
+
+      // If specific email provided, use that instead
+      if (newMessage.receiver_email.includes('@')) {
+        const { data: user, error: userError } = await supabase.from('profiles').select('id').eq('email', newMessage.receiver_email).single();
+        if (userError) throw userError;
+        receiverIds = [user.id];
+      }
+
+      // Send message to all receivers
+      const messageData = receiverIds.map(receiverId => ({
+        subject: newMessage.subject,
+        content: newMessage.content,
+        receiver_id: receiverId,
+        sender_id: profile?.id,
+        sender_email: profile?.email,
+        is_system: false
+      }));
+
+      const { error } = await supabase.from('messages').insert(messageData);
+
+      if (error) throw error;
+
+      toast({ title: `Message sent to ${receiverIds.length} recipient(s)!` });
+      setNewMessage({
+        subject: '',
+        content: '',
+        receiver_email: '',
+        receiver_role: 'all'
+      });
+    } catch (error) {
+      toast({ title: 'Error sending message', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
@@ -1923,6 +2855,83 @@ function AdminMessagesTab() {
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">Your communications</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Send New Message</CardTitle>
+          <CardDescription>Send messages to users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={newMessage.subject}
+                onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                placeholder="Enter message subject"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Message Content</Label>
+              <Textarea
+                value={newMessage.content}
+                onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
+                placeholder="Enter your message"
+                rows={6}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Send To</Label>
+                <Select
+                  value={newMessage.receiver_role}
+                  onValueChange={(value) => setNewMessage({ ...newMessage, receiver_role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select recipient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="student">All Students</SelectItem>
+                    <SelectItem value="teacher">All Teachers</SelectItem>
+                    <SelectItem value="moderator">All Moderators</SelectItem>
+                    <SelectItem value="specific">Specific Email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {newMessage.receiver_role === 'specific' && (
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input
+                    type="email"
+                    value={newMessage.receiver_email}
+                    onChange={(e) => setNewMessage({ ...newMessage, receiver_email: e.target.value })}
+                    placeholder="user@school.com"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={handleSendNewMessage}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Message'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
@@ -1975,27 +2984,27 @@ function AdminMessagesTab() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this message? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteMessage(message.id)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </button>
                     ))

@@ -333,9 +333,36 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
   );
 }
 
-function StatCard({ title, value, icon: Icon, className, loading = false }: { title: stringI'll fix the editing and deleting functionality across the website. Let me analyze the issues and implement the necessary changes.
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
+  return (
+    <Card className={className}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
+          </div>
+          <div className="p-2 rounded-lg bg-card">
+            <Icon className="w-6 h-6 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-<dyad-write path="src/components/dashboards/ModeratorDashboard.tsx" description="Fixing edit and delete functionality in ModeratorDashboard">
+// Profile Tab Component
+function ProfileTab() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">ManageI'll restore the moderator functions and ensure they work properly. Let me fix this:
+
+<dyad-write path="src/components/dashboards/ModeratorDashboard.tsx" description="Restoring moderator functions and ensuring they work properly">
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Button } from '@/components/ui/button';

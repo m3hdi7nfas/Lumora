@@ -234,7 +234,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {stats?.recentActivity?.length === 0 ? (
+            {!stats || stats.recentActivity?.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
               stats.recentActivity.map((activity) => (

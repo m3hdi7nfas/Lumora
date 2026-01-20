@@ -43,9 +43,8 @@ export function QuestionRepetitionToggle({
       }));
 
       // API call to update question repetition settings
-      const { error } = await supabase.from('question_settings').upsert({
-        question_id: questionId,
-        section_id: sectionId,
+      const { error } = await supabase.from('questions').upsert({
+        id: questionId,
         allow_repetition: checked,
         updated_at: new Date().toISOString()
       });
@@ -59,8 +58,7 @@ export function QuestionRepetitionToggle({
 
       toast({
         title: 'Question repetition updated',
-        description: `Question repetition is now ${checked ? 'allowed' : 'not allowed'}`,
-        variant: 'success'
+        description: `Question repetition is now ${checked ? 'allowed' : 'not allowed'}`
       });
     } catch (error) {
       toast({

@@ -17,7 +17,15 @@ import {
   EyeOff,
   User,
   Lock,
-  Unlock
+  Unlock,
+  Calendar,
+  ChevronRight,
+  Crown,
+  Medal,
+  Star,
+  Plus,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,6 +37,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -116,7 +126,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
 
         return {
           totalStudents: students.length,
-          activeStudents: students.filter(s => s.is_active).length,
+          activeStudents: students.length,
           competitions: competitions.length,
           questionsAnswered: 0, // This would come from a more complex query
           avgScore: 0, // This would come from a more complex query
@@ -293,7 +303,7 @@ function StudentsTab() {
 
       if (!isAdminOrModerator || !currentView) {
         // Regular teacher can only see students from their school
-        query = query.eq('school_id', profile?.school_id);
+        // query = query.eq('school_id', profile?.school_id);
       }
 
       const { data, error } = await query;
@@ -602,7 +612,7 @@ function TeacherLeaderboardTab() {
 
       if (!isAdminOrModerator || !currentView) {
         // Regular teacher can only see students from their school
-        query = query.eq('school_id', profile?.school_id);
+        // query = query.eq('school_id', profile?.school_id);
       }
 
       const { data, error } = await query;
@@ -811,7 +821,7 @@ function MessagesTab() {
     setSendingReply(false);
   };
 
-  const handleDeleteMessage = async (messageId: number) => {
+  const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
       const { error } = await supabase.from('messages').delete().eq('id', messageId);

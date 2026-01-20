@@ -167,7 +167,6 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
       toast({
         title: 'Ad settings updated',
         description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`,
-        variant: 'success'
       });
     } catch (error) {
       toast({
@@ -199,7 +198,7 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
 
         return {
           totalUsers: users.length,
-          activeCompetitions: competitions.filter(c => c.is_active).length,
+          activeCompetitions: competitions.length,
           totalQuestions: questions.length,
           pendingReviews: 0 // This would come from a more complex query
         };
@@ -1765,7 +1764,7 @@ function MessagesTab() {
     setSendingReply(false);
   };
 
-  const handleDeleteMessage = async (messageId: number) => {
+  const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
       const { error } = await supabase.from('messages').delete().eq('id', messageId);

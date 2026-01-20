@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import ModeratorDashboard from '@/components/dashboards/ModeratorDashboard';
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
+import AdminDashboard from '@/components/dashboards/AdminDashboard';
 
 export default function Dashboard() {
   const { user, profile, loading, currentView } = useAuth();
@@ -62,8 +63,9 @@ export default function Dashboard() {
   const effectiveRole = currentView || profile.role;
 
   switch (effectiveRole) {
-    case 'moderator':
     case 'admin':
+      return <AdminDashboard />;
+    case 'moderator':
       return <ModeratorDashboard />;
     case 'teacher':
       return <TeacherDashboard />;

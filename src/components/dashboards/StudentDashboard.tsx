@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -95,7 +96,169 @@ export default function StudentDashboard() {
   );
 }
 
-// Student Overview Component
+// Messages Tab Component - Students cannot reply
+function MessagesTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const { toast } = useToast();
+
+  const filteredMessages = messages.filter(message =>
+    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      // API call to delete message
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">Communications from teachers and moderators</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbox</CardTitle>
+              <CardDescription>Your messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedMessage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedMessage.subject}</CardTitle>
+                <CardDescription>
+                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{selectedMessage.content}</p>
+                  </div>
+
+                  {/* Students cannot reply - show info message instead */}
+                  <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                    <div className="flex items-center gap-3">
+                      <Lock className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-medium">Reply Disabled</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Students cannot reply to messages from teachers and moderators.
+                          If you need to respond, please contact your teacher directly.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <p>Select a message to view details</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Rest of the StudentDashboard components remain the same...
 function StudentOverview() {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -237,7 +400,6 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
   );
 }
 
-// Competitions Tab Component
 function CompetitionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
@@ -329,7 +491,6 @@ function CompetitionsTab() {
   );
 }
 
-// Challenges Tab Component
 function ChallengesTab() {
   const [activeTab, setActiveTab] = useState('active');
   const { toast } = useToast();
@@ -455,7 +616,6 @@ function ChallengesTab() {
   );
 }
 
-// Badges Tab Component
 function BadgesTab() {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -559,200 +719,6 @@ function BadgesTab() {
   );
 }
 
-// Messages Tab Component
-function MessagesTab() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const { toast } = useToast();
-
-  const filteredMessages = messages.filter(message =>
-    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleSendReply = async () => {
-    if (!replyContent || !selectedMessage) return;
-
-    setSendingReply(true);
-
-    try {
-      // API call to send message
-      const { error } = await supabase.from('messages').insert({
-        content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
-        sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
-      });
-
-      if (error) throw error;
-
-      toast({ title: 'Reply sent successfully!' });
-      setReplyContent('');
-    } catch (error) {
-      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
-    }
-
-    setSendingReply(false);
-  };
-
-  const handleDeleteMessage = async (messageId: number) => {
-    try {
-      // API call to delete message
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-
-      if (error) throw error;
-
-      toast({ title: 'Message deleted successfully!' });
-      setMessages(messages.filter(msg => msg.id !== messageId));
-      if (selectedMessage?.id === messageId) {
-        setSelectedMessage(null);
-      }
-    } catch (error) {
-      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Messages</h1>
-        <p className="text-muted-foreground">Communications from teachers and moderators</p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inbox</CardTitle>
-              <CardDescription>Your messages</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search messages..."
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No messages found</p>
-                  ) : (
-                    filteredMessages.map((message) => (
-                      <button
-                        key={message.id}
-                        onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{message.sender}</p>
-                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                            {!message.read && (
-                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
-                            )}
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-2">
-          {selectedMessage ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{selectedMessage.subject}</CardTitle>
-                <CardDescription>
-                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm">{selectedMessage.content}</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <Label>Your Reply</Label>
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Type your reply here..."
-                      rows={8}
-                    />
-                    <Button
-                      onClick={handleSendReply}
-                      disabled={sendingReply || !replyContent}
-                      className="gradient-hero"
-                    >
-                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Send Reply
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-64">
-                <div className="text-center text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
-                  <p>Select a message to view details</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Profile View Component
 function ProfileView() {
   const { profile } = useAuth();
   const { toast } = useToast();

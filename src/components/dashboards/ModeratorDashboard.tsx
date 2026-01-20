@@ -29,13 +29,17 @@ import {
   X,
   Loader2,
   Check,
-  BarChart3
+  BarChart3,
+  Checkbox,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Switch } from '@/components/ui/switch';
 
 function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -46,10 +50,10 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
     { id: 'questions', icon: FileQuestion, label: 'Questions' },
+    { id: 'leaderboard', icon: BarChart3, label: 'Leaderboard' },
     { id: 'badges', icon: Award, label: 'Badges' },
     { id: 'avatars', icon: UserPlus, label: 'Avatars' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
-    { id: 'leaderboard', icon: BarChart3, label: 'Leaderboard' },
   ];
 
   return (
@@ -109,10 +113,10 @@ export default function ModeratorDashboard() {
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'competitions' && <CompetitionsTab />}
       {activeTab === 'questions' && <QuestionsTab />}
+      {activeTab === 'leaderboard' && <LeaderboardTab />}
       {activeTab === 'badges' && <BadgesTab />}
       {activeTab === 'avatars' && <AvatarsTab />}
       {activeTab === 'messages' && <MessagesTab />}
-      {activeTab === 'leaderboard' && <LeaderboardTab />}
     </DashboardLayout>
   );
 }
@@ -120,6 +124,7 @@ export default function ModeratorDashboard() {
 // Overview Tab Component
 function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
+  const [showAds, setShowAds] = useState(true);
 
   // Data will be loaded from API
   const stats = {
@@ -138,6 +143,30 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
     { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
   ];
 
+  const handleAdsToggle = async (checked: boolean) => {
+    setShowAds(checked);
+    try {
+      // API call to update ad settings
+      const { error } = await supabase.from('settings').upsert({
+        key: 'show_ads',
+        value: checked
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Ad settings updated',
+        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`
+      });
+    } catch (error) {
+      toast({
+        title: 'Error updating ad settings',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -146,6 +175,27 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
           <p className="text-muted-foreground">Overview of platform activity and quick actions</p>
         </div>
       </div>
+
+      {/* Ads Toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Advertisement Settings</CardTitle>
+          <CardDescription>Control whether ads are displayed to users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <LayoutTemplate className="w-5 h-5 text-primary" />
+              <span>Show Advertisements</span>
+            </div>
+            <Switch
+              checked={showAds}
+              onCheckedChange={handleAdsToggle}
+              id="ads-toggle"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -255,407 +305,54 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
   );
 }
 
-// Profile Tab Component
-function ProfileTab() {
-  const { profile } = useAuth();
-  const { toast } = useToast();
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">My Profile</h1>
-        <p className="text-muted-foreground">Manage your moderator account</p>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={profile?.email || ''} disabled className="bg-muted" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Input value={profile?.role || ''} disabled className="bg-muted" />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Display Name</Label>
-              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Competitions Created</p>
-              <p className="text-2xl font-bold">0</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Questions Approved</p>
-              <p className="text-2xl font-bold">0</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Users Managed</p>
-              <p className="text-2xl font-bold">0</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// Schools Tab Component
-function SchoolsTab() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [newSchoolName, setNewSchoolName] = useState('');
-  const [newSchoolPassword, setNewSchoolPassword] = useState('');
-  const [creatingSchool, setCreatingSchool] = useState(false);
-  const { toast } = useToast();
-
-  // Data will be loaded from API
-  const schools = [];
-
-  const filteredSchools = schools.filter(school =>
-    school.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleCreateSchool = async () => {
-    if (!newSchoolName || !newSchoolPassword) {
-      toast({ title: 'Please fill all fields', variant: 'destructive' });
-      return;
-    }
-
-    setCreatingSchool(true);
-
-    try {
-      // API call to create school
-      const { error } = await supabase.from('schools').insert({
-        name: newSchoolName,
-        password: newSchoolPassword
-      });
-
-      if (error) throw error;
-
-      toast({ title: 'School created successfully!' });
-      setNewSchoolName('');
-      setNewSchoolPassword('');
-    } catch (error) {
-      toast({ title: 'Error creating school', description: error.message, variant: 'destructive' });
-    }
-
-    setCreatingSchool(false);
-  };
-
-  const handleDeleteSchool = async (schoolId: number) => {
-    try {
-      // API call to delete school
-      const { error } = await supabase.from('schools').delete().eq('id', schoolId);
-
-      if (error) throw error;
-
-      toast({ title: 'School deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting school', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">School Management</h1>
-          <p className="text-muted-foreground">Manage registered schools</p>
-        </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="gradient-hero">
-              <Plus className="w-4 h-4 mr-2" />
-              Add School
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New School</DialogTitle>
-              <DialogDescription>Add a new school to the platform</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>School Name</Label>
-                <Input
-                  value={newSchoolName}
-                  onChange={(e) => setNewSchoolName(e.target.value)}
-                  placeholder="Enter school name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Access Password</Label>
-                <Input
-                  type="password"
-                  value={newSchoolPassword}
-                  onChange={(e) => setNewSchoolPassword(e.target.value)}
-                  placeholder="Set school password"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreateSchool} disabled={creatingSchool}>
-                {creatingSchool && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create School
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Schools List</CardTitle>
-          <CardDescription>All registered educational institutions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search schools..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              {filteredSchools.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No schools found</p>
-              ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="p-3 text-left font-medium">School Name</th>
-                      <th className="p-3 text-left font-medium">Students</th>
-                      <th className="p-3 text-left font-medium">Teachers</th>
-                      <th className="p-3 text-left font-medium">Created</th>
-                      <th className="p-3 text-left font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSchools.map((school) => (
-                      <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                        <td className="p-3 font-medium">{school.name}</td>
-                        <td className="p-3">{school.students}</td>
-                        <td className="p-3">{school.teachers}</td>
-                        <td className="p-3 text-muted-foreground">{school.created}</td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete School</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {school.name}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteSchool(school.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Users Tab Component
-function UsersTab() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRole, setSelectedRole] = useState('all');
-  const { toast } = useToast();
-
-  // Data will be loaded from API
-  const users = [];
-
-  const filteredUsers = users.filter(user =>
-    (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedRole === 'all' || user.role === selectedRole)
-  );
-
-  const handleDeleteUser = async (userId: number) => {
-    try {
-      // API call to delete user
-      const { error } = await supabase.from('profiles').delete().eq('id', userId);
-
-      if (error) throw error;
-
-      toast({ title: 'User deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">User Management</h1>
-        <p className="text-muted-foreground">View and manage all platform users</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Users List</CardTitle>
-          <CardDescription>All registered users</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search users..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={selectedRole} onValueChange={setSelectedRole}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="student">Students</SelectItem>
-                  <SelectItem value="teacher">Teachers</SelectItem>
-                  <SelectItem value="moderator">Moderators</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="overflow-x-auto">
-              {filteredUsers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No users found</p>
-              ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="p-3 text-left font-medium">Name</th>
-                      <th className="p-3 text-left font-medium">Email</th>
-                      <th className="p-3 text-left font-medium">Role</th>
-                      <th className="p-3 text-left font-medium">School</th>
-                      <th className="p-3 text-left font-medium">Joined</th>
-                      <th className="p-3 text-left font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((user) => (
-                      <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                        <td className="p-3 font-medium">{user.name}</td>
-                        <td className="p-3 text-muted-foreground">{user.email}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'student' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
-                            {user.role}
-                          </span>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{user.school}</td>
-                        <td className="p-3 text-muted-foreground">{user.joined}</td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete {user.name}? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteUser(user.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-// Competitions Tab Component
+// Competitions Tab Component with School Assignment
 function CompetitionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [newCompetitionName, setNewCompetitionName] = useState('');
   const [newCompetitionDescription, setNewCompetitionDescription] = useState('');
   const [creatingCompetition, setCreatingCompetition] = useState(false);
+  const [selectedSchools, setSelectedSchools] = useState<string[]>([]);
+  const [selectAllSchools, setSelectAllSchools] = useState(false);
   const { toast } = useToast();
 
   // Data will be loaded from API
   const competitions = [];
+  const schools = [
+    { id: 'school1', name: 'Springfield High' },
+    { id: 'school2', name: 'Shelbyville Elementary' },
+    { id: 'school3', name: 'Capital City Academy' },
+  ];
 
   const filteredCompetitions = competitions.filter(comp =>
     comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     comp.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handleSchoolSelection = (schoolId: string) => {
+    if (selectedSchools.includes(schoolId)) {
+      setSelectedSchools(selectedSchools.filter(id => id !== schoolId));
+    } else {
+      setSelectedSchools([...selectedSchools, schoolId]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectAllSchools) {
+      setSelectedSchools([]);
+    } else {
+      setSelectedSchools(schools.map(school => school.id));
+    }
+    setSelectAllSchools(!selectAllSchools);
+  };
+
   const handleCreateCompetition = async () => {
     if (!newCompetitionName) {
       toast({ title: 'Please enter competition name', variant: 'destructive' });
+      return;
+    }
+
+    if (selectedSchools.length === 0) {
+      toast({ title: 'Please select at least one school', variant: 'destructive' });
       return;
     }
 
@@ -666,14 +363,20 @@ function CompetitionsTab() {
       const { error } = await supabase.from('competitions').insert({
         name: newCompetitionName,
         description: newCompetitionDescription,
-        is_practice: false
+        is_practice: false,
+        assigned_schools: selectedSchools
       });
 
       if (error) throw error;
 
-      toast({ title: 'Competition created successfully!' });
+      toast({
+        title: 'Competition created successfully!',
+        description: `Assigned to ${selectedSchools.length} school(s)`
+      });
       setNewCompetitionName('');
       setNewCompetitionDescription('');
+      setSelectedSchools([]);
+      setSelectAllSchools(false);
     } catch (error) {
       toast({ title: 'Error creating competition', description: error.message, variant: 'destructive' });
     }
@@ -708,7 +411,7 @@ function CompetitionsTab() {
               New Competition
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Competition</DialogTitle>
               <DialogDescription>Set up a new competition for students</DialogDescription>
@@ -730,6 +433,62 @@ function CompetitionsTab() {
                   placeholder="Describe the competition"
                   rows={4}
                 />
+              </div>
+
+              {/* School Assignment Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>Assign to Schools</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAll}
+                    className="text-xs"
+                  >
+                    {selectAllSchools ? (
+                      <>
+                        <Square className="w-3 h-3 mr-1" /> Deselect All
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-3 h-3 mr-1" /> Select All
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto border rounded-lg p-3">
+                  {schools.map((school) => (
+                    <div
+                      key={school.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => handleSchoolSelection(school.id)}
+                    >
+                      <Checkbox
+                        checked={selectedSchools.includes(school.id)}
+                        onCheckedChange={() => handleSchoolSelection(school.id)}
+                        id={`school-${school.id}`}
+                      />
+                      <Label htmlFor={`school-${school.id}`} className="cursor-pointer">
+                        {school.name}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedSchools.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-muted-foreground">Selected:</span>
+                    {selectedSchools.map(schoolId => {
+                      const school = schools.find(s => s.id === schoolId);
+                      return (
+                        <span key={schoolId} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
+                          {school?.name}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
@@ -769,7 +528,7 @@ function CompetitionsTab() {
                       <th className="p-3 text-left font-medium">Name</th>
                       <th className="p-3 text-left font-medium">Status</th>
                       <th className="p-3 text-left font-medium">Participants</th>
-                      <th className="p-3 text-left font-medium">Dates</th>
+                      <th className="p-3 text-left font-medium">Assigned Schools</th>
                       <th className="p-3 text-left font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -786,8 +545,14 @@ function CompetitionsTab() {
                           </span>
                         </td>
                         <td className="p-3">{comp.participants}</td>
-                        <td className="p-3 text-muted-foreground text-xs">
-                          {comp.startDate} - {comp.endDate}
+                        <td className="p-3">
+                          <div className="flex flex-wrap gap-1">
+                            {comp.assignedSchools.map((school: string) => (
+                              <span key={school} className="px-2 py-1 bg-accent/10 text-accent rounded-full text-xs">
+                                {school}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -833,148 +598,328 @@ function CompetitionsTab() {
   );
 }
 
-// Questions Tab Component
-function QuestionsTab() {
+// Messages Tab Component - Students cannot reply
+function MessagesTab() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [messages, setMessages] = useState([]);
   const { toast } = useToast();
 
-  // Data will be loaded from API
-  const questions = [];
-
-  const filteredQuestions = questions.filter(question =>
-    (question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     question.subject.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedStatus === 'all' || question.status === selectedStatus)
+  const filteredMessages = messages.filter(message =>
+    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.content.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDeleteQuestion = async (questionId: number) => {
+  const handleSendReply = async () => {
+    if (!replyContent || !selectedMessage) return;
+
+    setSendingReply(true);
+
     try {
-      // API call to delete question
-      const { error } = await supabase.from('questions').delete().eq('id', questionId);
+      // API call to send message
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: 'moderator@lumora.com',
+        subject: `Re: ${selectedMessage.subject}`,
+        allow_reply: false // Students cannot reply to moderator messages
+      });
 
       if (error) throw error;
 
-      toast({ title: 'Question deleted successfully!' });
+      toast({ title: 'Reply sent successfully!' });
+      setReplyContent('');
     } catch (error) {
-      toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
+    }
+
+    setSendingReply(false);
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      // API call to delete message
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
     }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-display font-bold">Question Management</h1>
-        <p className="text-muted-foreground">Review and manage questions</p>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">User communications and support</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbox</CardTitle>
+              <CardDescription>User messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedMessage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedMessage.subject}</CardTitle>
+                <CardDescription>
+                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{selectedMessage.content}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={handleSendReply}
+                        disabled={sendingReply || !replyContent}
+                        className="gradient-hero"
+                      >
+                        {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Send Reply
+                      </Button>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Lock className="w-3 h-3" />
+                        <span>Students cannot reply to this message</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <p>Select a message to view details</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Leaderboard Tab Component - Moved before Badges
+function LeaderboardTab() {
+  const [selectedCompetition, setSelectedCompetition] = useState('all');
+  const [timeRange, setTimeRange] = useState('all-time');
+  const { toast } = useToast();
+
+  // Data will be loaded from API
+  const competitions = [
+    { id: 'all', name: 'All Competitions' },
+    { id: 'math-challenge', name: 'Math Challenge 2024' },
+    { id: 'science-olympiad', name: 'Science Olympiad' },
+  ];
+  const leaderboardData = [];
+
+  const badgeColors = {
+    gold: 'bg-gold text-gold-foreground',
+    silver: 'bg-silver text-silver-foreground',
+    bronze: 'bg-bronze text-bronze-foreground',
+    none: 'bg-muted text-muted-foreground'
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
+          <p className="text-muted-foreground">Track student performance across competitions</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Select competition" />
+            </SelectTrigger>
+            <SelectContent>
+              {competitions.map(comp => (
+                <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Time range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all-time">All Time</SelectItem>
+              <SelectItem value="this-month">This Month</SelectItem>
+              <SelectItem value="this-week">This Week</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Questions List</CardTitle>
-          <CardDescription>All platform questions</CardDescription>
+          <CardTitle>Top Performers</CardTitle>
+          <CardDescription>Students with the highest scores in selected competition</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search questions..."
-                  className="pl-10"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending Review</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="overflow-x-auto">
-              {filteredQuestions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No questions found</p>
-              ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="p-3 text-left font-medium">Question</th>
-                      <th className="p-3 text-left font-medium">Subject</th>
-                      <th className="p-3 text-left font-medium">Status</th>
-                      <th className="p-3 text-left font-medium">Created By</th>
-                      <th className="p-3 text-left font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredQuestions.map((question) => (
-                      <tr key={question.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                        <td className="p-3">
-                          <div className="font-medium">{question.text}</div>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{question.subject}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${question.status === 'approved' ? 'bg-success/10 text-success' : question.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>
-                            {question.status}
-                          </span>
-                        </td>
-                        <td className="p-3 text-muted-foreground">{question.createdBy}</td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                              <Eye className="w-3 h-3" />
-                            </Button>
-                            {question.status === 'pending' && (
-                              <>
-                                <Button variant="success" size="sm" className="h-8 w-8 p-0">
-                                  <Check className="w-3 h-3" />
-                                </Button>
-                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </>
-                            )}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this question? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteQuestion(question.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+          <div className="overflow-x-auto">
+            {leaderboardData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">Name</th>
+                    <th className="p-3 text-left font-medium">School</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Achievement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardData.map((student) => (
+                    <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{student.rank}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.name.split(' ').map(n => n[0]).join('')}
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                          <span>{student.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.school}</td>
+                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
+                      <td className="p-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
+                          {student.rank}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>School Rankings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground py-4">No school ranking data available</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Competition Stats</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground py-4">No competition stats available</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -1187,7 +1132,531 @@ function BadgesTab() {
   );
 }
 
-// Avatars Tab Component
+// Other tab components remain the same...
+function ProfileTab() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your moderator account</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Created</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Questions Approved</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Users Managed</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SchoolsTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newSchoolName, setNewSchoolName] = useState('');
+  const [newSchoolPassword, setNewSchoolPassword] = useState('');
+  const [creatingSchool, setCreatingSchool] = useState(false);
+  const { toast } = useToast();
+
+  // Data will be loaded from API
+  const schools = [];
+
+  const filteredSchools = schools.filter(school =>
+    school.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleCreateSchool = async () => {
+    if (!newSchoolName || !newSchoolPassword) {
+      toast({ title: 'Please fill all fields', variant: 'destructive' });
+      return;
+    }
+
+    setCreatingSchool(true);
+
+    try {
+      // API call to create school
+      const { error } = await supabase.from('schools').insert({
+        name: newSchoolName,
+        password: newSchoolPassword
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'School created successfully!' });
+      setNewSchoolName('');
+      setNewSchoolPassword('');
+    } catch (error) {
+      toast({ title: 'Error creating school', description: error.message, variant: 'destructive' });
+    }
+
+    setCreatingSchool(false);
+  };
+
+  const handleDeleteSchool = async (schoolId: number) => {
+    try {
+      // API call to delete school
+      const { error } = await supabase.from('schools').delete().eq('id', schoolId);
+
+      if (error) throw error;
+
+      toast({ title: 'School deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting school', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">School Management</h1>
+          <p className="text-muted-foreground">Manage registered schools</p>
+        </div>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button className="gradient-hero">
+              <Plus className="w-4 h-4 mr-2" />
+              Add School
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New School</DialogTitle>
+              <DialogDescription>Add a new school to the platform</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>School Name</Label>
+                <Input
+                  value={newSchoolName}
+                  onChange={(e) => setNewSchoolName(e.target.value)}
+                  placeholder="Enter school name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Access Password</Label>
+                <Input
+                  type="password"
+                  value={newSchoolPassword}
+                  onChange={(e) => setNewSchoolPassword(e.target.value)}
+                  placeholder="Set school password"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleCreateSchool} disabled={creatingSchool}>
+                {creatingSchool && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Create School
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Schools List</CardTitle>
+          <CardDescription>All registered educational institutions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search schools..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            <div className="overflow-x-auto">
+              {filteredSchools.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No schools found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">School Name</th>
+                      <th className="p-3 text-left font-medium">Students</th>
+                      <th className="p-3 text-left font-medium">Teachers</th>
+                      <th className="p-3 text-left font-medium">Created</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSchools.map((school) => (
+                      <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{school.name}</td>
+                        <td className="p-3">{school.students}</td>
+                        <td className="p-3">{school.teachers}</td>
+                        <td className="p-3 text-muted-foreground">{school.created}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete School</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {school.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteSchool(school.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function UsersTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRole, setSelectedRole] = useState('all');
+  const { toast } = useToast();
+
+  // Data will be loaded from API
+  const users = [];
+
+  const filteredUsers = users.filter(user =>
+    (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedRole === 'all' || user.role === selectedRole)
+  );
+
+  const handleDeleteUser = async (userId: number) => {
+    try {
+      // API call to delete user
+      const { error } = await supabase.from('profiles').delete().eq('id', userId);
+
+      if (error) throw error;
+
+      toast({ title: 'User deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">User Management</h1>
+        <p className="text-muted-foreground">View and manage all platform users</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Users List</CardTitle>
+          <CardDescription>All registered users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={selectedRole} onValueChange={setSelectedRole}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="student">Students</SelectItem>
+                  <SelectItem value="teacher">Teachers</SelectItem>
+                  <SelectItem value="moderator">Moderators</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="overflow-x-auto">
+              {filteredUsers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No users found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Name</th>
+                      <th className="p-3 text-left font-medium">Email</th>
+                      <th className="p-3 text-left font-medium">Role</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Joined</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3 font-medium">{user.name}</td>
+                        <td className="p-3 text-muted-foreground">{user.email}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.role === 'student' ? 'bg-primary/10 text-primary' : user.role === 'teacher' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            {user.role}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{user.school}</td>
+                        <td className="p-3 text-muted-foreground">{user.joined}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.name}? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteUser(user.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function QuestionsTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const { toast } = useToast();
+
+  // Data will be loaded from API
+  const questions = [];
+
+  const filteredQuestions = questions.filter(question =>
+    (question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     question.subject.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedStatus === 'all' || question.status === selectedStatus)
+  );
+
+  const handleDeleteQuestion = async (questionId: number) => {
+    try {
+      // API call to delete question
+      const { error } = await supabase.from('questions').delete().eq('id', questionId);
+
+      if (error) throw error;
+
+      toast({ title: 'Question deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Question Management</h1>
+        <p className="text-muted-foreground">Review and manage questions</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions List</CardTitle>
+          <CardDescription>All platform questions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search questions..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="overflow-x-auto">
+              {filteredQuestions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No questions found</p>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Question</th>
+                      <th className="p-3 text-left font-medium">Subject</th>
+                      <th className="p-3 text-left font-medium">Status</th>
+                      <th className="p-3 text-left font-medium">Created By</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredQuestions.map((question) => (
+                      <tr key={question.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3">
+                          <div className="font-medium">{question.text}</div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{question.subject}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${question.status === 'approved' ? 'bg-success/10 text-success' : question.status === 'pending' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>
+                            {question.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{question.createdBy}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                            {question.status === 'pending' && (
+                              <>
+                                <Button variant="success" size="sm" className="h-8 w-8 p-0">
+                                  <Check className="w-3 h-3" />
+                                </Button>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </>
+                            )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this question? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteQuestion(question.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function AvatarsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [newAvatarName, setNewAvatarName] = useState('');
@@ -1367,321 +1836,6 @@ function AvatarsTab() {
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-// Messages Tab Component
-function MessagesTab() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedMessage, setSelectedMessage] = useState(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [sendingReply, setSendingReply] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const { toast } = useToast();
-
-  const filteredMessages = messages.filter(message =>
-    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleSendReply = async () => {
-    if (!replyContent || !selectedMessage) return;
-
-    setSendingReply(true);
-
-    try {
-      // API call to send message
-      const { error } = await supabase.from('messages').insert({
-        content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
-        sender_id: 'moderator@lumora.com',
-        subject: `Re: ${selectedMessage.subject}`
-      });
-
-      if (error) throw error;
-
-      toast({ title: 'Reply sent successfully!' });
-      setReplyContent('');
-    } catch (error) {
-      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
-    }
-
-    setSendingReply(false);
-  };
-
-  const handleDeleteMessage = async (messageId: number) => {
-    try {
-      // API call to delete message
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-
-      if (error) throw error;
-
-      toast({ title: 'Message deleted successfully!' });
-      setMessages(messages.filter(msg => msg.id !== messageId));
-      if (selectedMessage?.id === messageId) {
-        setSelectedMessage(null);
-      }
-    } catch (error) {
-      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Messages</h1>
-        <p className="text-muted-foreground">User communications and support</p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Inbox</CardTitle>
-              <CardDescription>User messages</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search messages..."
-                    className="pl-10"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredMessages.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No messages found</p>
-                  ) : (
-                    filteredMessages.map((message) => (
-                      <button
-                        key={message.id}
-                        onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{message.sender}</p>
-                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                            {!message.read && (
-                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
-                            )}
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="md:col-span-2">
-          {selectedMessage ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{selectedMessage.subject}</CardTitle>
-                <CardDescription>
-                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm">{selectedMessage.content}</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <Label>Your Reply</Label>
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Type your reply here..."
-                      rows={8}
-                    />
-                    <Button
-                      onClick={handleSendReply}
-                      disabled={sendingReply || !replyContent}
-                      className="gradient-hero"
-                    >
-                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Send Reply
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="flex items-center justify-center h-64">
-                <div className="text-center text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
-                  <p>Select a message to view details</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Leaderboard Tab Component
-function LeaderboardTab() {
-  const [selectedCompetition, setSelectedCompetition] = useState('all');
-  const [timeRange, setTimeRange] = useState('all-time');
-  const { toast } = useToast();
-
-  // Data will be loaded from API
-  const competitions = [];
-  const leaderboardData = [];
-
-  const badgeColors = {
-    gold: 'bg-gold text-gold-foreground',
-    silver: 'bg-silver text-silver-foreground',
-    bronze: 'bg-bronze text-bronze-foreground',
-    none: 'bg-muted text-muted-foreground'
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
-          <p className="text-muted-foreground">Track student performance across competitions</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Select competition" />
-            </SelectTrigger>
-            <SelectContent>
-              {competitions.map(comp => (
-                <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Time range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all-time">All Time</SelectItem>
-              <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="this-week">This Week</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Performers</CardTitle>
-          <CardDescription>Students with the highest scores in selected competition</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            {leaderboardData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
-            ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Rank</th>
-                    <th className="p-3 text-left font-medium">Name</th>
-                    <th className="p-3 text-left font-medium">School</th>
-                    <th className="p-3 text-left font-medium">Score</th>
-                    <th className="p-3 text-left font-medium">Achievement</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboardData.map((student) => (
-                    <tr key={student.rank} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{student.rank}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <span>{student.name}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{student.school}</td>
-                      <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
-                      <td className="p-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[student.badge]}`}>
-                          {student.rank}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>School Rankings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">No school ranking data available</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Competition Stats</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">No competition stats available</p>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

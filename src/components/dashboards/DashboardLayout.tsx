@@ -48,30 +48,8 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  // Mock notifications data - replace with real data from API
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      title: 'New competition announced',
-      message: 'The Spring Challenge 2024 has been announced!',
-      read: false,
-      date: '2024-03-15'
-    },
-    {
-      id: 2,
-      title: 'Your badge achievement',
-      message: 'You earned the "Quick Learner" badge!',
-      read: false,
-      date: '2024-03-14'
-    },
-    {
-      id: 3,
-      title: 'Message from moderator',
-      message: 'Please check the updated competition rules',
-      read: true,
-      date: '2024-03-10'
-    }
-  ]);
+  // Clear preloaded notifications - start with empty array
+  const [notifications, setNotifications] = useState([]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

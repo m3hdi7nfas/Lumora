@@ -33,9 +33,10 @@ interface DashboardLayoutProps {
   children: ReactNode;
   sidebar: ReactNode;
   title: string;
+  onNavItemClick?: () => void; // Add callback for navigation clicks
 }
 
-export function DashboardLayout({ children, sidebar, title }: DashboardLayoutProps) {
+export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -88,6 +89,19 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
     setNotifications(notifications.map(n => ({ ...n, read: true })));
   };
 
+  const handleSidebarToggle = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleNavItemClick = () => {
+    // Close sidebar on mobile when clicking a navigation item
+    if (window.innerWidth < 1024) { // lg breakpoint
+      setSidebarOpen(false);
+    }
+    // Call the optional callback if provided
+    onNavItemClick?.();
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
@@ -97,7 +111,7 @@ export function DashboardLayout({ children, sidebar, title }: DashboardLayoutPro
         <div className="flex items-center justify-between h-full px-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              onClick={handleSidebarToggle}
               className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
             >
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

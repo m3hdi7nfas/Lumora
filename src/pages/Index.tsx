@@ -128,8 +128,8 @@ const Index = () => {
       {/* Floating Ad Box */}
       <AdBox />
 
-      {/* Moderator Controls */}
-      {profile?.role === 'moderator' && (
+      {/* Moderator Controls - REMOVED */}
+      {/* {profile?.role === 'moderator' && (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
           <Button
             onClick={() => setIsEditing(!isEditing)}
@@ -146,7 +146,7 @@ const Index = () => {
             </p>
           )}
         </div>
-      )}
+      )} */}
     </div>
   );
 };

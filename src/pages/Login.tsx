@@ -38,7 +38,7 @@ export default function Login() {
     if (error) {
       toast({
         title: 'Login failed',
-        description: error.message,
+        description: error.message || 'An unknown error occurred',
         variant: 'destructive',
       });
     } else {
@@ -66,7 +66,7 @@ export default function Login() {
         if (signUpError) {
           toast({
             title: 'Demo login failed',
-            description: signUpError.message,
+            description: signUpError.message || 'Failed to create demo account',
             variant: 'destructive',
           });
           setDemoLoading(null);
@@ -79,7 +79,7 @@ export default function Login() {
         if (retryError) {
           toast({
             title: 'Demo login failed',
-            description: retryError.message,
+            description: retryError.message || 'Failed to sign in after account creation',
             variant: 'destructive',
           });
           setDemoLoading(null);
@@ -88,7 +88,7 @@ export default function Login() {
       } else if (signInError) {
         toast({
           title: 'Demo login failed',
-          description: signInError.message,
+          description: signInError.message || 'Failed to sign in',
           variant: 'destructive',
         });
         setDemoLoading(null);
@@ -107,7 +107,7 @@ export default function Login() {
       console.error('Demo login error:', err);
       toast({
         title: 'Demo login failed',
-        description: 'An unexpected error occurred.',
+        description: err.message || 'An unexpected error occurred',
         variant: 'destructive',
       });
     }

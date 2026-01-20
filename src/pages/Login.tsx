@@ -53,6 +53,68 @@ export default function Login() {
     setLoading(false);
   };
 
+  const createAdminDemoAccount = async () => {
+    try {
+      console.log('Creating admin demo account...');
+
+      // First, check if the admin account already exists
+      const { data: existingUser, error: checkError } = await supabase.auth.admin.getUserByEmail('demo.admin@lumora.com');
+
+      if (checkError && !checkError.message.includes('User not found')) {
+        console.error('Error checking for existing admin:', checkError);
+        throw checkError;
+      }
+
+      if (existingUser) {
+        console.log('Admin account already exists');
+        return;
+      }
+
+      // Create the admin user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: 'demo.admin@lumora.com',
+        password: 'Demo123!',
+        email_confirm: true,
+        user_metadata: {
+          role: 'admin',
+          display_name: 'Demo Admin'
+        }
+      });
+
+      if (authError) {
+        console.error('Error creating admin user:', authError);
+        throw authError;
+      }
+
+      console.log('Admin user created:', authData.user.id);
+
+      // Create the profile in the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: authData.user.id,
+          email: 'demo.admin@lumora.com',
+          role: 'admin',
+          display_name: 'Demo Admin',
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileError) {
+        console.error('Error creating admin profile:', profileError);
+        throw profileError;
+      }
+
+      console.log('Admin profile created successfully');
+      return authData.user;
+
+    } catch (error) {
+      console.error('Error in createAdminDemoAccount:', error);
+      throw error;
+    }
+  };
+
   const createProfileManually = async (userId: string, email: string, role: string) => {
     try {
       console.log('Creating profile manually for user:', userId, email, role);
@@ -89,6 +151,16 @@ export default function Login() {
 
     try {
       console.log(`Starting demo login for ${role}:`, account.email);
+
+      // Special handling for admin - try to create the account if it doesn't exist
+      if (role === 'admin') {
+        try {
+          await createAdminDemoAccount();
+          console.log('Admin account creation attempted');
+        } catch (adminError) {
+          console.warn('Admin account creation failed, but continuing with login:', adminError.message);
+        }
+      }
 
       // Try to sign in first
       const { error: signInError } = await signIn(account.email, account.password);

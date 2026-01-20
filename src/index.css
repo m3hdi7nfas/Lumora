@@ -1,0 +1,259 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+/* EduQuest Design System - Gamified Educational Platform */
+
+@layer base {
+  :root {
+    /* Light mode - Prominent light blue theme */
+    --background: 210 60% 94%;
+    --foreground: 220 40% 15%;
+
+    --card: 210 70% 98%;
+    --card-foreground: 220 40% 15%;
+
+    --popover: 210 70% 98%;
+    --popover-foreground: 220 40% 15%;
+
+    /* Primary - Vibrant Blue */
+    --primary: 220 85% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary - Sky Blue */
+    --secondary: 210 70% 90%;
+    --secondary-foreground: 220 85% 40%;
+
+    /* Muted - Soft blue tones */
+    --muted: 210 50% 88%;
+    --muted-foreground: 210 25% 40%;
+
+    /* Accent - Vibrant Teal for gamification */
+    --accent: 185 80% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Success - Achievement Green */
+    --success: 150 65% 42%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning - Competition Orange */
+    --warning: 38 95% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Gold - Rankings */
+    --gold: 45 100% 50%;
+    --silver: 220 15% 65%;
+    --bronze: 30 55% 42%;
+
+    --border: 210 40% 82%;
+    --input: 210 50% 88%;
+    --ring: 220 85% 55%;
+
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(220 85% 55%) 0%, hsl(265 70% 58%) 50%, hsl(185 80% 45%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(210 70% 98%) 0%, hsl(210 65% 95%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(185 80% 45%) 0%, hsl(200 85% 50%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%) 0%, hsl(38 95% 55%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(150 65% 42%) 0%, hsl(170 65% 48%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 2px 8px -2px hsl(220 85% 55% / 0.12);
+    --shadow-md: 0 8px 24px -4px hsl(220 85% 55% / 0.18);
+    --shadow-lg: 0 16px 48px -8px hsl(220 85% 55% / 0.22);
+    --shadow-glow: 0 0 40px hsl(185 80% 45% / 0.35);
+
+    /* Sidebar */
+    --sidebar-background: 220 85% 55%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 220 85% 55%;
+    --sidebar-accent: 220 75% 65%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 75% 48%;
+    --sidebar-ring: 185 80% 45%;
+  }
+
+  .dark {
+    /* Dark mode - Deep blue theme */
+    --background: 220 45% 8%;
+    --foreground: 210 30% 95%;
+
+    --card: 220 40% 12%;
+    --card-foreground: 210 30% 95%;
+
+    --popover: 220 40% 12%;
+    --popover-foreground: 210 30% 95%;
+
+    --primary: 215 75% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 35% 18%;
+    --secondary-foreground: 215 75% 70%;
+
+    --muted: 220 30% 16%;
+    --muted-foreground: 210 20% 60%;
+
+    --accent: 185 70% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 150 60% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 35 95% 60%;
+    --warning-foreground: 0 0% 10%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 30% 20%;
+    --input: 220 30% 20%;
+    --ring: 215 75% 55%;
+
+    --sidebar-background: 220 45% 10%;
+    --sidebar-foreground: 210 30% 95%;
+    --sidebar-primary: 185 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 35% 18%;
+    --sidebar-accent-foreground: 210 30% 95%;
+    --sidebar-border: 220 30% 20%;
+    --sidebar-ring: 185 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-size: 110%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  /* Custom Scrollbar - Flying Thumb, no track */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0;
+    height: 0;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+    box-shadow: 0 0 10px hsla(var(--primary), 0.5);
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display font-bold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .gradient-gold {
+    background: var(--gradient-gold);
+  }
+
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-hero);
+  }
+
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .animate-shine {
+    animation: shine 2s linear infinite;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+
+  100% {
+    background-position: -200% center;
+  }
+}

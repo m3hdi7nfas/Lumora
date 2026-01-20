@@ -1519,7 +1519,7 @@ function AdminLeaderboardTab() {
                             <span>{student.display_name || 'No name'}</span>
                           </div>
                         </td>
-                        < <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                        <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
                         <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
                       </tr>
                     ))}

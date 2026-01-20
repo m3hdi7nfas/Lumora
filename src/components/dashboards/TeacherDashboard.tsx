@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import {
   Users,
   BarChart3,
@@ -15,17 +15,19 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  User
+  User,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
@@ -78,6 +80,7 @@ function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
 
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   return (
     <DashboardLayout
@@ -96,7 +99,7 @@ export default function TeacherDashboard() {
 // Teacher Overview Component
 function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const stats = {
@@ -119,6 +122,12 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
       <div>
         <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
         <p className="text-muted-foreground">Overview of your class performance and activities</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Teacher - Can access all schools and competitions</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -234,6 +243,7 @@ function StudentsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const students = [];
@@ -251,6 +261,12 @@ function StudentsTab() {
         <div>
           <h1 className="text-2xl font-display font-bold">Student Management</h1>
           <p className="text-muted-foreground">View and manage your students</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Unlock className="w-4 h-4" />
+              <span>Admin/Moderator View - Can see all schools</span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -279,7 +295,7 @@ function StudentsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Students List</CardTitle>
-          <CardDescription>All your students</CardDescription>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -291,6 +307,7 @@ function StudentsTab() {
                   <tr className="border-b border-border">
                     <th className="p-3 text-left font-medium">Name</th>
                     <th className="p-3 text-left font-medium">Class</th>
+                    <th className="p-3 text-left font-medium">School</th>
                     <th className="p-3 text-left font-medium">Score</th>
                     <th className="p-3 text-left font-medium">Progress</th>
                     <th className="p-3 text-left font-medium">Status</th>
@@ -311,6 +328,7 @@ function StudentsTab() {
                         </div>
                       </td>
                       <td className="p-3 text-muted-foreground">{student.class}</td>
+                      <td className="p-3 text-muted-foreground">{student.school}</td>
                       <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
@@ -345,6 +363,7 @@ function TeacherLeaderboardTab() {
   const [selectedCompetition, setSelectedCompetition] = useState('all');
   const [selectedClass, setSelectedClass] = useState('all');
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const competitions = [];
@@ -364,6 +383,12 @@ function TeacherLeaderboardTab() {
         <div>
           <h1 className="text-2xl font-display font-bold">Class Leaderboard</h1>
           <p className="text-muted-foreground">Track your students' performance</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Unlock className="w-4 h-4" />
+              <span>Admin/Moderator View - Can see all competitions</span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -394,7 +419,7 @@ function TeacherLeaderboardTab() {
       <Card>
         <CardHeader>
           <CardTitle>Student Performance</CardTitle>
-          <CardDescription>Your students' scores and progress</CardDescription>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'} scores and progress</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -406,6 +431,7 @@ function TeacherLeaderboardTab() {
                   <tr className="border-b border-border">
                     <th className="p-3 text-left font-medium">Rank</th>
                     <th className="p-3 text-left font-medium">Student</th>
+                    <th className="p-3 text-left font-medium">School</th>
                     <th className="p-3 text-left font-medium">Score</th>
                     <th className="p-3 text-left font-medium">Progress</th>
                     <th className="p-3 text-left font-medium">Achievement</th>
@@ -423,6 +449,7 @@ function TeacherLeaderboardTab() {
                           <span>{student.name}</span>
                         </div>
                       </td>
+                      <td className="p-3 text-muted-foreground">{student.school}</td>
                       <td className="p-3 font-bold">{student.score.toLocaleString()}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
@@ -480,6 +507,7 @@ function MessagesTab() {
   const [sendingReply, setSendingReply] = useState(false);
   const [messages, setMessages] = useState([]);
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -534,6 +562,12 @@ function MessagesTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">Student communications</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Teacher - Can see messages from all students</span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -541,7 +575,7 @@ function MessagesTab() {
           <Card>
             <CardHeader>
               <CardTitle>Inbox</CardTitle>
-              <CardDescription>Student messages</CardDescription>
+              <CardDescription>{isAdminOrModerator && currentView ? 'All student messages' : 'Your student messages'}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

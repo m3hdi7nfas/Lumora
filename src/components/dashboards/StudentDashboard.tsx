@@ -20,7 +20,8 @@ import {
   EyeOff,
   Loader2,
   Users,
-  Search
+  Search,
+  Unlock
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -86,6 +87,7 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   return (
     <DashboardLayout
@@ -105,7 +107,7 @@ export default function StudentDashboard() {
 
 // Student Overview Component
 function StudentOverview() {
-  const { profile } = useAuth();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
   const { toast } = useToast();
 
   // Data will be loaded from API
@@ -130,6 +132,12 @@ function StudentOverview() {
       <div>
         <h1 className="text-2xl font-display font-bold">Student Dashboard</h1>
         <p className="text-muted-foreground">Welcome back, {profile?.display_name || 'Student'}!</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Student - Can access all schools and competitions</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -245,6 +253,7 @@ function CompetitionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCompetition, setSelectedCompetition] = useState(null);
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const competitions = [];
@@ -275,6 +284,12 @@ function CompetitionsTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Competitions</h1>
         <p className="text-muted-foreground">Join active competitions and challenge yourself</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Unlock className="w-4 h-4" />
+            <span>Admin/Moderator View - Can see all competitions including locked ones</span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -313,11 +328,18 @@ function CompetitionsTab() {
                     <Trophy className="w-4 h-4 text-muted-foreground" />
                     <span>{competition.prize}</span>
                   </div>
+                  {competition.locked && !isAdminOrModerator && (
+                    <div className="flex items-center gap-2 text-sm text-warning">
+                      <Lock className="w-4 h-4" />
+                      <span>This competition is locked</span>
+                    </div>
+                  )}
                   <Button
                     onClick={() => handleJoinCompetition(competition.id)}
                     className="w-full gradient-hero"
+                    disabled={competition.locked && !isAdminOrModerator}
                   >
-                    Join Competition
+                    {competition.locked && !isAdminOrModerator ? 'Locked Competition' : 'Join Competition'}
                   </Button>
                 </div>
               </CardContent>
@@ -337,6 +359,7 @@ function PracticeTab() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const subjects = [];
@@ -373,6 +396,12 @@ function PracticeTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Practice Mode</h1>
         <p className="text-muted-foreground">Sharpen your skills with practice questions</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Student - Can access all practice questions</span>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -528,6 +557,7 @@ function ChallengesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   const filteredActiveChallenges = activeChallenges.filter(challenge =>
     challenge.opponent.toLowerCase().includes(searchTerm.toLowerCase())
@@ -587,6 +617,12 @@ function ChallengesTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Challenges</h1>
         <p className="text-muted-foreground">Challenge your friends to 1v1 battles</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Student - Can see all challenges</span>
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="active" className="space-y-4">
@@ -694,6 +730,7 @@ function ChallengesTab() {
 function BadgesTab() {
   const [badges, setBadges] = useState([]);
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   // Data will be loaded from API
   const badgeCategories = [
@@ -715,6 +752,12 @@ function BadgesTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Badges & Achievements</h1>
         <p className="text-muted-foreground">Show off your accomplishments</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Student - Can see all badges</span>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -774,6 +817,7 @@ function MessagesTab() {
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -828,6 +872,12 @@ function MessagesTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">Your communications with teachers and moderators</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Student - Can see all messages</span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -874,6 +924,30 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </button>
                     ))

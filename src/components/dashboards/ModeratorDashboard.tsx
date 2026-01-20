@@ -34,7 +34,8 @@ import {
   Square,
   RefreshCw,
   User,
-  LogOut
+  LogOut,
+  Calendar
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -142,7 +143,7 @@ export default function ModeratorDashboard() {
 function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
   const [showAds, setShowAds] = useState(true);
-  const [allowQuestionRepetition, setAllowQuestionRepetition] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Load settings from localStorage on component mount
   useEffect(() => {
@@ -150,12 +151,33 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
     if (savedShowAds !== null) {
       setShowAds(savedShowAds === 'true');
     }
-
-    const savedQuestionRepetition = localStorage.getItem('allowQuestionRepetition');
-    if (savedQuestionRepetition !== null) {
-      setAllowQuestionRepetition(savedQuestionRepetition === 'true');
-    }
   }, []);
+
+  const handleAdsToggle = async (checked: boolean) => {
+    setLoading(true);
+    try {
+      setShowAds(checked);
+      // Save to localStorage
+      localStorage.setItem('showAds', checked.toString());
+
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('adsSettingChanged', { detail: { showAds: checked } }));
+
+      toast({
+        title: 'Ad settings updated',
+        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`,
+        variant: 'success'
+      });
+    } catch (error) {
+      toast({
+        title: 'Error updating ad settings',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Data will be loaded from API
   const stats = {
@@ -170,68 +192,9 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
   const quickActions = [
     { id: 'competitions', icon: Trophy, title: 'Manage Competitions', description: 'Create and edit competitions' },
     { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
-    { id: 'users', icon: Users, title: 'User Management', description: 'Manage user accounts' },
+    { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
   ];
-
-  const handleAdsToggle = async (checked: boolean) => {
-    setShowAds(checked);
-    // Save to localStorage
-    localStorage.setItem('showAds', checked.toString());
-
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('adsSettingChanged', { detail: { showAds: checked } }));
-
-    try {
-      // API call to update ad settings
-      const { error } = await supabase.from('settings').upsert({
-        key: 'show_ads',
-        value: checked
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Ad settings updated',
-        description: `Advertisements are now ${checked ? 'enabled' : 'disabled'}`,
-        variant: 'success'
-      });
-    } catch (error) {
-      toast({
-        title: 'Error updating ad settings',
-        description: error.message,
-        variant: 'destructive'
-      });
-    }
-  };
-
-  const handleQuestionRepetitionToggle = async (checked: boolean) => {
-    setAllowQuestionRepetition(checked);
-    // Save to localStorage
-    localStorage.setItem('allowQuestionRepetition', checked.toString());
-
-    try {
-      // API call to update question repetition settings
-      const { error } = await supabase.from('settings').upsert({
-        key: 'allow_question_repetition',
-        value: checked
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Question repetition settings updated',
-        description: `Users can ${checked ? 'now' : 'no longer'} repeat question sections`,
-        variant: 'success'
-      });
-    } catch (error) {
-      toast({
-        title: 'Error updating question repetition settings',
-        description: error.message,
-        variant: 'destructive'
-      });
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -260,27 +223,7 @@ function OverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) 
                 checked={showAds}
                 onCheckedChange={handleAdsToggle}
                 id="ads-toggle"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Question Repetition Setting */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Question Repetition</CardTitle>
-            <CardDescription>Allow users to repeat question sections</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <RefreshCw className="w-5 h-5 text-primary" />
-                <span>Allow Question Repetition</span>
-              </div>
-              <Switch
-                checked={allowQuestionRepetition}
-                onCheckedChange={handleQuestionRepetitionToggle}
-                id="question-repetition-toggle"
+                disabled={loading}
               />
             </div>
           </CardContent>
@@ -463,6 +406,7 @@ function SchoolsTab() {
   const [newSchool, setNewSchool] = useState({ name: '', password: '' });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const filteredSchools = schools.filter(school =>
     school.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -1136,8 +1080,8 @@ function BadgesTab() {
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -1240,6 +1184,7 @@ function MessagesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1361,8 +1306,8 @@ function MessagesTab() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

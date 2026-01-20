@@ -21,7 +21,8 @@ import {
   Eye,
   User as UserIcon,
   Shield,
-  BookOpen
+  BookOpen,
+  Crown
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -41,7 +42,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
-  const { profile, signOut, currentView, setCurrentView, isAdminOrModerator } = useAuth();
+  const { profile, signOut, currentView, setCurrentView, isAdminOrModerator, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -257,8 +258,17 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     </DropdownMenuItem>
                     {currentView && (
                       <DropdownMenuItem onClick={handleResetView}>
-                        <Shield className="w-4 h-4 mr-2" />
-                        Back to {profile?.role} View
+                        {isAdmin ? (
+                          <>
+                            <Crown className="w-4 h-4 mr-2" />
+                            Back to Admin View
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="w-4 h-4 mr-2" />
+                            Back to Moderator View
+                          </>
+                        )}
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />

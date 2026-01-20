@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft, Crown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
@@ -13,6 +13,7 @@ import { AdBanner } from '@/components/ads/AdBanner';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
+  admin: { email: 'demo.admin@lumora.com', password: 'Demo123!', role: 'Admin', icon: Crown },
   moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'Moderator', icon: Shield },
   teacher: { email: 'demo.teacher@lumora.com', password: 'Demo123!', role: 'Teacher', icon: BookOpen },
   student: { email: 'demo.student@lumora.com', password: 'Demo123!', role: 'Student', icon: User },
@@ -151,7 +152,7 @@ export default function Login() {
             {/* Demo Login Section */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground text-center font-medium">Try a demo account</p>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {(Object.keys(DEMO_ACCOUNTS) as Array<keyof typeof DEMO_ACCOUNTS>).map((role) => {
                   const account = DEMO_ACCOUNTS[role];
                   const Icon = account.icon;

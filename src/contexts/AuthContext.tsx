@@ -12,6 +12,7 @@ interface Profile {
   display_name: string | null;
   avatar_url?: string | null;
   avatar_id: string | null;
+  school_id?: string | null;
 }
 
 interface AuthContextType {
@@ -25,6 +26,7 @@ interface AuthContextType {
   currentView: UserRole | null;
   setCurrentView: (role: UserRole | null) => void;
   isAdminOrModerator: boolean;
+  isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentView, setCurrentView] = useState<UserRole | null>(null);
 
   const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
+  const isAdmin = profile?.role === 'admin';
 
   const fetchProfile = async (userId: string, retries = 3): Promise<void> => {
     for (let i = 0; i < retries; i++) {
@@ -117,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, currentView, setCurrentView, isAdminOrModerator }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, currentView, setCurrentView, isAdminOrModerator, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

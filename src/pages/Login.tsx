@@ -26,7 +26,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
-  const { signIn, signUp } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -60,7 +60,7 @@ export default function Login() {
     try {
       console.log(`Attempting demo login for ${role}:`, account.email);
 
-      // Try to sign in first
+      // Try to sign in with the demo account
       const { error: signInError } = await signIn(account.email, account.password);
 
       if (!signInError) {
@@ -75,48 +75,12 @@ export default function Login() {
         return;
       }
 
-      console.log('Sign in failed, creating account:', signInError.message);
-
-      // If sign in fails, create the account
-      const { error: signUpError } = await signUp(account.email, account.password, role);
-
-      if (signUpError) {
-        console.error('Sign up error:', signUpError);
-        toast({
-          title: 'Demo login failed',
-          description: signUpError.message || 'Failed to create demo account',
-          variant: 'destructive',
-        });
-        setDemoLoading(null);
-        return;
-      }
-
-      console.log('Account created, waiting for profile...');
-
-      // Wait for profile creation
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Try to sign in again
-      const { error: retryError } = await signIn(account.email, account.password);
-
-      if (retryError) {
-        console.error('Retry sign in failed:', retryError);
-        toast({
-          title: 'Demo login failed',
-          description: retryError.message || 'Failed to sign in after account creation',
-          variant: 'destructive',
-        });
-        setDemoLoading(null);
-        return;
-      }
-
-      console.log('Demo login successful after account creation');
+      console.error('Demo login failed:', signInError.message);
       toast({
-        title: `Welcome, Demo ${account.role}!`,
-        description: 'Account created and logged in.',
+        title: 'Demo login failed',
+        description: `Could not log in with demo ${account.role} account. The demo accounts need to be created manually in Supabase.`,
+        variant: 'destructive',
       });
-      await new Promise(resolve => setTimeout(resolve, 300));
-      navigate('/dashboard');
 
     } catch (err) {
       console.error('Demo login exception:', err);

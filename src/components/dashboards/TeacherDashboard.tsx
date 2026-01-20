@@ -24,6 +24,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -81,7 +84,7 @@ export default function TeacherDashboard() {
       title="Lumora Teacher Dashboard"
       sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <TeacherOverview />}
+      {activeTab === 'overview' && <TeacherOverview setActiveTab={setActiveTab} />}
       {activeTab === 'students' && <StudentsTab />}
       {activeTab === 'leaderboard' && <TeacherLeaderboardTab />}
       {activeTab === 'messages' && <MessagesTab />}
@@ -91,7 +94,7 @@ export default function TeacherDashboard() {
 }
 
 // Teacher Overview Component
-function TeacherOverview() {
+function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
   const { profile } = useAuth();
 

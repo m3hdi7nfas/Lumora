@@ -13,10 +13,10 @@ import { AdBanner } from '@/components/ads/AdBanner';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
-  admin: { email: 'demo.admin@lumora.com', password: 'Demo123!', role: 'Admin', icon: Crown },
-  moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'Moderator', icon: Shield },
-  teacher: { email: 'demo.teacher@lumora.com', password: 'Demo123!', role: 'Teacher', icon: BookOpen },
-  student: { email: 'demo.student@lumora.com', password: 'Demo123!', role: 'Student', icon: User },
+  admin: { email: 'demo.admin@lumora.com', password: 'Demo123!', role: 'admin', icon: Crown },
+  moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'moderator', icon: Shield },
+  teacher: { email: 'demo.teacher@lumora.com', password: 'Demo123!', role: 'teacher', icon: BookOpen },
+  student: { email: 'demo.student@lumora.com', password: 'Demo123!', role: 'student', icon: User },
 };
 
 export default function Login() {

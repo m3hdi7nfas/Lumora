@@ -27,7 +27,22 @@ const Index = () => {
       const local = localStorage.getItem('lumora-landing-content');
 
       try {
-        const { data, error } = await (supabase as any)
+        // Check if site_settings table exists first
+        const { data: tableCheck, error: tableError } = await supabase
+          .from('site_settings')
+          .select('*')
+          .limit(1);
+
+        if (tableError) {
+          console.log('site_settings table does not exist, using local storage');
+          if (local) {
+            return JSON.parse(local) as SiteContent;
+          }
+          return defaultSiteContent;
+        }
+
+        // If table exists, try to fetch the landing page content
+        const { data, error } = await supabase
           .from('site_settings')
           .select('value')
           .eq('key', 'landing_page')
@@ -66,12 +81,24 @@ const Index = () => {
       localStorage.setItem('lumora-landing-content', JSON.stringify(newContent));
 
       try {
-        const { error } = await (supabase as any)
+        // Check if site_settings table exists
+        const { data: tableCheck, error: tableError } = await supabase
+          .from('site_settings')
+          .select('*')
+          .limit(1);
+
+        if (tableError) {
+          console.log('site_settings table does not exist, skipping database save');
+          return;
+        }
+
+        // If table exists, try to save
+        const { error } = await supabase
           .from('site_settings')
           .upsert({ key: 'landing_page', value: newContent });
 
         if (error) {
-          console.warn('Supabase save failed (ignore if table site_settings is missing):', error.message);
+          console.warn('Supabase save failed:', error.message);
         }
       } catch (e) {
         console.warn('Supabase save failed');

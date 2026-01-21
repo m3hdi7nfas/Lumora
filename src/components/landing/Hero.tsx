@@ -97,19 +97,12 @@ export function Hero({
           <ScrollAnimation delay={0.4}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               <StatCard
-                icon={Users}
-                value={content.stats.students}
-                label="Students"
-                isEditingGlobal={isEditingGlobal}
-                onSave={(val) => updateContent?.('stats.students', val)}
-                prizeText="Expected"
-              />
-              <StatCard
                 icon={Trophy}
                 value={content.stats.competitions}
                 label="Competitions"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.competitions', val)}
+                prizeText="Expected"
               />
               <StatCard
                 icon={Star}
@@ -117,7 +110,6 @@ export function Hero({
                 label="Questions"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.questions', val)}
-                prizeText="Expected"
               />
               <StatCard
                 icon={Users}
@@ -125,6 +117,14 @@ export function Hero({
                 label="Schools"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.schools', val)}
+                prizeText="Expected"
+              />
+              <StatCard
+                icon={Users}
+                value={content.stats.students}
+                label="Students"
+                isEditingGlobal={isEditingGlobal}
+                onSave={(val) => updateContent?.('stats.students', val)}
               />
             </div>
           </ScrollAnimation>

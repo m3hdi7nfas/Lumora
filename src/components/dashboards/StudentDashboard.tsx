@@ -2,7 +2,27 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trophy, BookOpen, Award, Swords, Mail, User, Lock, Calendar, ChevronRight, Crown, Medal, Star, RefreshCw, Eye, EyeOff, Loader2, Users, Search, Unlock } from 'lucide-react';
+import {
+  Trophy,
+  BookOpen,
+  Award,
+  Swords,
+  Mail,
+  User,
+  Lock,
+  Calendar,
+  ChevronRight,
+  Crown,
+  Medal,
+  Star,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Loader2,
+  Users,
+  Search,
+  Unlock
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,17 +48,17 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-              activeTab === item.id
-                ? 'bg-primary text-primary-foreground shadow-card'
-                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
+              ? 'bg-primary text-primary-foreground shadow-card'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
+
       <div className="mt-auto pt-6 border-t border-border/50">
         <div className="p-4 rounded-2xl bg-muted/30">
           <div className="flex items-center gap-3 mb-3">
@@ -62,12 +82,11 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  
+
   return (
     <DashboardLayout
       title="Lumora Student Dashboard"
       sidebar={<StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
-      onNavItemClick={() => setActiveTab(activeTab)}
     >
       {activeTab === 'overview' && <StudentOverview />}
       {activeTab === 'competitions' && <CompetitionsTab />}
@@ -90,14 +109,9 @@ function StudentOverview() {
     queryFn: async () => {
       try {
         // Get student data
-        const { data: student, error: studentError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', profile?.id)
-          .single();
-        
+        const { data: student, error: studentError } = await supabase.from('profiles').select('*').eq('id', profile?.id).single();
         if (studentError) throw studentError;
-        
+
         return {
           totalScore: student.score || 0,
           competitionsEntered: 0,
@@ -124,7 +138,7 @@ function StudentOverview() {
         <h1 className="text-2xl font-display font-bold">My Learning Journey</h1>
         <p className="text-muted-foreground">Track your progress and achievements</p>
       </div>
-      
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -156,7 +170,7 @@ function StudentOverview() {
           loading={statsLoading}
         />
       </div>
-      
+
       {/* Quick Actions */}
       <Card>
         <CardHeader>
@@ -176,6 +190,7 @@ function StudentOverview() {
                 </div>
               </div>
             </button>
+
             <button className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-lg bg-muted">
@@ -187,6 +202,7 @@ function StudentOverview() {
                 </div>
               </div>
             </button>
+
             <button className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left">
               <div className="flex items-center gap-3">
                 <div className="p-3 rounded-lg bg-muted">
@@ -201,7 +217,7 @@ function StudentOverview() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Recent Activity */}
       <Card>
         <CardHeader>
@@ -238,7 +254,7 @@ function StatCard({ title, value, icon: Icon, className, loading = false }: { ti
 
 // Competitions Tab Component
 function CompetitionsTab() {
-  const [competitions, setCompetitions] = useState<any[]>([]);
+  const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -248,12 +264,8 @@ function CompetitionsTab() {
       const { data, error } = await supabase.from('competitions').select('*');
       if (error) throw error;
       setCompetitions(data || []);
-    } catch (error: any) {
-      toast({
-        title: 'Error fetching competitions',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -268,7 +280,7 @@ function CompetitionsTab() {
         <h1 className="text-2xl font-display font-bold">Competitions</h1>
         <p className="text-muted-foreground">Join competitions and test your knowledge</p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Available Competitions</CardTitle>
@@ -306,7 +318,7 @@ function CompetitionsTab() {
 
 // Challenges Tab Component
 function ChallengesTab() {
-  const [challenges, setChallenges] = useState<any[]>([]);
+  const [challenges, setChallenges] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -317,12 +329,8 @@ function ChallengesTab() {
       const { data, error } = await supabase.from('challenges').select('*');
       if (error) throw error;
       setChallenges(data || []);
-    } catch (error: any) {
-      toast({
-        title: 'Error fetching challenges',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      toast({ title: 'Error fetching challenges', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -337,7 +345,7 @@ function ChallengesTab() {
         <h1 className="text-2xl font-display font-bold">Challenges</h1>
         <p className="text-muted-foreground">Challenge your friends to 1v1 battles</p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>Active Challenges</CardTitle>
@@ -375,7 +383,7 @@ function ChallengesTab() {
 
 // Badges Tab Component
 function BadgesTab() {
-  const [badges, setBadges] = useState<any[]>([]);
+  const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -385,12 +393,8 @@ function BadgesTab() {
       const { data, error } = await supabase.from('badges').select('*');
       if (error) throw error;
       setBadges(data || []);
-    } catch (error: any) {
-      toast({
-        title: 'Error fetching badges',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      toast({ title: 'Error fetching badges', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -405,7 +409,7 @@ function BadgesTab() {
         <h1 className="text-2xl font-display font-bold">My Badges</h1>
         <p className="text-muted-foreground">Achievements you've earned</p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>My Badges Collection</CardTitle>
@@ -439,8 +443,8 @@ function BadgesTab() {
 
 // Messages Tab Component
 function MessagesTab() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  const [messages, setMessages] = useState([]);
+  const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -448,7 +452,7 @@ function MessagesTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  const filteredMessages = messages.filter(message => 
+  const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
     message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
@@ -457,46 +461,36 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('receiver_id', profile?.id);
+      const { data, error } = await supabase.from('messages').select('*').eq('receiver_id', profile?.id);
       if (error) throw error;
       setMessages(data || []);
-    } catch (error: any) {
-      toast({
-        title: 'Error fetching messages',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
+
     setSendingReply(true);
+
     try {
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          content: replyContent,
-          receiver_id: selectedMessage.senderEmail,
-          sender_id: profile?.email,
-          subject: `Re: ${selectedMessage.subject}`
-        });
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: profile?.email,
+        subject: `Re: ${selectedMessage.subject}`
+      });
+
       if (error) throw error;
-      toast({
-        title: 'Reply sent successfully!'
-      });
+
+      toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
-    } catch (error: any) {
-      toast({
-        title: 'Error sending reply',
-        description: error.message,
-        variant: 'destructive'
-      });
+    } catch (error) {
+      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
     }
+
     setSendingReply(false);
   };
 
@@ -510,7 +504,7 @@ function MessagesTab() {
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">Your communications</p>
       </div>
-      
+
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <Card>
@@ -529,6 +523,7 @@ function MessagesTab() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
+
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                   {loading ? (
                     <div className="text-center py-4">
@@ -541,15 +536,11 @@ function MessagesTab() {
                       <button
                         key={message.id}
                         onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${
-                          selectedMessage?.id === message.id
-                            ? 'bg-primary/10 border border-primary'
-                            : 'hover:bg-muted/50'
-                        } ${!message.read && 'border-l-2 border-primary'}`}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map((n: string) => n[0]).join('')}
+                            {message.sender.split(' ').map(n => n[0]).join('')}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
@@ -571,7 +562,7 @@ function MessagesTab() {
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="md:col-span-2">
           {selectedMessage ? (
             <Card>
@@ -586,6 +577,7 @@ function MessagesTab() {
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
+
                   <div className="space-y-4">
                     <Label>Your Reply</Label>
                     <Textarea
@@ -633,7 +625,7 @@ function ProfileTab() {
         <h1 className="text-2xl font-display font-bold">My Profile</h1>
         <p className="text-muted-foreground">Manage your student account</p>
       </div>
-      
+
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -644,17 +636,19 @@ function ProfileTab() {
               <Label>Email</Label>
               <Input value={profile?.email || ''} disabled className="bg-muted" />
             </div>
+
             <div className="space-y-2">
               <Label>Role</Label>
               <Input value={profile?.role || ''} disabled className="bg-muted" />
             </div>
+
             <div className="space-y-2">
               <Label>Display Name</Label>
               <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Quick Stats</CardTitle>
@@ -664,10 +658,12 @@ function ProfileTab() {
               <p className="text-sm text-muted-foreground">Total Score</p>
               <p className="text-2xl font-bold">{profile?.score || 0}</p>
             </div>
+
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Joined</p>
               <p className="text-2xl font-bold">0</p>
             </div>
+
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Badges Earned</p>
               <p className="text-2xl font-bold">0</p>

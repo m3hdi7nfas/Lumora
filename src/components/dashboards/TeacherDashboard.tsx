@@ -2,31 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Users,
-  BarChart3,
-  Trophy,
-  Search,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
-  MessageSquare,
-  RefreshCw,
-  Loader2,
-  Eye,
-  EyeOff,
-  User,
-  Lock,
-  Unlock,
-  Calendar,
-  ChevronRight,
-  Crown,
-  Medal,
-  Star,
-  Plus,
-  Edit,
-  Trash2
-} from 'lucide-react';
+import { Users, BarChart3, Trophy, Search, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, User, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -56,17 +31,17 @@ function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-              ? 'bg-primary text-primary-foreground shadow-card'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              activeTab === item.id
+                ? 'bg-primary text-primary-foreground shadow-card'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
-
       <div className="mt-auto pt-6 border-t border-border/50">
         <div className="p-4 rounded-2xl bg-muted/30">
           <div className="flex items-center gap-3 mb-3">
@@ -91,11 +66,12 @@ function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
 export default function TeacherDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const { profile, currentView, isAdminOrModerator } = useAuth();
-
+  
   return (
     <DashboardLayout
       title="Lumora Teacher Dashboard"
       sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+      onNavItemClick={() => setActiveTab(activeTab)}
     >
       {activeTab === 'overview' && <TeacherOverview setActiveTab={setActiveTab} />}
       {activeTab === 'students' && <StudentsTab />}
@@ -117,13 +93,18 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
     queryFn: async () => {
       try {
         // Get students for this teacher
-        const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
+        const { data: students, error: studentsError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'student');
         if (studentsError) throw studentsError;
-
+        
         // Get competitions
-        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
+        const { data: competitions, error: compError } = await supabase
+          .from('competitions')
+          .select('*');
         if (compError) throw compError;
-
+        
         return {
           totalStudents: students.length,
           activeStudents: students.length,
@@ -132,7 +113,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
           avgScore: 0, // This would come from a more complex query
           recentActivity: []
         };
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching stats:', error);
         return {
           totalStudents: 0,
@@ -164,7 +145,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
           </div>
         )}
       </div>
-
+      
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
@@ -196,7 +177,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
           loading={statsLoading}
         />
       </div>
-
+      
       {/* Quick Actions */}
       <Card>
         <CardHeader>
@@ -225,7 +206,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
           </div>
         </CardContent>
       </Card>
-
+      
       {/* Recent Activity */}
       <Card>
         <CardHeader>
@@ -237,7 +218,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
             {!stats || stats.recentActivity?.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
-              stats.recentActivity.map((activity) => (
+              stats.recentActivity.map((activity: any) => (
                 <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="p-2 rounded-lg bg-muted">
                     {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
@@ -284,13 +265,13 @@ function StudentsTab() {
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [students, setStudents] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [editingStudent, setEditingStudent] = useState(null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
   const queryClient = useQueryClient();
 
-  const filteredStudents = students.filter(student =>
-    (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredStudents = students.filter(student => 
+    (student.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
      student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedClass === 'all' || student.class === selectedClass)
   );
@@ -300,17 +281,21 @@ function StudentsTab() {
     try {
       // Fetch students - if admin/moderator viewing as teacher, show all students
       let query = supabase.from('profiles').select('*').eq('role', 'student');
-
+      
       if (!isAdminOrModerator || !currentView) {
         // Regular teacher can only see students from their school
         // query = query.eq('school_id', profile?.school_id);
       }
-
+      
       const { data, error } = await query;
       if (error) throw error;
       setStudents(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error fetching students',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
     setLoading(false);
   };
@@ -327,40 +312,58 @@ function StudentsTab() {
 
   const handleUpdateStudent = async () => {
     if (!editingStudent.name) {
-      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      toast({
+        title: 'Please fill all required fields',
+        variant: 'destructive'
+      });
       return;
     }
-
+    
     setLoading(true);
-
     try {
-      const { error } = await supabase.from('profiles').update({
-        display_name: editingStudent.name,
-        is_active: editingStudent.is_active
-      }).eq('id', editingStudent.id);
-
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          display_name: editingStudent.name,
+          is_active: editingStudent.is_active
+        })
+        .eq('id', editingStudent.id);
       if (error) throw error;
-
-      toast({ title: 'Student updated successfully!' });
+      
+      toast({
+        title: 'Student updated successfully!'
+      });
       setEditingStudent(null);
       fetchStudents();
-    } catch (error) {
-      toast({ title: 'Error updating student', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error updating student',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
-
     setLoading(false);
   };
 
   const handleDeleteStudent = async (studentId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', studentId);
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', studentId);
       if (error) throw error;
-
-      toast({ title: 'Student deleted successfully!' });
+      
+      toast({
+        title: 'Student deleted successfully!'
+      });
       fetchStudents();
-    } catch (error) {
-      toast({ title: 'Error deleting student', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting student',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
     setLoading(false);
   };
@@ -383,7 +386,6 @@ function StudentsTab() {
             </div>
           )}
         </div>
-
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -407,7 +409,7 @@ function StudentsTab() {
           </Select>
         </div>
       </div>
-
+      
       <Card>
         <CardHeader>
           <CardTitle>Students List</CardTitle>
@@ -440,7 +442,7 @@ function StudentsTab() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                            {student.display_name?.split(' ').map((n: string) => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium">{student.display_name || 'No name'}</p>
@@ -454,10 +456,7 @@ function StudentsTab() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-full h-2 bg-muted rounded-full">
-                            <div
-                              className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress || 0}%` }}
-                            />
+                            <div className="h-2 bg-primary rounded-full" style={{ width: `${student.progress || 0}%` }} />
                           </div>
                           <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
@@ -511,7 +510,7 @@ function StudentsTab() {
           </div>
         </CardContent>
       </Card>
-
+      
       {/* Edit Student Dialog */}
       {editingStudent && (
         <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
@@ -571,10 +570,10 @@ function TeacherLeaderboardTab() {
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [competitions, setCompetitions] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [leaderboardData, setLeaderboardData] = useState([]);
-
+  const [competitions, setCompetitions] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
+  const [leaderboardData, setLeaderboardData] = useState<any[]>([]);
+  
   const badgeColors = {
     gold: 'bg-gold text-gold-foreground',
     silver: 'bg-silver text-silver-foreground',
@@ -588,8 +587,12 @@ function TeacherLeaderboardTab() {
       const { data, error } = await supabase.from('competitions').select('*');
       if (error) throw error;
       setCompetitions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error fetching competitions',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
     setLoading(false);
   };
@@ -608,19 +611,26 @@ function TeacherLeaderboardTab() {
     setLoading(true);
     try {
       // Fetch students with scores
-      let query = supabase.from('profiles').select('*').eq('role', 'student').order('score', { ascending: false });
-
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'student')
+        .order('score', { ascending: false });
+      
       if (!isAdminOrModerator || !currentView) {
         // Regular teacher can only see students from their school
         // query = query.eq('school_id', profile?.school_id);
       }
-
+      
       const { data, error } = await query;
       if (error) throw error;
-
       setLeaderboardData(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error fetching leaderboard',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
     setLoading(false);
   };
@@ -644,7 +654,6 @@ function TeacherLeaderboardTab() {
             </div>
           )}
         </div>
-
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
             <SelectTrigger className="w-full sm:w-[200px]">
@@ -657,7 +666,6 @@ function TeacherLeaderboardTab() {
               ))}
             </SelectContent>
           </Select>
-
           <Select value={selectedClass} onValueChange={setSelectedClass}>
             <SelectTrigger className="w-full sm:w-[150px]">
               <SelectValue placeholder="Select class" />
@@ -671,7 +679,7 @@ function TeacherLeaderboardTab() {
           </Select>
         </div>
       </div>
-
+      
       <Card>
         <CardHeader>
           <CardTitle>Student Performance</CardTitle>
@@ -704,7 +712,7 @@ function TeacherLeaderboardTab() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                            {student.display_name?.split(' ').map((n: string) => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
                           </div>
                           <span>{student.display_name || 'No name'}</span>
                         </div>
@@ -714,10 +722,7 @@ function TeacherLeaderboardTab() {
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-full h-2 bg-muted rounded-full">
-                            <div
-                              className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress || 0}%` }}
-                            />
+                            <div className="h-2 bg-primary rounded-full" style={{ width: `${student.progress || 0}%` }} />
                           </div>
                           <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
@@ -735,7 +740,7 @@ function TeacherLeaderboardTab() {
           </div>
         </CardContent>
       </Card>
-
+      
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -745,7 +750,6 @@ function TeacherLeaderboardTab() {
             <p className="text-center text-muted-foreground py-4">No class statistics available</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Top Performers</CardTitle>
@@ -761,8 +765,8 @@ function TeacherLeaderboardTab() {
 
 // Messages Tab Component
 function MessagesTab() {
-  const [messages, setMessages] = useState([]);
-  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
   const [replyContent, setReplyContent] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -771,7 +775,7 @@ function MessagesTab() {
   const { profile, currentView, isAdminOrModerator } = useAuth();
   const queryClient = useQueryClient();
 
-  const filteredMessages = messages.filter(message =>
+  const filteredMessages = messages.filter(message => 
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
     message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
@@ -782,42 +786,50 @@ function MessagesTab() {
     try {
       // Fetch messages - if admin/moderator viewing as teacher, show all messages
       let query = supabase.from('messages').select('*').eq('receiver_id', profile?.id);
-
+      
       if (isAdminOrModerator && currentView) {
         // Admin/moderator can see all messages
         query = supabase.from('messages').select('*');
       }
-
+      
       const { data, error } = await query;
       if (error) throw error;
       setMessages(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error fetching messages',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
     setLoading(false);
   };
 
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
-
     setSendingReply(true);
-
     try {
-      const { error } = await supabase.from('messages').insert({
-        content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
-        sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
-      });
-
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          content: replyContent,
+          receiver_id: selectedMessage.senderEmail,
+          sender_id: profile?.email,
+          subject: `Re: ${selectedMessage.subject}`
+        });
       if (error) throw error;
-
-      toast({ title: 'Reply sent successfully!' });
+      
+      toast({
+        title: 'Reply sent successfully!'
+      });
       setReplyContent('');
-    } catch (error) {
-      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
+    } catch (error: any) {
+      toast({
+        title: 'Error sending reply',
+        description: error.message,
+        variant: 'destructive'
+      });
     }
-
     setSendingReply(false);
   };
 
@@ -837,7 +849,7 @@ function MessagesTab() {
           </div>
         )}
       </div>
-
+      
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <Card>
@@ -856,7 +868,6 @@ function MessagesTab() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                   {loading ? (
                     <div className="text-center py-4">
@@ -869,11 +880,15 @@ function MessagesTab() {
                       <button
                         key={message.id}
                         onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          selectedMessage?.id === message.id
+                            ? 'bg-primary/10 border border-primary'
+                            : 'hover:bg-muted/50'
+                        } ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
+                            {message.sender.split(' ').map((n: string) => n[0]).join('')}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
@@ -895,7 +910,7 @@ function MessagesTab() {
             </CardContent>
           </Card>
         </div>
-
+        
         <div className="md:col-span-2">
           {selectedMessage ? (
             <Card>
@@ -910,7 +925,6 @@ function MessagesTab() {
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
-
                   <div className="space-y-4">
                     <Label>Your Reply</Label>
                     <Textarea
@@ -958,7 +972,7 @@ function ProfileView() {
         <h1 className="text-2xl font-display font-bold">My Profile</h1>
         <p className="text-muted-foreground">Manage your teacher account</p>
       </div>
-
+      
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -969,19 +983,17 @@ function ProfileView() {
               <Label>Email</Label>
               <Input value={profile?.email || ''} disabled className="bg-muted" />
             </div>
-
             <div className="space-y-2">
               <Label>Role</Label>
               <Input value={profile?.role || ''} disabled className="bg-muted" />
             </div>
-
             <div className="space-y-2">
               <Label>Display Name</Label>
               <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
           <CardHeader>
             <CardTitle>Quick Stats</CardTitle>
@@ -991,12 +1003,10 @@ function ProfileView() {
               <p className="text-sm text-muted-foreground">Students Taught</p>
               <p className="text-2xl font-bold">0</p>
             </div>
-
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Organized</p>
               <p className="text-2xl font-bold">0</p>
             </div>
-
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Avg. Class Score</p>
               <p className="text-2xl font-bold">0%</p>

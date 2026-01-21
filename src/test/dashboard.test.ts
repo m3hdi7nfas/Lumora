@@ -3,10 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/contexts/AuthContext";
-import AdminDashboard from "@/components/dashboards/AdminDashboard";
-import ModeratorDashboard from "@/components/dashboards/ModeratorDashboard";
-import TeacherDashboard from "@/components/dashboards/TeacherDashboard";
-import StudentDashboard from "@/components/dashboards/StudentDashboard";
+import { AdminDashboard } from "@/components/dashboards/AdminDashboard";
+import { ModeratorDashboard } from "@/components/dashboards/ModeratorDashboard";
+import { TeacherDashboard } from "@/components/dashboards/TeacherDashboard";
+import { StudentDashboard } from "@/components/dashboards/StudentDashboard";
 import { initializeLocalStorage } from "@/lib/initializeLocalStorage";
 
 describe("Dashboard Components", () => {

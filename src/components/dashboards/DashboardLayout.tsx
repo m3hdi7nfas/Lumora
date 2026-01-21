@@ -1,28 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Bell, Search, User, ChevronDown, Settings, LogOut, Moon, Sun, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2, Upload, ChevronDown as ChevronDownIcon, ChevronUp } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from 'next-themes';
-import { Logo } from '@/components/ui/Logo';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-import { ProfileDialog } from '@/components/profile/ProfileDialog';
-
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-  sidebar: React.ReactNode;
-  title: string;
-  onNavItemClick?: (itemId: string) => void;
-}
+// ... (keep existing imports)
 
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false); // Renamed from profileOpen
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { signOut, profile } = useAuth();
@@ -51,6 +31,11 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
     e.preventDefault();
     // Implement search functionality
     console.log('Searching for:', searchQuery);
+  };
+
+  // Handle profile click - only open dialog when "Profile" is clicked
+  const handleProfileClick = () => {
+    setProfileDialogOpen(true);
   };
 
   return (
@@ -117,7 +102,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
             </DropdownMenu>
 
             {/* Profile dropdown */}
-            <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
@@ -128,11 +113,11 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuItem onClick={() => setProfileOpen(false)}>
+                <DropdownMenuItem onClick={handleProfileClick}>
                   <User className="w-4 h-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setProfileOpen(false)}>
+                <DropdownMenuItem onClick={() => setNotificationsOpen(false)}>
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
@@ -170,8 +155,8 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
         </div>
       </div>
 
-      {/* Profile Dialog */}
-      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+      {/* Profile Dialog - only opens when Profile is clicked */}
+      <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
     </div>
   );
 }

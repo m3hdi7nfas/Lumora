@@ -102,6 +102,7 @@ export function Hero({
                 label="Students"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.students', val)}
+                prizeText="Expected"
               />
               <StatCard
                 icon={Trophy}
@@ -109,7 +110,6 @@ export function Hero({
                 label="Competitions"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.competitions', val)}
-                prizeText="Expected"
               />
               <StatCard
                 icon={Star}
@@ -117,6 +117,7 @@ export function Hero({
                 label="Questions"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.questions', val)}
+                prizeText="Expected"
               />
               <StatCard
                 icon={Users}

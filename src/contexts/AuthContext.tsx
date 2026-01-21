@@ -1,6 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
 
 type UserRole = 'moderator' | 'teacher' | 'student' | 'admin';
 
@@ -20,8 +18,8 @@ interface Profile {
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: any | null;
+  session: any | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -107,9 +105,55 @@ const DEMO_ACCOUNTS = {
   }
 };
 
+// Local storage utilities for users
+const LOCAL_STORAGE_KEYS = {
+  USERS: 'lumora_users',
+  CURRENT_USER: 'lumora_current_user'
+};
+
+const localStorageCRUD = {
+  get: (key) => {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return [];
+    }
+  },
+
+  set: (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+      return false;
+    }
+  },
+
+  add: (key, item) => {
+    const items = localStorageCRUD.get(key);
+    items.push(item);
+    return localStorageCRUD.set(key, items);
+  },
+
+  update: (key, id, updates) => {
+    const items = localStorageCRUD.get(key);
+    const updatedItems = items.map(item => item.id === id ? { ...item, ...updates } : item);
+    return localStorageCRUD.set(key, updatedItems);
+  },
+
+  remove: (key, id) => {
+    const items = localStorageCRUD.get(key);
+    const filteredItems = items.filter(item => item.id !== id);
+    return localStorageCRUD.set(key, filteredItems);
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<any | null>(null);
+  const [session, setSession] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<UserRole | null>(null);
@@ -122,66 +166,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS] !== undefined;
   };
 
-  const fetchProfile = async (userId: string, retries = 3): Promise<void> => {
-    for (let i = 0; i < retries; i++) {
-      // Delay between retries (longer for first attempt after signup)
-      if (i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 500 * i));
-      }
+  // Initialize users in local storage if not present
+  useEffect(() => {
+    const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+    if (users.length === 0) {
+      // Add demo accounts to local storage
+      Object.values(DEMO_ACCOUNTS).forEach(demoAccount => {
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, demoAccount.profile);
+      });
+    }
+  }, []);
 
+  // Load current user from local storage
+  useEffect(() => {
+    const currentUser = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_USER);
+    if (currentUser) {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (error) {
-          console.log(`Profile fetch attempt ${i + 1} failed:`, error.message);
-          continue;
-        }
-
-        if (data) {
-          setProfile(data as Profile);
-          return;
-        }
+        const userData = JSON.parse(currentUser);
+        setUser(userData.user);
+        setSession(userData.session);
+        setProfile(userData.profile);
       } catch (error) {
-        console.log(`Profile fetch attempt ${i + 1} failed:`, error.message);
+        console.error('Error parsing current user:', error);
       }
     }
-
-    console.log('Failed to fetch profile after retries');
-  };
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event);
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          // Use a small delay to let the trigger create the profile
-          setTimeout(() => fetchProfile(session.user.id), 200);
-        } else {
-          setProfile(null);
-        }
-
-        setLoading(false);
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    setLoading(false);
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -201,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           aud: 'authenticated',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        } as User;
+        };
 
         const mockSession = {
           access_token: 'demo-access-token',
@@ -210,12 +219,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           expires_in: 3600,
           expires_at: Math.floor(Date.now() / 1000) + 3600,
           refresh_token: 'demo-refresh-token'
-        } as Session;
+        };
 
         setUser(mockUser);
         setSession(mockSession);
         setProfile(demoAccount.profile);
-        setLoading(false);
+
+        // Save to local storage
+        localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+          user: mockUser,
+          session: mockSession,
+          profile: demoAccount.profile
+        }));
 
         return { error: null };
       } else {
@@ -223,13 +238,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Regular Supabase sign in for non-demo accounts
+    // Check regular users in local storage
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        console.error('Sign in error:', error.message);
-        return { error: new Error(error.message) };
+      const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+      const user = users.find(u => u.email === email);
+
+      if (!user) {
+        return { error: new Error('User not found') };
       }
+
+      // For demo purposes, we'll accept any password for non-demo accounts
+      // In a real app, you would store hashed passwords and compare them
+      const mockUser = {
+        id: user.user_id,
+        email: user.email,
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const mockSession = {
+        access_token: 'local-access-token',
+        token_type: 'bearer',
+        user: mockUser,
+        expires_in: 3600,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        refresh_token: 'local-refresh-token'
+      };
+
+      setUser(mockUser);
+      setSession(mockSession);
+      setProfile(user);
+
+      // Save to local storage
+      localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify({
+        user: mockUser,
+        session: mockSession,
+        profile: user
+      }));
+
       return { error: null };
     } catch (error) {
       console.error('Sign in exception:', error);
@@ -246,21 +295,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: window.location.origin,
-          data: { role }
-        }
-      });
+      // Check if user already exists
+      const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+      const existingUser = users.find(u => u.email === email);
 
-      if (error) {
-        console.error('Sign up error:', error.message);
-        return { error: new Error(error.message) };
+      if (existingUser) {
+        return { error: new Error('User already exists') };
       }
 
-      console.log('Sign up successful, waiting for profile creation...');
+      // Create new user
+      const newUser = {
+        id: `user-${Date.now()}`,
+        user_id: `user-${Date.now()}`,
+        email: email,
+        role: role,
+        display_name: email.split('@')[0],
+        avatar_url: null,
+        avatar_id: null,
+        school_id: null,
+        score: 0,
+        class: null,
+        is_active: true,
+        progress: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, newUser);
+
+      console.log('Sign up successful');
       return { error: null };
     } catch (error) {
       console.error('Sign up exception:', error);
@@ -269,9 +333,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear current user from local storage
+    localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_USER);
     setProfile(null);
     setCurrentView(null);
+    setUser(null);
+    setSession(null);
   };
 
   return (

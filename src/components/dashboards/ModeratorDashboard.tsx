@@ -29,11 +29,9 @@ import {
   Star,
   Plus,
   Edit,
-  Trash2
+  Trash2,
+  Upload
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -44,6 +42,68 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Local storage utilities
+const LOCAL_STORAGE_KEYS = {
+  USERS: 'lumora_users',
+  COMPETITIONS: 'lumora_competitions',
+  QUESTIONS: 'lumora_questions',
+  SCHOOLS: 'lumora_schools',
+  APPROVALS: 'lumora_approvals',
+  MESSAGES: 'lumora_messages'
+};
+
+// Generate random password
+function generateRandomPassword(length = 12) {
+  const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+  let password = "";
+  for (let i = 0; i < length; i++) {
+    password += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  return password;
+}
+
+// Local storage CRUD operations
+const localStorageCRUD = {
+  get: (key) => {
+    try {
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return [];
+    }
+  },
+
+  set: (key, data) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (error) {
+      console.error(`Error writing ${key} to localStorage:`, error);
+      return false;
+    }
+  },
+
+  add: (key, item) => {
+    const items = localStorageCRUD.get(key);
+    items.push(item);
+    return localStorageCRUD.set(key, items);
+  },
+
+  update: (key, id, updates) => {
+    const items = localStorageCRUD.get(key);
+    const updatedItems = items.map(item => item.id === id ? { ...item, ...updates } : item);
+    return localStorageCRUD.set(key, updatedItems);
+  },
+
+  remove: (key, id) => {
+    const items = localStorageCRUD.get(key);
+    const filteredItems = items.filter(item => item.id !== id);
+    return localStorageCRUD.set(key, filteredItems);
+  }
+};
 
 function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -145,39 +205,18 @@ function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading 
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['moderator-stats'],
-    queryFn: async () => {
-      try {
-        const { data: users, error: usersError } = await supabase.from('profiles').select('*');
-        if (usersError) throw usersError;
+  // Get stats from local storage
+  const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+  const competitions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS);
+  const questions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
+  const pending = localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS);
 
-        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
-        if (compError) throw compError;
-
-        const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
-        if (questionsError) throw questionsError;
-
-        const { data: pending, error: pendingError } = await supabase.from('pending_approvals').select('*');
-        if (pendingError) throw pendingError;
-
-        return {
-          totalUsers: users.length,
-          activeCompetitions: competitions.length,
-          totalQuestions: questions.length,
-          pendingReviews: pending.length
-        };
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-        return {
-          totalUsers: 0,
-          activeCompetitions: 0,
-          totalQuestions: 0,
-          pendingReviews: 0
-        };
-      }
-    }
-  });
+  const stats = {
+    totalUsers: users.length,
+    activeCompetitions: competitions.length,
+    totalQuestions: questions.length,
+    pendingReviews: pending.length
+  };
 
   const quickActions = [
     { id: 'schools', icon: School, title: 'Manage Schools', description: 'Configure school access' },
@@ -225,31 +264,27 @@ function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Users"
-          value={stats?.totalUsers?.toLocaleString() || '0'}
+          value={stats.totalUsers.toLocaleString()}
           icon={Users}
           className="bg-primary/10 border-primary/20"
-          loading={statsLoading}
         />
         <StatCard
           title="Active Competitions"
-          value={stats?.activeCompetitions?.toString() || '0'}
+          value={stats.activeCompetitions.toString()}
           icon={Trophy}
           className="bg-accent/10 border-accent/20"
-          loading={statsLoading}
         />
         <StatCard
           title="Total Questions"
-          value={stats?.totalQuestions?.toLocaleString() || '0'}
+          value={stats.totalQuestions.toLocaleString()}
           icon={FileQuestion}
           className="bg-success/10 border-success/20"
-          loading={statsLoading}
         />
         <StatCard
           title="Pending Approvals"
-          value={stats?.pendingReviews?.toString() || '0'}
+          value={stats.pendingReviews.toString()}
           icon={Clock}
           className="bg-warning/10 border-warning/20"
-          loading={statsLoading}
         />
       </div>
 
@@ -298,14 +333,14 @@ function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading 
   );
 }
 
-function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
+function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
   return (
     <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
+            <p className="text-2xl font-bold mt-1">{value}</p>
           </div>
           <div className="p-2 rounded-lg bg-card">
             <Icon className="w-6 h-6 text-primary" />
@@ -323,65 +358,79 @@ function CompetitionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newCompetition, setNewCompetition] = useState({
+    id: '',
     name: '',
     description: '',
     start_date: '',
     end_date: '',
     is_active: true,
     max_participants: 100,
-    difficulty: 'medium'
+    difficulty: 'medium',
+    participants: 0
   });
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  // Load competitions from local storage
+  useEffect(() => {
+    setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+  }, []);
 
   const filteredCompetitions = competitions.filter(comp =>
     comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     comp.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const fetchCompetitions = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('competitions').select('*');
-      if (error) throw error;
-      setCompetitions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   const handleAddCompetition = async () => {
-    if (!newCompetition.name || !newCompetition.description) {
-      toast({ title: 'Please fill all required fields', variant: 'destructive' });
-      return;
+    // Check if required fields are filled
+    const missingFields = [];
+    if (!newCompetition.name) missingFields.push('Name');
+    if (!newCompetition.description) missingFields.push('Description');
+
+    if (missingFields.length > 0) {
+      const confirm = window.confirm(`The following required fields are missing: ${missingFields.join(', ')}. Do you want to continue anyway?`);
+      if (!confirm) return;
     }
 
     setLoading(true);
     try {
+      // Generate ID
+      const newId = `comp-${Date.now()}`;
+      const competitionToAdd = {
+        ...newCompetition,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
       // Create pending approval instead of directly adding
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'competition',
-        data: newCompetition,
+        data: competitionToAdd,
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
 
       toast({ title: 'Competition submitted for admin approval!', description: 'An admin will review this shortly.' });
       setIsAddDialogOpen(false);
       setNewCompetition({
+        id: '',
         name: '',
         description: '',
         start_date: '',
         end_date: '',
         is_active: true,
         max_participants: 100,
-        difficulty: 'medium'
+        difficulty: 'medium',
+        participants: 0
       });
-      fetchCompetitions();
     } catch (error) {
       toast({ title: 'Error submitting competition', description: error.message, variant: 'destructive' });
     }
@@ -393,27 +442,26 @@ function CompetitionsTab() {
     try {
       // Create pending approval for deletion
       const competitionToDelete = competitions.find(comp => comp.id === id);
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'competition_delete',
         data: { competition_id: id, competition_name: competitionToDelete?.name },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
 
       toast({ title: 'Competition deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
-      fetchCompetitions();
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchCompetitions();
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -513,7 +561,7 @@ function CompetitionsTab() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Competition Name</Label>
+              <Label>Competition Name *</Label>
               <Input
                 value={newCompetition.name}
                 onChange={(e) => setNewCompetition({ ...newCompetition, name: e.target.value })}
@@ -521,7 +569,7 @@ function CompetitionsTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>Description *</Label>
               <Textarea
                 value={newCompetition.description}
                 onChange={(e) => setNewCompetition({ ...newCompetition, description: e.target.value })}
@@ -608,65 +656,81 @@ function QuestionsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
+    id: '',
     question_text: '',
     category: 'math',
     difficulty: 'medium',
     options: ['', '', '', ''],
     correct_answer: '',
     explanation: '',
-    is_approved: true
+    is_approved: true,
+    created_at: '',
+    updated_at: ''
   });
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  // Load questions from local storage
+  useEffect(() => {
+    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+  }, []);
 
   const filteredQuestions = questions.filter(q =>
     q.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
     q.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('questions').select('*');
-      if (error) throw error;
-      setQuestions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   const handleAddQuestion = async () => {
-    if (!newQuestion.question_text || !newQuestion.correct_answer) {
-      toast({ title: 'Please fill all required fields', variant: 'destructive' });
-      return;
+    // Check if required fields are filled
+    const missingFields = [];
+    if (!newQuestion.question_text) missingFields.push('Question Text');
+    if (!newQuestion.correct_answer) missingFields.push('Correct Answer');
+
+    if (missingFields.length > 0) {
+      const confirm = window.confirm(`The following required fields are missing: ${missingFields.join(', ')}. Do you want to continue anyway?`);
+      if (!confirm) return;
     }
 
     setLoading(true);
     try {
+      // Generate ID
+      const newId = `quest-${Date.now()}`;
+      const questionToAdd = {
+        ...newQuestion,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
       // Create pending approval for question
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'question',
-        data: newQuestion,
+        data: questionToAdd,
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
       toast({ title: 'Question submitted for admin approval!', description: 'An admin will review this shortly.' });
       setIsAddDialogOpen(false);
       setNewQuestion({
+        id: '',
         question_text: '',
         category: 'math',
         difficulty: 'medium',
         options: ['', '', '', ''],
         correct_answer: '',
         explanation: '',
-        is_approved: true
+        is_approved: true,
+        created_at: '',
+        updated_at: ''
       });
-      fetchQuestions();
     } catch (error) {
       toast({ title: 'Error submitting question', description: error.message, variant: 'destructive' });
     }
@@ -678,18 +742,21 @@ function QuestionsTab() {
     try {
       // Create pending approval for question deletion
       const questionToDelete = questions.find(q => q.id === id);
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'question_delete',
         data: { question_id: id, question_text: questionToDelete?.question_text },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
       toast({ title: 'Question deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
-      fetchQuestions();
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
@@ -701,10 +768,6 @@ function QuestionsTab() {
     newOptions[index] = value;
     setNewQuestion({ ...newQuestion, options: newOptions });
   };
-
-  useEffect(() => {
-    fetchQuestions();
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -804,7 +867,7 @@ function QuestionsTab() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Question Text</Label>
+              <Label>Question Text *</Label>
               <Textarea
                 value={newQuestion.question_text}
                 onChange={(e) => setNewQuestion({ ...newQuestion, question_text: e.target.value })}
@@ -918,15 +981,27 @@ function UsersTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
+    id: '',
     email: '',
     display_name: '',
     role: 'student',
     school_id: '',
-    password: 'default123'
+    password: '',
+    is_active: true,
+    score: 0,
+    progress: 0,
+    avatar_id: null,
+    created_at: '',
+    updated_at: ''
   });
   const [bulkUsers, setBulkUsers] = useState('');
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  // Load users from local storage
+  useEffect(() => {
+    setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
+  }, []);
 
   // Add null check for users
   const filteredUsers = (users || []).filter(user =>
@@ -935,48 +1010,68 @@ function UsersTab() {
     (roleFilter === 'all' || user?.role === roleFilter)
   );
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('profiles').select('*');
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching users', description: error.message, variant: 'destructive' });
-      setUsers([]); // Ensure we set to empty array on error
-    }
-    setLoading(false);
-  };
-
   const handleAddUser = async () => {
+    // Check if email is provided
     if (!newUser.email) {
       toast({ title: 'Email is required', variant: 'destructive' });
       return;
     }
 
+    // Auto-generate password if not provided
+    if (!newUser.password) {
+      newUser.password = generateRandomPassword();
+    }
+
+    // Auto-generate display name if not provided
+    if (!newUser.display_name) {
+      newUser.display_name = newUser.email.split('@')[0];
+    }
+
     setLoading(true);
     try {
+      // Generate ID
+      const newId = `user-${Date.now()}`;
+      const userToAdd = {
+        ...newUser,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
       // Create pending approval for user creation
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'user',
-        data: newUser,
+        data: userToAdd,
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
+
+      toast({
+        title: 'User creation submitted for admin approval!',
+        description: `Password: ${userToAdd.password}`
       });
-
-      if (error) throw error;
-
-      toast({ title: 'User creation submitted for admin approval!', description: 'An admin will review this shortly.' });
       setIsAddDialogOpen(false);
       setNewUser({
+        id: '',
         email: '',
         display_name: '',
         role: 'student',
         school_id: '',
-        password: 'default123'
+        password: '',
+        is_active: true,
+        score: 0,
+        progress: 0,
+        avatar_id: null,
+        created_at: '',
+        updated_at: ''
       });
-      fetchUsers();
     } catch (error) {
       toast({ title: 'Error submitting user', description: error.message, variant: 'destructive' });
     }
@@ -995,33 +1090,50 @@ function UsersTab() {
       const usersToAdd = [];
 
       for (const line of lines) {
-        const [email, name, role = 'student', school = ''] = line.split(',').map(item => item.trim());
+        const email = line.trim();
         if (!email) continue;
 
+        // Auto-generate password and display name
+        const password = generateRandomPassword();
+        const displayName = email.split('@')[0];
+
         usersToAdd.push({
+          id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           email,
-          display_name: name || email.split('@')[0],
-          role: role || 'student',
-          school_id: school || null,
-          password: 'default123'
+          display_name: displayName,
+          role: 'student',
+          school_id: null,
+          password: password,
+          is_active: true,
+          score: 0,
+          progress: 0,
+          avatar_id: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
       }
 
       // Create pending approval for bulk user creation
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'bulk_users',
         data: { users: usersToAdd },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
+
+      toast({
+        title: `Bulk user creation submitted for admin approval!`,
+        description: `${usersToAdd.length} users will be reviewed by an admin.`
       });
-
-      if (error) throw error;
-
-      toast({ title: `Bulk user creation submitted for admin approval!`, description: `${usersToAdd.length} users will be reviewed by an admin.` });
       setIsBulkAddDialogOpen(false);
       setBulkUsers('');
-      fetchUsers();
     } catch (error) {
       toast({ title: 'Error submitting bulk users', description: error.message, variant: 'destructive' });
     }
@@ -1033,18 +1145,21 @@ function UsersTab() {
     try {
       // Create pending approval for user deletion
       const userToDelete = users.find(user => user.id === id);
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'user_delete',
         data: { user_id: id, user_email: userToDelete?.email, user_name: userToDelete?.display_name },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({ title: 'User deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
-      fetchUsers();
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
@@ -1056,7 +1171,8 @@ function UsersTab() {
     try {
       // Create pending approval for role change
       const userToUpdate = users.find(user => user.id === userId);
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'user_role_change',
         data: {
           user_id: userId,
@@ -1067,22 +1183,20 @@ function UsersTab() {
         },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({ title: 'Role change submitted for admin approval!', description: 'An admin will review this shortly.' });
-      fetchUsers();
     } catch (error) {
       toast({ title: 'Error submitting role change', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -1238,7 +1352,7 @@ function UsersTab() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Email</Label>
+              <Label>Email *</Label>
               <Input
                 type="email"
                 value={newUser.email}
@@ -1247,12 +1361,13 @@ function UsersTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Display Name</Label>
+              <Label>Display Name (optional)</Label>
               <Input
                 value={newUser.display_name}
                 onChange={(e) => setNewUser({ ...newUser, display_name: e.target.value })}
                 placeholder="John Doe"
               />
+              <p className="text-xs text-muted-foreground">If left empty, will use the email prefix</p>
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
@@ -1280,13 +1395,22 @@ function UsersTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Password</Label>
+              <Label>Password (optional)</Label>
               <Input
                 type="password"
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                placeholder="••••••••"
+                placeholder="Leave empty to auto-generate"
               />
+              <p className="text-xs text-muted-foreground">If left empty, a secure password will be auto-generated</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-active"
+                checked={newUser.is_active}
+                onCheckedChange={(checked) => setNewUser({ ...newUser, is_active: checked })}
+              />
+              <Label htmlFor="is-active">Active User</Label>
             </div>
           </div>
           <DialogFooter>
@@ -1310,15 +1434,15 @@ function UsersTab() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Bulk Add Users</DialogTitle>
-            <DialogDescription>Add multiple users at once (CSV format: email,name,role,school) - requires admin approval</DialogDescription>
+            <DialogDescription>Add multiple users at once (one email per line)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>User Data</Label>
+              <Label>User Emails</Label>
               <Textarea
                 value={bulkUsers}
                 onChange={(e) => setBulkUsers(e.target.value)}
-                placeholder={`user1@school.com,John Doe,student,school123\nuser2@school.com,Jane Smith,teacher,school123\nuser3@school.com,Bob Johnson,moderator`}
+                placeholder={`user1@school.com\nuser2@school.com\nuser3@school.com`}
                 rows={10}
                 className="font-mono"
               />
@@ -1326,11 +1450,11 @@ function UsersTab() {
             <div className="p-3 bg-muted/50 rounded-lg">
               <p className="text-sm font-medium mb-2">Format Instructions:</p>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• One user per line</li>
-                <li>• Format: email,name,role,school</li>
-                <li>• Role can be: student, teacher, moderator, admin</li>
-                <li>• School is optional</li>
-                <li>• Example: user@school.com,John Doe,student,school123</li>
+                <li>• One email per line</li>
+                <li>• Passwords will be auto-generated</li>
+                <li>• Display names will be derived from email prefixes</li>
+                <li>• All users will be created as students by default</li>
+                <li>• Example: user@school.com</li>
               </ul>
             </div>
           </div>
@@ -1360,61 +1484,78 @@ function SchoolsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newSchool, setNewSchool] = useState({
+    id: '',
     name: '',
     location: '',
     contact_email: '',
     max_students: 1000,
-    is_active: true
+    is_active: true,
+    students: 0,
+    created_at: '',
+    updated_at: ''
   });
   const { toast } = useToast();
   const { profile } = useAuth();
+
+  // Load schools from local storage
+  useEffect(() => {
+    setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+  }, []);
 
   const filteredSchools = schools.filter(school =>
     school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     school.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const fetchSchools = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('schools').select('*');
-      if (error) throw error;
-      setSchools(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching schools', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   const handleAddSchool = async () => {
-    if (!newSchool.name) {
-      toast({ title: 'School name is required', variant: 'destructive' });
-      return;
+    // Check if required fields are filled
+    const missingFields = [];
+    if (!newSchool.name) missingFields.push('Name');
+
+    if (missingFields.length > 0) {
+      const confirm = window.confirm(`The following required fields are missing: ${missingFields.join(', ')}. Do you want to continue anyway?`);
+      if (!confirm) return;
     }
 
     setLoading(true);
     try {
+      // Generate ID
+      const newId = `school-${Date.now()}`;
+      const schoolToAdd = {
+        ...newSchool,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
       // Create pending approval for school creation
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'school',
-        data: newSchool,
+        data: schoolToAdd,
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
 
       toast({ title: 'School creation submitted for admin approval!', description: 'An admin will review this shortly.' });
       setIsAddDialogOpen(false);
       setNewSchool({
+        id: '',
         name: '',
         location: '',
         contact_email: '',
         max_students: 1000,
-        is_active: true
+        is_active: true,
+        students: 0,
+        created_at: '',
+        updated_at: ''
       });
-      fetchSchools();
     } catch (error) {
       toast({ title: 'Error submitting school', description: error.message, variant: 'destructive' });
     }
@@ -1426,27 +1567,26 @@ function SchoolsTab() {
     try {
       // Create pending approval for school deletion
       const schoolToDelete = schools.find(school => school.id === id);
-      const { error } = await supabase.from('pending_approvals').insert({
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
         type: 'school_delete',
         data: { school_id: id, school_name: schoolToDelete?.name },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
-        status: 'pending'
-      });
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
 
       toast({ title: 'School deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
-      fetchSchools();
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchSchools();
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -1546,7 +1686,7 @@ function SchoolsTab() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>School Name</Label>
+              <Label>School Name *</Label>
               <Input
                 value={newSchool.name}
                 onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
@@ -1613,26 +1753,60 @@ function ApprovalsTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
+  // Load approvals from local storage
+  useEffect(() => {
+    setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+  }, []);
+
   const filteredApprovals = approvals.filter(approval =>
     approval.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     approval.created_by_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const fetchApprovals = async () => {
+  const handleApprove = async (id: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('pending_approvals').select('*');
-      if (error) throw error;
-      setApprovals(data || []);
+      const approval = approvals.find(a => a.id === id);
+      if (!approval) return;
+
+      // Process the approval based on type
+      if (approval.type === 'question') {
+        // Approve question
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, approval.data);
+      } else if (approval.type === 'competition') {
+        // Add competition
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.COMPETITIONS, approval.data);
+      } else if (approval.type === 'user') {
+        // Add user
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, approval.data);
+      } else if (approval.type === 'school') {
+        // Add school
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.SCHOOLS, approval.data);
+      }
+
+      // Remove from pending approvals
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.APPROVALS, id);
+      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+
+      toast({ title: 'Approval processed successfully!' });
     } catch (error) {
-      toast({ title: 'Error fetching approvals', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error processing approval', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchApprovals();
-  }, []);
+  const handleReject = async (id: string) => {
+    setLoading(true);
+    try {
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.APPROVALS, id);
+      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+
+      toast({ title: 'Approval rejected successfully!' });
+    } catch (error) {
+      toast({ title: 'Error rejecting approval', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -1697,10 +1871,21 @@ function ApprovalsTab() {
                         )}
                       </div>
                       <div className="flex gap-2 ml-4">
-                        <Button size="sm" variant="outline" className="text-success">
+                        <Button
+                          size="sm"
+                          className="bg-success hover:bg-success/90 h-8 w-8 p-0"
+                          onClick={() => handleApprove(approval.id)}
+                          disabled={loading}
+                        >
                           <CheckCircle className="w-3 h-3" />
                         </Button>
-                        <Button size="sm" variant="outline" className="text-destructive">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleReject(approval.id)}
+                          disabled={loading}
+                        >
                           <XCircle className="w-3 h-3" />
                         </Button>
                       </div>
@@ -1732,7 +1917,11 @@ function MessagesTab() {
   });
   const { toast } = useToast();
   const { profile } = useAuth();
-  const queryClient = useQueryClient();
+
+  // Load messages from local storage
+  useEffect(() => {
+    setMessages(localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES));
+  }, []);
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1740,32 +1929,28 @@ function MessagesTab() {
     message.content.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const fetchMessages = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('messages').select('*').eq('receiver_id', profile?.id);
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
 
     setSendingReply(true);
 
     try {
-      const { error } = await supabase.from('messages').insert({
+      const replyMessage = {
+        id: `msg-${Date.now()}`,
+        subject: `Re: ${selectedMessage.subject}`,
         content: replyContent,
+        sender: profile?.display_name || profile?.email,
+        senderEmail: profile?.email,
         receiver_id: selectedMessage.senderEmail,
-        sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
-      });
+        receiverEmail: selectedMessage.senderEmail,
+        date: new Date().toISOString(),
+        read: false,
+        created_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.MESSAGES, replyMessage);
+      setMessages(localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES));
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
@@ -1788,33 +1973,38 @@ function MessagesTab() {
       let receiverIds = [];
 
       if (newMessage.receiver_role === 'all') {
-        const { data: users, error: usersError } = await supabase.from('profiles').select('id');
-        if (usersError) throw usersError;
-        receiverIds = users.map(user => user.id);
+        const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+        receiverIds = users.map(user => user.email);
       } else {
-        const { data: users, error: usersError } = await supabase.from('profiles').select('id').eq('role', newMessage.receiver_role);
-        if (usersError) throw usersError;
-        receiverIds = users.map(user => user.id);
+        const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+        receiverIds = users
+          .filter(user => user.role === newMessage.receiver_role)
+          .map(user => user.email);
       }
 
       if (newMessage.receiver_email.includes('@')) {
-        const { data: user, error: userError } = await supabase.from('profiles').select('id').eq('email', newMessage.receiver_email).single();
-        if (userError) throw userError;
-        receiverIds = [user.id];
+        receiverIds = [newMessage.receiver_email];
       }
 
       const messageData = receiverIds.map(receiverId => ({
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         subject: newMessage.subject,
         content: newMessage.content,
+        sender: profile?.display_name || profile?.email,
+        senderEmail: profile?.email,
         receiver_id: receiverId,
-        sender_id: profile?.id,
-        sender_email: profile?.email,
-        is_system: false
+        receiverEmail: receiverId,
+        date: new Date().toISOString(),
+        read: false,
+        created_at: new Date().toISOString()
       }));
 
-      const { error } = await supabase.from('messages').insert(messageData);
+      // Add all messages to local storage
+      messageData.forEach(message => {
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.MESSAGES, message);
+      });
 
-      if (error) throw error;
+      setMessages(localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES));
 
       toast({ title: `Message sent to ${receiverIds.length} recipient(s)!` });
       setNewMessage({
@@ -1833,11 +2023,10 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-      if (error) throw error;
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.MESSAGES, messageId);
+      setMessages(localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES));
 
       toast({ title: 'Message deleted successfully!' });
-      setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
       }
@@ -1846,10 +2035,6 @@ function MessagesTab() {
     }
     setLoading(false);
   };
-
-  useEffect(() => {
-    fetchMessages();
-  }, []);
 
   return (
     <div className="space-y-6">
@@ -2110,17 +2295,17 @@ function ProfileView() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Users</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS).length}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Active Competitions</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS).length}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Pending Approvals</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS).length}</p>
             </div>
           </CardContent>
         </Card>

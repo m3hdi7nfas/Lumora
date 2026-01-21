@@ -2,67 +2,27 @@ import { Navbar } from '@/components/landing/Navbar';
 import { Hero } from '@/components/landing/Hero';
 import { Features } from '@/components/landing/Features';
 import { Footer } from '@/components/landing/Footer';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
-import { LandingPageEditor } from '@/components/landing/LandingPageEditor';
-import { Button } from '@/components/ui/button';
-import { Edit, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { AdBox } from '@/components/ads/AdBox';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 const Index = () => {
   const { profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const [content, setContent] = useState<SiteContent>(defaultSiteContent);
 
-  const { data: content = defaultSiteContent } = useQuery({
-    queryKey: ['landing-content'],
-    queryFn: async () => {
-      // Use localStorage for persistence - no database dependency
-      const local = localStorage.getItem('lumora-landing-content');
-
-      if (local) {
-        try {
-          return JSON.parse(local) as SiteContent;
-        } catch (e) {
-          console.error('Error parsing local content, using default:', e);
-          return defaultSiteContent;
-        }
+  // Load content from local storage
+  useEffect(() => {
+    const local = localStorage.getItem('lumora-landing-content');
+    if (local) {
+      try {
+        setContent(JSON.parse(local) as SiteContent);
+      } catch (e) {
+        console.error('Error parsing local content, using default:', e);
       }
-
-      return defaultSiteContent;
-    },
-    initialData: () => {
-      const local = localStorage.getItem('lumora-landing-content');
-      if (local) {
-        try {
-          return JSON.parse(local);
-        } catch (e) {
-          return defaultSiteContent;
-        }
-      }
-      return defaultSiteContent;
-    },
-  });
-
-  const saveContent = useMutation({
-    mutationFn: async (newContent: SiteContent) => {
-      // Save to localStorage only - no database dependency
-      localStorage.setItem('lumora-landing-content', JSON.stringify(newContent));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['landing-content'] });
-      toast({ title: 'Landing page updated!' });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Error updating content', description: error.message, variant: 'destructive' });
-    },
-  });
+    }
+  }, []);
 
   const updateContent = (path: string, value: any) => {
     // Helper to deeply set value in object
@@ -81,11 +41,11 @@ const Index = () => {
     const parts = path.split('.');
     const updatedContent = setDeep(content, parts, value);
 
-    // Optimistic update of local state
-    queryClient.setQueryData(['landing-content'], updatedContent);
+    // Update state
+    setContent(updatedContent);
 
     // Save to localStorage
-    saveContent.mutate(updatedContent);
+    localStorage.setItem('lumora-landing-content', JSON.stringify(updatedContent));
   };
 
   return (

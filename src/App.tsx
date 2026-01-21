@@ -6,42 +6,49 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import NotFound from "./pages/NotFound";
+import MinimalTest from "./test/MinimalTest";
 import { futureConfig } from "./routerConfig";
 import { initializeLocalStorage } from "./lib/initializeLocalStorage";
 import { useEffect } from "react";
+import ErrorBoundary from "./components/ErrorBoundary";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   // Initialize local storage when app loads
   useEffect(() => {
-    initializeLocalStorage();
+    try {
+      initializeLocalStorage();
+    } catch (error) {
+      console.error('Error initializing local storage:', error);
+    }
   }, []);
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={futureConfig}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-            <ThemeToggle />
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={futureConfig}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="*" element={<MinimalTest />} />
+                </Routes>
+              </BrowserRouter>
+              <ThemeToggle />
+            </TooltipProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 

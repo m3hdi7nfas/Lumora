@@ -6,86 +6,105 @@ import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { AdBox } from '@/components/ads/AdBox';
+import ErrorBoundary from '@/components/ErrorBoundary';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState<SiteContent>(defaultSiteContent);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load content from local storage
+  // Load content from local storage with error handling
   useEffect(() => {
-    const local = localStorage.getItem('lumora-landing-content');
-    if (local) {
-      try {
-        setContent(JSON.parse(local) as SiteContent);
-      } catch (e) {
-        console.error('Error parsing local content, using default:', e);
+    try {
+      const local = localStorage.getItem('lumora-landing-content');
+      if (local) {
+        try {
+          setContent(JSON.parse(local) as SiteContent);
+        } catch (e) {
+          console.error('Error parsing local content, using default:', e);
+          setError('Failed to load custom content, using defaults');
+        }
       }
+    } catch (error) {
+      console.error('Error accessing local storage:', error);
+      setError('Failed to access local storage');
     }
   }, []);
 
   const updateContent = (path: string, value: any) => {
-    // Helper to deeply set value in object
-    const setDeep = (obj: any, pathParts: string[], val: any): any => {
-      const newObj = { ...obj };
-      let current = newObj;
-      for (let i = 0; i < pathParts.length - 1; i++) {
-        const key = pathParts[i];
-        current[key] = { ...current[key] };
-        current = current[key];
-      }
-      current[pathParts[pathParts.length - 1]] = val;
-      return newObj;
-    };
+    try {
+      // Helper to deeply set value in object
+      const setDeep = (obj: any, pathParts: string[], val: any): any => {
+        const newObj = { ...obj };
+        let current = newObj;
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          const key = pathParts[i];
+          current[key] = { ...current[key] };
+          current = current[key];
+        }
+        current[pathParts[pathParts.length - 1]] = val;
+        return newObj;
+      };
 
-    const parts = path.split('.');
-    const updatedContent = setDeep(content, parts, value);
+      const parts = path.split('.');
+      const updatedContent = setDeep(content, parts, value);
 
-    // Update state
-    setContent(updatedContent);
+      // Update state
+      setContent(updatedContent);
 
-    // Save to localStorage
-    localStorage.setItem('lumora-landing-content', JSON.stringify(updatedContent));
+      // Save to localStorage
+      localStorage.setItem('lumora-landing-content', JSON.stringify(updatedContent));
+    } catch (error) {
+      console.error('Error updating content:', error);
+      setError('Failed to update content');
+    }
   };
 
-  return (
-    <div className="min-h-screen relative">
-      <Navbar isEditingGlobal={isEditing} updateContent={updateContent} />
-      <Hero
-        content={content.hero}
-        isEditingGlobal={isEditing}
-        updateContent={(field, val) => updateContent(`hero.${field}`, val)}
-      />
-      <Features
-        content={content.features}
-        isEditingGlobal={isEditing}
-        updateContent={(val) => updateContent('features', val)}
-      />
-      <Footer isEditingGlobal={isEditing} updateContent={updateContent} />
-
-      {/* Floating Ad Box */}
-      <AdBox />
-
-      {/* Moderator Controls - REMOVED */}
-      {/* {profile?.role === 'moderator' && (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
+  // Add error display
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4 max-w-md mx-auto p-6">
+          <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded-lg">
+            <h3 className="font-medium mb-2">Content Error</h3>
+            <p className="text-sm">{error}</p>
+          </div>
           <Button
-            onClick={() => setIsEditing(!isEditing)}
-            className={cn(
-              "rounded-full h-14 w-14 shadow-xl transition-all hover:scale-110",
-              isEditing ? "bg-success text-success-foreground" : "gradient-hero"
-            )}
+            onClick={() => {
+              setError(null);
+              setContent(defaultSiteContent);
+            }}
+            className="gradient-hero"
           >
-            {isEditing ? <Check className="w-6 h-6" /> : <Edit className="w-6 h-6" />}
+            Reset to Defaults
           </Button>
-          {isEditing && (
-            <p className="bg-background/80 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold shadow-sm border border-border animate-bounce">
-              Editing Mode Active
-            </p>
-          )}
         </div>
-      )} */}
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="min-h-screen relative">
+        <Navbar isEditingGlobal={isEditing} updateContent={updateContent} />
+        <Hero
+          content={content.hero}
+          isEditingGlobal={isEditing}
+          updateContent={(field, val) => updateContent(`hero.${field}`, val)}
+        />
+        <Features
+          content={content.features}
+          isEditingGlobal={isEditing}
+          updateContent={(val) => updateContent('features', val)}
+        />
+        <Footer isEditingGlobal={isEditing} updateContent={updateContent} />
+
+        {/* Floating Ad Box */}
+        <AdBox />
+      </div>
+    </ErrorBoundary>
   );
 };
 

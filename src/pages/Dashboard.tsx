@@ -7,34 +7,78 @@ import ModeratorDashboard from '@/components/dashboards/ModeratorDashboard';
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface DashboardErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+  errorInfo?: React.ErrorInfo;
+}
+
+class DashboardErrorBoundary extends React.Component<{ children: React.ReactNode }, DashboardErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: undefined, errorInfo: undefined };
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error: error };
+  static getDerivedStateFromError(error: Error) {
+    return {
+      hasError: true,
+      error: error
+    };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("Dashboard Error:", error, errorInfo);
+    this.setState({ errorInfo });
   }
+
+  handleReload = () => {
+    window.location.reload();
+  };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold text-destructive">Something went wrong</h2>
-            <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              Refresh Page
-            </button>
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <div className="max-w-md w-full space-y-6 text-center">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-bold text-destructive">Oops! Something went wrong</h2>
+              <p className="text-muted-foreground">
+                We encountered an unexpected error. Don't worry, we're on it!
+              </p>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-4 text-left">
+              <p className="text-sm font-medium mb-2">Error Details:</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                <strong>Message:</strong> {this.state.error?.message || 'Unknown error'}
+              </p>
+              {this.state.errorInfo && (
+                <p className="text-sm text-muted-foreground">
+                  <strong>Component:</strong> {this.state.errorInfo.componentStack.split('\n')[0]}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={this.handleReload}
+                className="w-full gradient-hero px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Refresh Application
+              </button>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full px-4 py-2 border border-border/50 rounded-lg hover:bg-muted transition-colors"
+              >
+                Return to Home
+              </button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              If the problem persists, please contact support.
+            </p>
           </div>
         </div>
       );
@@ -48,6 +92,7 @@ export default function Dashboard() {
   const { user, profile, loading, currentView } = useAuth();
   const navigate = useNavigate();
   const [profileTimeout, setProfileTimeout] = useState(false);
+  const [dashboardError, setDashboardError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -70,7 +115,7 @@ export default function Dashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -106,44 +151,54 @@ export default function Dashboard() {
 
   // Wrap dashboards in error boundaries
   const renderDashboard = () => {
-    switch (effectiveRole) {
-      case 'admin':
-        console.log('Rendering AdminDashboard');
-        return (
-          <ErrorBoundary>
-            <AdminDashboard />
-          </ErrorBoundary>
-        );
-      case 'moderator':
-        console.log('Rendering ModeratorDashboard');
-        return (
-          <ErrorBoundary>
-            <ModeratorDashboard />
-          </ErrorBoundary>
-        );
-      case 'teacher':
-        console.log('Rendering TeacherDashboard');
-        return (
-          <ErrorBoundary>
-            <TeacherDashboard />
-          </ErrorBoundary>
-        );
-      case 'student':
-        console.log('Rendering StudentDashboard');
-        return (
-          <ErrorBoundary>
-            <StudentDashboard />
-          </ErrorBoundary>
-        );
-      default:
-        console.log('Defaulting to TeacherDashboard');
-        return (
-          <ErrorBoundary>
-            <TeacherDashboard />
-          </ErrorBoundary>
-        );
+    try {
+      switch (effectiveRole) {
+        case 'admin':
+          console.log('Rendering AdminDashboard');
+          return <AdminDashboard />;
+        case 'moderator':
+          console.log('Rendering ModeratorDashboard');
+          return <ModeratorDashboard />;
+        case 'teacher':
+          console.log('Rendering TeacherDashboard');
+          return <TeacherDashboard />;
+        case 'student':
+          console.log('Rendering StudentDashboard');
+          return <StudentDashboard />;
+        default:
+          console.log('Defaulting to TeacherDashboard');
+          return <TeacherDashboard />;
+      }
+    } catch (error) {
+      console.error('Error rendering dashboard:', error);
+      setDashboardError(error as Error);
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold text-destructive">Dashboard Error</h2>
+            <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Error: {error.message}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
     }
   };
 
-  return renderDashboard();
+  if (dashboardError) {
+    return renderDashboard();
+  }
+
+  return (
+    <DashboardErrorBoundary>
+      {renderDashboard()}
+    </DashboardErrorBoundary>
+  );
 }

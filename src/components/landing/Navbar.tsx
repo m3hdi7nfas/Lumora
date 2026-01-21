@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
+import { GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EditableText } from './EditableText';
-import { Logo } from './Logo';
 
 export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGlobal?: boolean; updateContent?: (path: string, val: any) => void }) {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <Logo size="md" />
+          <div className="p-2 rounded-xl gradient-hero">
+            <GraduationCap className="w-6 h-6 text-primary-foreground" />
+          </div>
           <span className="text-xl font-display font-bold">
             <EditableText
               value="Lumora"

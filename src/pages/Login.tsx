@@ -11,7 +11,6 @@ import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { ContactDialog } from '@/components/landing/ContactDialog';
-import { Logo } from '@/components/landing/Logo';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
@@ -119,7 +118,9 @@ export default function Login() {
         <Card className="w-full shadow-card-hover border-border/50">
           <CardHeader className="text-center space-y-2 pt-4 pb-3">
             <Link to="/" className="inline-flex items-center gap-2 justify-center mb-1">
-              <Logo size="md" />
+              <div className="p-2 rounded-xl gradient-hero">
+                <GraduationCap className="w-6 h-6 text-primary-foreground" />
+              </div>
             </Link>
             <CardTitle className="text-2xl font-display">Welcome to Lumora</CardTitle>
             <CardDescription className="text-sm">

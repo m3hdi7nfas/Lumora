@@ -1,3 +1,4 @@
+import { GraduationCap, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EditableText } from './EditableText';
 import { useState } from 'react';
@@ -5,8 +6,6 @@ import { ContactDialog } from './ContactDialog';
 import { PrivacyDialog } from './PrivacyDialog';
 import { TermsDialog } from './TermsDialog';
 import { AboutDialog } from './AboutDialog';
-import { Logo } from './Logo';
-import { Heart } from 'lucide-react';
 
 export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGlobal?: boolean; updateContent?: (path: string, val: any) => void }) {
   const [contactOpen, setContactOpen] = useState(false);
@@ -19,7 +18,9 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
       <div className="container">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <Logo size="sm" />
+            <div className="p-2 rounded-xl gradient-hero">
+              <GraduationCap className="w-5 h-5 text-primary-foreground" />
+            </div>
             <span className="font-display font-bold">
               <EditableText
                 value="Lumora"

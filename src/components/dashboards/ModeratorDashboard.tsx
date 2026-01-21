@@ -50,6 +50,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { localStorageCRUD } from '@/lib/localStorageCRUD';
+import { Switch } from '@/components/ui/switch';
 
 const LOCAL_STORAGE_KEYS = {
   USERS: 'lumora_users',
@@ -317,7 +318,7 @@ function SchoolsTab() {
                       <TableCell>{school.city}, {school.country}</TableCell>
                       <TableCell>{school.students || 0}</TableCell>
                       <TableCell>
-                        <Badge variant={school.is_active ? 'success' : 'destructive'}>
+                        <Badge variant={school.is_active ? 'default' : 'destructive'}>
                           {school.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>

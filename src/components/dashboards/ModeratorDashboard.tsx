@@ -161,37 +161,15 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
 
 export default function ModeratorDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [showAds, setShowAds] = useState(true);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
-  // Load ads setting from localStorage
-  useEffect(() => {
-    const savedShowAds = localStorage.getItem('showAds');
-    if (savedShowAds !== null) {
-      setShowAds(savedShowAds === 'true');
-    }
-  }, []);
-
-  const handleAdsToggle = (checked: boolean) => {
-    setLoading(true);
-    setShowAds(checked);
-    localStorage.setItem('showAds', checked.toString());
-
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('adsSettingChanged', {
-      detail: { showAds: checked }
-    }));
-
-    setLoading(false);
-  };
 
   return (
     <DashboardLayout
       title="Lumora Moderator Dashboard"
       sidebar={<ModeratorSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} showAds={showAds} handleAdsToggle={handleAdsToggle} loading={loading} />}
+      {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} loading={loading} />}
       {activeTab === 'schools' && <SchoolsTab />}
       {activeTab === 'competitions' && <CompetitionsTab />}
       {activeTab === 'questions' && <QuestionsTab />}
@@ -204,7 +182,7 @@ export default function ModeratorDashboard() {
 }
 
 // Moderator Overview Component
-function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading }: { setActiveTab: (tab: string) => void, showAds: boolean, handleAdsToggle: (checked: boolean) => void, loading: boolean }) {
+function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
   const { toast } = useToast();
   const { profile } = useAuth();
 
@@ -236,31 +214,6 @@ function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading 
           <h1 className="text-2xl font-display font-bold">Moderator Dashboard</h1>
           <p className="text-muted-foreground">Full control over platform activity and settings</p>
         </div>
-      </div>
-
-      {/* Settings Cards */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Ads Toggle */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Advertisement Settings</CardTitle>
-            <CardDescription>Control whether ads are displayed to users</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <LayoutTemplate className="w-5 h-5 text-primary" />
-                <span>Show Advertisements</span>
-              </div>
-              <Switch
-                checked={showAds}
-                onCheckedChange={handleAdsToggle}
-                id="ads-toggle"
-                disabled={loading}
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Stats Cards */}

@@ -177,6 +177,7 @@ export function AdminDashboard() {
   const [showAds, setShowAds] = useState(true);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   // Load ads setting from localStorage
   useEffect(() => {
@@ -257,27 +258,29 @@ function AdminOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading }: {
 
       {/* Settings Cards */}
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Ads Toggle */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Advertisement Settings</CardTitle>
-            <CardDescription>Control whether ads are displayed to users</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <LayoutTemplate className="w-5 h-5 text-primary" />
-                <span>Show Advertisements</span>
+        {/* Ads Toggle - Only for Admins */}
+        {profile?.role === 'admin' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Advertisement Settings</CardTitle>
+              <CardDescription>Control whether ads are displayed to users</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <LayoutTemplate className="w-5 h-5 text-primary" />
+                  <span>Show Advertisements</span>
+                </div>
+                <Switch
+                  checked={showAds}
+                  onCheckedChange={handleAdsToggle}
+                  id="ads-toggle"
+                  disabled={loading}
+                />
               </div>
-              <Switch
-                checked={showAds}
-                onCheckedChange={handleAdsToggle}
-                id="ads-toggle"
-                disabled={loading}
-              />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1113,6 +1116,7 @@ function UsersTab() {
     } catch (error) {
       toast({ title: 'Error adding users', description: error.message, variant: 'destructive' });
     }
+
     setLoading(false);
   };
 

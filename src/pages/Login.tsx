@@ -230,6 +230,17 @@ export default function Login() {
                 Contact Administration
               </Button>
             </div>
+
+            {/* School Information */}
+            <div className="mt-6 pt-4 border-t border-border/50 text-center">
+              <h3 className="font-medium mb-2">School Information</h3>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Lumora Education Platform</p>
+                <p>123 Education Street</p>
+                <p>Knowledge City, United States</p>
+                <p>Contact: support@lumora.com</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </motion.div>

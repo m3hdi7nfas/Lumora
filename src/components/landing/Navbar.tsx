@@ -8,14 +8,7 @@ export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGl
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <Logo size="md" />
-          <span className="text-xl font-display font-bold">
-            <EditableText
-              value="Lumora"
-              isEditingGlobal={isEditingGlobal}
-              onSave={(val) => updateContent?.('siteName', val)}
-            />
-          </span>
+          <Logo size="lg" textSize="lg" />
         </Link>
 
         <div className="hidden md:flex items-center gap-8">

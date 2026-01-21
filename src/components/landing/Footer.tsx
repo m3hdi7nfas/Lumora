@@ -18,14 +18,7 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
       <div className="container">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <Logo size="md" />
-            <span className="font-display font-bold">
-              <EditableText
-                value="Lumora"
-                isEditingGlobal={isEditingGlobal}
-                onSave={(val) => updateContent?.('siteName', val)}
-              />
-            </span>
+            <Logo size="lg" textSize="lg" />
           </Link>
 
           <p className="text-muted-foreground text-sm flex items-center gap-1">

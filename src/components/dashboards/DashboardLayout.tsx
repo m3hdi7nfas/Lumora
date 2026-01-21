@@ -111,8 +111,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
             </button>
 
             <Link to="/" className="flex items-center gap-2">
-              <Logo size="sm" />
-              <span className="font-display font-bold hidden sm:block">Lumora</span>
+              <Logo size="md" textSize="md" />
             </Link>
           </div>
 

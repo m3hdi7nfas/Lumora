@@ -112,7 +112,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
 
             <Link to="/" className="flex items-center gap-2">
               <div className="p-2 rounded-xl gradient-hero">
-                <img src="/logo.png" alt="Lumora Logo" className="w-5 h-5" />
+                <GraduationCap className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="font-display font-bold hidden sm:block">Lumora</span>
             </Link>

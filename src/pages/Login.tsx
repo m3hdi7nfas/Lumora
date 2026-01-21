@@ -119,7 +119,7 @@ export default function Login() {
           <CardHeader className="text-center space-y-2 pt-4 pb-3">
             <Link to="/" className="inline-flex items-center gap-2 justify-center mb-1">
               <div className="p-2 rounded-xl gradient-hero">
-                <img src="/logo.png" alt="Lumora Logo" className="w-6 h-6" />
+                <GraduationCap className="w-6 h-6 text-primary-foreground" />
               </div>
             </Link>
             <CardTitle className="text-2xl font-display">Welcome to Lumora</CardTitle>

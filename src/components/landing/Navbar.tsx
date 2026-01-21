@@ -9,7 +9,7 @@ export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGl
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
           <div className="p-2 rounded-xl gradient-hero">
-            <GraduationCap className="w-6 h-6 text-primary-foreground" />
+            <img src="/logo.png" alt="Lumora Logo" className="w-6 h-6" />
           </div>
           <span className="text-xl font-display font-bold">
             <EditableText

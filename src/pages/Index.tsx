@@ -3,10 +3,11 @@ import { Hero } from '@/components/landing/Hero';
 import { Features } from '@/components/landing/Features';
 import { Footer } from '@/components/landing/Footer';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
-import { useAuth } from '@/contexts/AuthContext'; // Make sure this import is correct
+import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { AdBox } from '@/components/ads/AdBox';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { profile } = useAuth();

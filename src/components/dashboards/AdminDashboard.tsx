@@ -33,14 +33,8 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
-  Image as ImageIcon,
-  Mail,
-  Settings,
-  ToggleLeft,
-  ToggleRight,
   List,
   Type,
-  MultipleChoice,
   Pencil,
   BookOpen
 } from 'lucide-react';
@@ -232,7 +226,9 @@ function AdminOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: strin
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'avatars', icon: User, title: 'Manage Avatars', description: 'Upload and manage avatars' },
     { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
+    { id: 'messages', icon: MessageSquare, title: 'Messages', description: 'User communications' },
     { id: 'settings', icon: Settings, title: 'Platform Settings', description: 'Configure platform features' },
+    { id: 'preview', icon: Eye, title: 'Preview Views', description: 'View as different roles' },
   ];
 
   return (
@@ -1134,7 +1130,7 @@ function QuestionSetsTab() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="mcq" id="mcq" />
                   <Label htmlFor="mcq" className="flex items-center gap-2">
-                    <MultipleChoice className="w-4 h-4" />
+                    <List className="w-4 h-4" />
                     Multiple Choice
                   </Label>
                 </div>
@@ -1396,7 +1392,7 @@ function QuestionsTab() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="mcq" id="mcq-question" />
                   <Label htmlFor="mcq-question" className="flex items-center gap-2">
-                    <MultipleChoice className="w-4 h-4" />
+                    <List className="w-4 h-4" />
                     Multiple Choice
                   </Label>
                 </div>

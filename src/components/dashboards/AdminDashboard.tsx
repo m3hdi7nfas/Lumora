@@ -37,7 +37,9 @@ import {
   BookOpen,
   Award,
   Image as ImageIcon,
-  Badge as BadgeIcon
+  Badge as BadgeIcon,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -50,6 +52,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {
@@ -304,47 +308,50 @@ function AdminOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading }: {
         />
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common admin tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => setActiveTab(action.id)}
-                className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-muted">
-                    <action.icon className="w-5 h-5 text-primary" />
+      {/* Quick Actions and Recent Activity in 2 columns */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common admin tasks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4">
+              {quickActions.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => setActiveTab(action.id)}
+                  className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-lg bg-muted">
+                      <action.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{action.title}</h3>
+                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-medium">{action.title}</h3>
-                    <p className="text-xs text-muted-foreground">{action.description}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest platform events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-center text-muted-foreground py-4">No recent activity</p>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest platform events</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -651,6 +658,7 @@ function QuestionsTab() {
     question_text: '',
     category: 'math',
     difficulty: 'medium',
+    question_type: 'mcq',
     options: ['', '', '', ''],
     correct_answer: '',
     explanation: '',
@@ -674,7 +682,7 @@ function QuestionsTab() {
     // Check if required fields are filled
     const missingFields = [];
     if (!newQuestion.question_text) missingFields.push('Question Text');
-    if (!newQuestion.correct_answer) missingFields.push('Correct Answer');
+    if (newQuestion.question_type === 'mcq' && !newQuestion.correct_answer) missingFields.push('Correct Answer');
 
     if (missingFields.length > 0) {
       const confirm = window.confirm(`The following required fields are missing: ${missingFields.join(', ')}. Do you want to continue anyway?`);
@@ -703,6 +711,7 @@ function QuestionsTab() {
         question_text: '',
         category: 'math',
         difficulty: 'medium',
+        question_type: 'mcq',
         options: ['', '', '', ''],
         correct_answer: '',
         explanation: '',
@@ -781,6 +790,7 @@ function QuestionsTab() {
                         <div className="flex items-center gap-4 mt-2">
                           <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.category}</span>
                           <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">{question.difficulty}</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.question_type}</span>
                           <span className={`px-2 py-1 rounded-full text-xs ${question.is_approved ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
                             {question.is_approved ? 'Approved' : 'Pending'}
                           </span>
@@ -826,12 +836,28 @@ function QuestionsTab() {
 
       {/* Add Question Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Question</DialogTitle>
             <DialogDescription>Create a new question for competitions</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <Select
+                value={newQuestion.question_type}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mcq">Multiple Choice Question (MCQ)</SelectItem>
+                  <SelectItem value="written">Written Answer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Question Text *</Label>
               <Textarea
@@ -841,6 +867,7 @@ function QuestionsTab() {
                 rows={3}
               />
             </div>
+
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
@@ -878,27 +905,29 @@ function QuestionsTab() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Options</Label>
-              <div className="space-y-3">
-                {newQuestion.options.map((option, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Input
-                      value={option}
-                      onChange={(e) => handleOptionChange(index, e.target.value)}
-                      placeholder={`Option ${index + 1}`}
-                    />
-                    <Button
-                      variant={newQuestion.correct_answer === option ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
-                    >
-                      {newQuestion.correct_answer === option ? 'Correct ✓' : 'Mark Correct'}
-                    </Button>
-                  </div>
-                ))}
+            {newQuestion.question_type === 'mcq' && (
+              <div className="space-y-2">
+                <Label>Options</Label>
+                <div className="space-y-3">
+                  {newQuestion.options.map((option, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={option}
+                        onChange={(e) => handleOptionChange(index, e.target.value)}
+                        placeholder={`Option ${index + 1}`}
+                      />
+                      <Button
+                        variant={newQuestion.correct_answer === option ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
+                      >
+                        {newQuestion.correct_answer === option ? 'Correct ✓' : 'Mark Correct'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label>Explanation</Label>
@@ -1412,6 +1441,8 @@ function SchoolsTab() {
     created_at: '',
     updated_at: ''
   });
+  const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
+  const [expandedSchools, setExpandedSchools] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   // Load schools from local storage
@@ -1481,6 +1512,21 @@ function SchoolsTab() {
     setLoading(false);
   };
 
+  const toggleExpandSchool = (schoolId: string) => {
+    const newSet = new Set(expandedSchools);
+    if (newSet.has(schoolId)) {
+      newSet.delete(schoolId);
+    } else {
+      newSet.add(schoolId);
+    }
+    setExpandedSchools(newSet);
+  };
+
+  const getStudentsForSchool = (schoolId: string) => {
+    const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
+    return users.filter(user => user.school_id === schoolId);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1519,51 +1565,101 @@ function SchoolsTab() {
               <p className="text-center text-muted-foreground py-4">No schools found</p>
             ) : (
               <div className="space-y-4">
-                {filteredSchools.map((school) => (
-                  <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{school.name}</h3>
-                        <p className="text-xs text-muted-foreground">{school.location}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="text-xs text-muted-foreground">Students: {school.students || 0}/{school.max_students}</span>
-                          <span className={`px-2 py-1 rounded-full text-xs ${school.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                            {school.is_active ? 'Active' : 'Inactive'}
-                          </span>
+                {filteredSchools.map((school) => {
+                  const isExpanded = expandedSchools.has(school.id);
+                  const students = getStudentsForSchool(school.id);
+
+                  return (
+                    <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{school.name}</h3>
+                          <p className="text-xs text-muted-foreground">{school.location}</p>
+                          <div className="flex items-center gap-4 mt-2">
+                            <span className="text-xs text-muted-foreground">Students: {students.length}/{school.max_students}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${school.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                              {school.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 w-8 p-0"
+                            onClick={() => toggleExpandSchool(school.id)}
+                          >
+                            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete School</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this school? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteSchool(school.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-4">
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete School</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this school? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteSchool(school.id)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+
+                      {isExpanded && students.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <h4 className="font-medium mb-2">Students in this school</h4>
+                          <ScrollArea className="max-h-60">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-border">
+                                  <th className="p-2 text-left font-medium">Name</th>
+                                  <th className="p-2 text-left font-medium">Email</th>
+                                  <th className="p-2 text-left font-medium">Role</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {students.map((student) => (
+                                  <tr key={student.id} className="border-b border-border/50 last:border-none">
+                                    <td className="p-2">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                                          {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                                        </div>
+                                        <span>{student.display_name || 'No name'}</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-2 text-muted-foreground">{student.email}</td>
+                                    <td className="p-2">
+                                      <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.role === 'student' ? 'bg-primary/10 text-primary' : 'bg-accent/10 text-accent'}`}>
+                                        {student.role}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </ScrollArea>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1665,11 +1761,16 @@ function ApprovalsTab() {
       // Process the approval based on type
       if (approval.type === 'question') {
         // Approve question
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.QUESTIONS, approval.data.question_id, {
-          is_approved: true,
-          approved_by: 'admin',
-          approved_at: new Date().toISOString()
-        });
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, approval.data);
+      } else if (approval.type === 'competition') {
+        // Add competition
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.COMPETITIONS, approval.data);
+      } else if (approval.type === 'user') {
+        // Add user
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, approval.data);
+      } else if (approval.type === 'school') {
+        // Add school
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.SCHOOLS, approval.data);
       }
 
       // Remove from pending approvals
@@ -1797,7 +1898,6 @@ function MessagesTab() {
   const [sendingReply, setSendingReply] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [newMessage, setNewMessage] = useState({
     subject: '',
     content: '',
@@ -1902,7 +2002,6 @@ function MessagesTab() {
         receiver_email: '',
         receiver_role: 'all'
       });
-      setIsComposeOpen(false);
     } catch (error) {
       toast({ title: 'Error sending message', description: error.message, variant: 'destructive' });
     }
@@ -1928,15 +2027,9 @@ function MessagesTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Messages</h1>
-          <p className="text-muted-foreground">Your communications</p>
-        </div>
-        <Button onClick={() => setIsComposeOpen(true)} className="gradient-hero">
-          <Send className="w-4 h-4 mr-2" />
-          Compose Message
-        </Button>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">Your communications</p>
       </div>
 
       <Card>

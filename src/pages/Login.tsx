@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft, Crown } from 'lucide-react';
+import { GraduationCap, Eye, EyeOff, Loader2, Shield, BookOpen, User, ArrowLeft, Crown, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { motion } from 'framer-motion';
 import { AdBanner } from '@/components/ads/AdBanner';
+import { ContactDialog } from '@/components/landing/ContactDialog';
 
 // Demo credentials
 const DEMO_ACCOUNTS = {
@@ -25,6 +26,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -213,16 +215,30 @@ export default function Login() {
               </Button>
             </form>
 
-            <p className="text-center text-xs text-muted-foreground">
-              Don't have an account?{' '}
-              <span className="text-primary font-medium">Contact your school administrator</span>
-            </p>
+            <div className="text-center space-y-2">
+              <p className="text-center text-xs text-muted-foreground">
+                Don't have an account?{' '}
+                <span className="text-primary font-medium">Contact your school administrator</span>
+              </p>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs h-auto p-0 text-muted-foreground hover:text-primary"
+                onClick={() => setContactOpen(true)}
+              >
+                <Mail className="w-3 h-3 mr-1" />
+                Contact Administration
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </motion.div>
 
       {/* Ad Banner */}
       <AdBanner />
+
+      {/* Contact Dialog */}
+      <ContactDialog open={contactOpen} onOpenChange={setContactOpen} />
     </div>
   );
 }

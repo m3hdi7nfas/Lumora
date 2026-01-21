@@ -33,7 +33,8 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
-  MultipleChoice,
+  List,
+  Type,
   Pencil,
   BookOpen
 } from 'lucide-react';
@@ -1198,7 +1199,7 @@ function QuestionSetsTab() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="mcq" id="mcq" />
                   <Label htmlFor="mcq" className="flex items-center gap-2">
-                    <MultipleChoice className="w-4 h-4" />
+                    <List className="w-4 h-4" />
                     Multiple Choice
                   </Label>
                 </div>
@@ -1472,7 +1473,7 @@ function QuestionsTab() {
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="mcq" id="mcq-question" />
                   <Label htmlFor="mcq-question" className="flex items-center gap-2">
-                    <MultipleChoice className="w-4 h-4" />
+                    <List className="w-4 h-4" />
                     Multiple Choice
                   </Label>
                 </div>

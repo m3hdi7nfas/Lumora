@@ -15,7 +15,8 @@ import {
   User,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Eye
 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -49,6 +50,8 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   const handleSignOut = async () => {
     try {
       await signOut();
+      // Redirect to login after sign out
+      navigate('/login');
     } catch (error) {
       console.error('Error signing out:', error);
       toast({

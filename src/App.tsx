@@ -11,6 +11,9 @@ import { futureConfig } from "./routerConfig";
 import { initializeLocalStorage } from "./lib/initializeLocalStorage";
 import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import Index from "./pages/Index";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +37,9 @@ const App = () => {
               <Sonner />
               <BrowserRouter future={futureConfig}>
                 <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="*" element={<MinimalTest />} />
                 </Routes>
               </BrowserRouter>

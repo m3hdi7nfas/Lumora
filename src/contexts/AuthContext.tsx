@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
 // Define the AuthContext type
@@ -34,7 +33,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<string | null>(null);
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Check if user is authenticated
@@ -123,8 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       setCurrentView(null);
 
-      // Redirect to login
-      navigate('/login');
+      // Note: Navigation should be handled by the component that calls signOut
+      // since useNavigate can only be used within Router context
     } catch (error) {
       console.error('Sign out error:', error);
       toast({

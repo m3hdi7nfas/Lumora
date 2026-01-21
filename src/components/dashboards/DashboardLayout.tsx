@@ -33,6 +33,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { Logo } from '@/components/landing/Logo';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -50,7 +51,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
 
   // Clear preloaded notifications - start with empty array
   const [notifications, setNotifications] = useState([]);
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleSignOut = async () => {
@@ -111,9 +111,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
             </button>
 
             <Link to="/" className="flex items-center gap-2">
-              <div className="p-2 rounded-xl gradient-hero">
-                <GraduationCap className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <Logo size="sm" />
               <span className="font-display font-bold hidden sm:block">Lumora</span>
             </Link>
           </div>

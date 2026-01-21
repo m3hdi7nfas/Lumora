@@ -1,157 +1,371 @@
-// Update the AdminOverviewTab component to include pending approvals in stats
+try {
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: profile?.email,
+        subject: `Re: ${selectedMessage.subject}`
+      });
 
-function AdminOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
-  // ... existing code ...
+      if (error) throw error;
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['admin-stats'],
-    queryFn: async () => {
-      try {
-        const { data: users, error: usersError } = await supabase.from('profiles').select('*');
-        if (usersError) throw usersError;
-
-        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
-        if (compError) throw compError;
-
-        const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
-        if (questionsError) throw questionsError;
-
-        const { data: pending, error: pendingError } = await supabase.from('pending_approvals').select('*');
-        if (pendingError) throw pendingError;
-
-        return {
-          totalUsers: users.length,
-          activeCompetitions: competitions.length,
-          totalQuestions: questions.length,
-          pendingReviews: pending.length
-        };
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-        return {
-          totalUsers: 0,
-          activeCompetitions: 0,
-          totalQuestions: 0,
-          pendingReviews: 0
-        };
-      }
+      toast({ title: 'Reply sent successfully!' });
+      setReplyContent('');
+    } catch (error) {
+      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
     }
-  });
 
-  const quickActions = [
-    { id: 'competitions', icon: Trophy, title: 'Manage Competitions', description: 'Create and edit competitions' },
-    { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
-    { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
-    { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
-    { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
-  ];
+    setSendingReply(false);
+  };
+
+  const handleSendNewMessage = async () => {
+    if (!newMessage.subject || !newMessage.content || !newMessage.receiver_email) {
+      toast({ title: 'Please fill all fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let receiverIds = [];
+
+      if (newMessage.receiver_role === 'all') {
+        const { data: users, error: usersError } = await supabase.from('profiles').select('id');
+        if (usersError) throw usersError;
+        receiverIds = users.map(user => user.id);
+      } else {
+        const { data: users, error: usersError } = await supabase.from('profiles').select('id').eq('role', newMessage.receiver_role);
+        if (usersError) throw usersError;
+        receiverIds = users.map(user => user.id);
+      }
+
+      if (newMessage.receiver_email.includes('@')) {
+        const { data: user, error: userError } = await supabase.from('profiles').select('id').eq('email', newMessage.receiver_email).single();
+        if (userError) throw userError;
+        receiverIds = [user.id];
+      }
+
+      const messageData = receiverIds.map(receiverId => ({
+        subject: newMessage.subject,
+        content: newMessage.content,
+        receiver_id: receiverId,
+        sender_id: profile?.id,
+        sender_email: profile?.email,
+        is_system: false
+      }));
+
+      const { error } = await supabase.from('messages').insert(messageData);
+
+      if (error) throw error;
+
+      toast({ title: `Message sent to ${receiverIds.length} recipient(s)!` });
+      setNewMessage({
+        subject: '',
+        content: '',
+        receiver_email: '',
+        receiver_role: 'all'
+      });
+    } catch (error) {
+      toast({ title: 'Error sending message', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Full control over platform activity and settings</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">Your communications</p>
       </div>
 
-      {/* Settings Cards */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Send New Message</CardTitle>
+          <CardDescription>Send messages to users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={newMessage.subject}
+                onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+                placeholder="Enter message subject"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Message Content</Label>
+              <Textarea
+                value={newMessage.content}
+                onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
+                placeholder="Enter your message"
+                rows={6}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Send To</Label>
+                <Select
+                  value={newMessage.receiver_role}
+                  onValueChange={(value) => setNewMessage({ ...newMessage, receiver_role: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select recipient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="student">All Students</SelectItem>
+                    <SelectItem value="teacher">All Teachers</SelectItem>
+                    <SelectItem value="moderator">All Moderators</SelectItem>
+                    <SelectItem value="specific">Specific Email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {newMessage.receiver_role === 'specific' && (
+                <div className="space-y-2">
+                  <Label>Email Address</Label>
+                  <Input
+                    type="email"
+                    value={newMessage.receiver_email}
+                    onChange={(e) => setNewMessage({ ...newMessage, receiver_email: e.target.value })}
+                    placeholder="user@school.com"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={handleSendNewMessage}
+              disabled={loading}
+              className="gradient-hero"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Message'
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbox</CardTitle>
+              <CardDescription>Your messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    </div>
+                  ) : filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedMessage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedMessage.subject}</CardTitle>
+                <CardDescription>
+                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{selectedMessage.content}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent}
+                      className="gradient-hero"
+                    >
+                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reply
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <p>Select a message to view details</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Profile View Component
+function ProfileView() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your admin account</p>
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Ads Toggle */}
         <Card>
           <CardHeader>
-            <CardTitle>Advertisement Settings</CardTitle>
-            <CardDescription>Control whether ads are displayed to users</CardDescription>
+            <CardTitle>Account Information</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <LayoutTemplate className="w-5 h-5 text-primary" />
-                <span>Show Advertisements</span>
-              </div>
-              <Switch
-                checked={showAds}
-                onCheckedChange={handleAdsToggle}
-                id="ads-toggle"
-                disabled={loading}
-              />
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Total Users</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Active Competitions</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Pending Approvals</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Users"
-          value={stats?.totalUsers?.toLocaleString() || '0'}
-          icon={Users}
-          className="bg-primary/10 border-primary/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="Active Competitions"
-          value={stats?.activeCompetitions?.toString() || '0'}
-          icon={Trophy}
-          className="bg-accent/10 border-accent/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="Total Questions"
-          value={stats?.totalQuestions?.toLocaleString() || '0'}
-          icon={FileQuestion}
-          className="bg-success/10 border-success/20"
-          loading={statsLoading}
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={stats?.pendingReviews?.toString() || '0'}
-          icon={Clock}
-          className="bg-warning/10 border-warning/20"
-          loading={statsLoading}
-        />
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common admin tasks</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {quickActions.map((action) => (
-              <button
-                key={action.id}
-                onClick={() => setActiveTab(action.id)}
-                className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-lg bg-muted">
-                    <action.icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{action.title}</h3>
-                    <p className="text-xs text-muted-foreground">{action.description}</p>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest platform events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-center text-muted-foreground py-4">No recent activity</p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

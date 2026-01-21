@@ -53,7 +53,7 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
     { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'users', icon: Users, label: 'Users' },
-    { id: 'approvals', icon: CheckSquare, label: 'Approvals' },
+    { id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
   ];
 
@@ -320,7 +320,24 @@ function StatCard({ title, value, icon: Icon, className, loading = false }: { ti
 function CompetitionsTab() {
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newCompetition, setNewCompetition] = useState({
+    name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    is_active: true,
+    max_participants: 100,
+    difficulty: 'medium'
+  });
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  const filteredCompetitions = competitions.filter(comp =>
+    comp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    comp.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchCompetitions = async () => {
     setLoading(true);
@@ -334,15 +351,81 @@ function CompetitionsTab() {
     setLoading(false);
   };
 
+  const handleAddCompetition = async () => {
+    if (!newCompetition.name || !newCompetition.description) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Create pending approval instead of directly adding
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'competition',
+        data: newCompetition,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Competition submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewCompetition({
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        is_active: true,
+        max_participants: 100,
+        difficulty: 'medium'
+      });
+      fetchCompetitions();
+    } catch (error) {
+      toast({ title: 'Error submitting competition', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteCompetition = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for deletion
+      const competitionToDelete = competitions.find(comp => comp.id === id);
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'competition_delete',
+        data: { competition_id: id, competition_name: competitionToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Competition deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      fetchCompetitions();
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchCompetitions();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Competitions</h1>
-        <p className="text-muted-foreground">Manage all competitions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Competitions</h1>
+          <p className="text-muted-foreground">Manage all competitions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Competition
+        </Button>
       </div>
 
       <Card>
@@ -352,30 +435,168 @@ function CompetitionsTab() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search competitions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : competitions.length === 0 ? (
+            ) : filteredCompetitions.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No competitions found</p>
             ) : (
-              competitions.map((competition) => (
-                <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{competition.name}</h3>
-                      <p className="text-xs text-muted-foreground">{competition.description}</p>
+              <div className="space-y-4">
+                {filteredCompetitions.map((competition) => (
+                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{competition.name}</h3>
+                        <p className="text-xs text-muted-foreground">{competition.description}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {competition.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Participants: {competition.participants || 0}/{competition.max_participants}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Competition</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this competition?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteCompetition(competition.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
-                    <Button size="sm" className="gradient-hero">
-                      Manage
-                    </Button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Competition Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Competition</DialogTitle>
+            <DialogDescription>Create a new competition for students (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Competition Name</Label>
+              <Input
+                value={newCompetition.name}
+                onChange={(e) => setNewCompetition({ ...newCompetition, name: e.target.value })}
+                placeholder="e.g., Math Olympiad 2024"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newCompetition.description}
+                onChange={(e) => setNewCompetition({ ...newCompetition, description: e.target.value })}
+                placeholder="Describe the competition..."
+                rows={3}
+              />
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.start_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, start_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.end_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, end_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Max Participants</Label>
+                <Input
+                  type="number"
+                  value={newCompetition.max_participants}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, max_participants: parseInt(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={newCompetition.difficulty}
+                  onValueChange={(value) => setNewCompetition({ ...newCompetition, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-active"
+                checked={newCompetition.is_active}
+                onCheckedChange={(checked) => setNewCompetition({ ...newCompetition, is_active: checked })}
+              />
+              <Label htmlFor="is-active">Active Competition</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddCompetition} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -384,7 +605,24 @@ function CompetitionsTab() {
 function QuestionsTab() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({
+    question_text: '',
+    category: 'math',
+    difficulty: 'medium',
+    options: ['', '', '', ''],
+    correct_answer: '',
+    explanation: '',
+    is_approved: true
+  });
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  const filteredQuestions = questions.filter(q =>
+    q.question_text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    q.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchQuestions = async () => {
     setLoading(true);
@@ -398,15 +636,87 @@ function QuestionsTab() {
     setLoading(false);
   };
 
+  const handleAddQuestion = async () => {
+    if (!newQuestion.question_text || !newQuestion.correct_answer) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Create pending approval for question
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'question',
+        data: newQuestion,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Question submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewQuestion({
+        question_text: '',
+        category: 'math',
+        difficulty: 'medium',
+        options: ['', '', '', ''],
+        correct_answer: '',
+        explanation: '',
+        is_approved: true
+      });
+      fetchQuestions();
+    } catch (error) {
+      toast({ title: 'Error submitting question', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for question deletion
+      const questionToDelete = questions.find(q => q.id === id);
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'question_delete',
+        data: { question_id: id, question_text: questionToDelete?.question_text },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Question deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      fetchQuestions();
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...newQuestion.options];
+    newOptions[index] = value;
+    setNewQuestion({ ...newQuestion, options: newOptions });
+  };
+
   useEffect(() => {
     fetchQuestions();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Questions</h1>
-        <p className="text-muted-foreground">Manage all questions</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Questions</h1>
+          <p className="text-muted-foreground">Manage all questions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Question
+        </Button>
       </div>
 
       <Card>
@@ -416,30 +726,185 @@ function QuestionsTab() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search questions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : questions.length === 0 ? (
+            ) : filteredQuestions.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No questions found</p>
             ) : (
-              questions.map((question) => (
-                <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{question.question_text}</h3>
-                      <p className="text-xs text-muted-foreground">Category: {question.category}</p>
+              <div className="space-y-4">
+                {filteredQuestions.map((question) => (
+                  <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{question.question_text}</h3>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.category}</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">{question.difficulty}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs ${question.is_approved ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            {question.is_approved ? 'Approved' : 'Pending'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this question?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteQuestion(question.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
-                    <Button size="sm" className="gradient-hero">
-                      Review
-                    </Button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Add Question Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Question</DialogTitle>
+            <DialogDescription>Create a new question for competitions (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question Text</Label>
+              <Textarea
+                value={newQuestion.question_text}
+                onChange={(e) => setNewQuestion({ ...newQuestion, question_text: e.target.value })}
+                placeholder="Enter the question..."
+                rows={3}
+              />
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select
+                  value={newQuestion.category}
+                  onValueChange={(value) => setNewQuestion({ ...newQuestion, category: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="math">Math</SelectItem>
+                    <SelectItem value="science">Science</SelectItem>
+                    <SelectItem value="history">History</SelectItem>
+                    <SelectItem value="english">English</SelectItem>
+                    <SelectItem value="general">General Knowledge</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={newQuestion.difficulty}
+                  onValueChange={(value) => setNewQuestion({ ...newQuestion, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Options</Label>
+              <div className="space-y-3">
+                {newQuestion.options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                    <Button
+                      variant={newQuestion.correct_answer === option ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
+                    >
+                      {newQuestion.correct_answer === option ? 'Correct ✓' : 'Mark Correct'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Explanation</Label>
+              <Textarea
+                value={newQuestion.explanation}
+                onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
+                placeholder="Explain why the correct answer is right..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-approved"
+                checked={newQuestion.is_approved}
+                onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, is_approved: checked })}
+              />
+              <Label htmlFor="is-approved">Approved</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddQuestion} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -448,7 +913,27 @@ function QuestionsTab() {
 function UsersTab() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    display_name: '',
+    role: 'student',
+    school_id: '',
+    password: 'default123'
+  });
+  const [bulkUsers, setBulkUsers] = useState('');
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Add null check for users
+  const filteredUsers = (users || []).filter(user =>
+    (user?.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     user?.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (roleFilter === 'all' || user?.role === roleFilter)
+  );
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -458,6 +943,139 @@ function UsersTab() {
       setUsers(data || []);
     } catch (error) {
       toast({ title: 'Error fetching users', description: error.message, variant: 'destructive' });
+      setUsers([]); // Ensure we set to empty array on error
+    }
+    setLoading(false);
+  };
+
+  const handleAddUser = async () => {
+    if (!newUser.email) {
+      toast({ title: 'Email is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Create pending approval for user creation
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'user',
+        data: newUser,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'User creation submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewUser({
+        email: '',
+        display_name: '',
+        role: 'student',
+        school_id: '',
+        password: 'default123'
+      });
+      fetchUsers();
+    } catch (error) {
+      toast({ title: 'Error submitting user', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleBulkAddUsers = async () => {
+    if (!bulkUsers.trim()) {
+      toast({ title: 'Please enter user data', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const lines = bulkUsers.split('\n').filter(line => line.trim());
+      const usersToAdd = [];
+
+      for (const line of lines) {
+        const [email, name, role = 'student', school = ''] = line.split(',').map(item => item.trim());
+        if (!email) continue;
+
+        usersToAdd.push({
+          email,
+          display_name: name || email.split('@')[0],
+          role: role || 'student',
+          school_id: school || null,
+          password: 'default123'
+        });
+      }
+
+      // Create pending approval for bulk user creation
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'bulk_users',
+        data: { users: usersToAdd },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: `Bulk user creation submitted for admin approval!`, description: `${usersToAdd.length} users will be reviewed by an admin.` });
+      setIsBulkAddDialogOpen(false);
+      setBulkUsers('');
+      fetchUsers();
+    } catch (error) {
+      toast({ title: 'Error submitting bulk users', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for user deletion
+      const userToDelete = users.find(user => user.id === id);
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'user_delete',
+        data: { user_id: id, user_email: userToDelete?.email, user_name: userToDelete?.display_name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'User deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      fetchUsers();
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for role change
+      const userToUpdate = users.find(user => user.id === userId);
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'user_role_change',
+        data: {
+          user_id: userId,
+          current_role: userToUpdate?.role,
+          new_role: newRole,
+          user_email: userToUpdate?.email,
+          user_name: userToUpdate?.display_name
+        },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'Role change submitted for admin approval!', description: 'An admin will review this shortly.' });
+      fetchUsers();
+    } catch (error) {
+      toast({ title: 'Error submitting role change', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -468,9 +1086,21 @@ function UsersTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Users</h1>
-        <p className="text-muted-foreground">Manage all users</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Users</h1>
+          <p className="text-muted-foreground">Manage all users</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+            <Plus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
+          <Button onClick={() => setIsBulkAddDialogOpen(true)} variant="outline">
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Add
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -480,30 +1110,245 @@ function UsersTab() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="admin">Admins</SelectItem>
+                  <SelectItem value="moderator">Moderators</SelectItem>
+                  <SelectItem value="teacher">Teachers</SelectItem>
+                  <SelectItem value="student">Students</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No users found</p>
             ) : (
-              users.map((user) => (
-                <div key={user.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{user.display_name || user.email}</h3>
-                      <p className="text-xs text-muted-foreground">Role: {user.role}</p>
-                    </div>
-                    <Button size="sm" className="gradient-hero">
-                      Manage
-                    </Button>
-                  </div>
-                </div>
-              ))
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="p-3 text-left font-medium">Name</th>
+                      <th className="p-3 text-left font-medium">Email</th>
+                      <th className="p-3 text-left font-medium">Role</th>
+                      <th className="p-3 text-left font-medium">School</th>
+                      <th className="p-3 text-left font-medium">Status</th>
+                      <th className="p-3 text-left font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                              {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
+                            </div>
+                            <span>{user.display_name || 'No name'}</span>
+                          </div>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{user.email}</td>
+                        <td className="p-3">
+                          <Select
+                            value={user.role}
+                            onValueChange={(value) => handleRoleChange(user.id, value)}
+                            disabled={user.id === profile?.id || (value === 'admin' && profile?.role !== 'admin')}
+                          >
+                            <SelectTrigger className="w-[120px] h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="student">Student</SelectItem>
+                              <SelectItem value="teacher">Teacher</SelectItem>
+                              <SelectItem value="moderator">Moderator</SelectItem>
+                              {profile?.role === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-3 text-muted-foreground">{user.school_id || 'N/A'}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {user.is_active ? 'active' : 'inactive'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action will be submitted for admin approval. Are you sure you want to request deletion of this user?
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteUser(user.id)}
+                                  >
+                                    Request Deletion
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Add User Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>Create a new user account (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                placeholder="user@school.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input
+                value={newUser.display_name}
+                onChange={(e) => setNewUser({ ...newUser, display_name: e.target.value })}
+                placeholder="John Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select
+                value={newUser.role}
+                onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
+                  <SelectItem value="moderator">Moderator</SelectItem>
+                  {profile?.role === 'admin' && <SelectItem value="admin">Admin</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>School ID (optional)</Label>
+              <Input
+                value={newUser.school_id}
+                onChange={(e) => setNewUser({ ...newUser, school_id: e.target.value })}
+                placeholder="school123"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddUser} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Add Users Dialog */}
+      <Dialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk Add Users</DialogTitle>
+            <DialogDescription>Add multiple users at once (CSV format: email,name,role,school) - requires admin approval</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>User Data</Label>
+              <Textarea
+                value={bulkUsers}
+                onChange={(e) => setBulkUsers(e.target.value)}
+                placeholder={`user1@school.com,John Doe,student,school123\nuser2@school.com,Jane Smith,teacher,school123\nuser3@school.com,Bob Johnson,moderator`}
+                rows={10}
+                className="font-mono"
+              />
+            </div>
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm font-medium mb-2">Format Instructions:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• One user per line</li>
+                <li>• Format: email,name,role,school</li>
+                <li>• Role can be: student, teacher, moderator, admin</li>
+                <li>• School is optional</li>
+                <li>• Example: user@school.com,John Doe,student,school123</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleBulkAddUsers} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -512,7 +1357,22 @@ function UsersTab() {
 function SchoolsTab() {
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newSchool, setNewSchool] = useState({
+    name: '',
+    location: '',
+    contact_email: '',
+    max_students: 1000,
+    is_active: true
+  });
   const { toast } = useToast();
+  const { profile } = useAuth();
+
+  const filteredSchools = schools.filter(school =>
+    school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    school.location.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchSchools = async () => {
     setLoading(true);
@@ -526,15 +1386,79 @@ function SchoolsTab() {
     setLoading(false);
   };
 
+  const handleAddSchool = async () => {
+    if (!newSchool.name) {
+      toast({ title: 'School name is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Create pending approval for school creation
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'school',
+        data: newSchool,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'School creation submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewSchool({
+        name: '',
+        location: '',
+        contact_email: '',
+        max_students: 1000,
+        is_active: true
+      });
+      fetchSchools();
+    } catch (error) {
+      toast({ title: 'Error submitting school', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteSchool = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for school deletion
+      const schoolToDelete = schools.find(school => school.id === id);
+      const { error } = await supabase.from('pending_approvals').insert({
+        type: 'school_delete',
+        data: { school_id: id, school_name: schoolToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending'
+      });
+
+      if (error) throw error;
+
+      toast({ title: 'School deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      fetchSchools();
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchSchools();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Schools</h1>
-        <p className="text-muted-foreground">Manage all schools</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Schools</h1>
+          <p className="text-muted-foreground">Manage all schools</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add School
+        </Button>
       </div>
 
       <Card>
@@ -544,30 +1468,140 @@ function SchoolsTab() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search schools..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : schools.length === 0 ? (
+            ) : filteredSchools.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No schools found</p>
             ) : (
-              schools.map((school) => (
-                <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{school.name}</h3>
-                      <p className="text-xs text-muted-foreground">Location: {school.location}</p>
+              <div className="space-y-4">
+                {filteredSchools.map((school) => (
+                  <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{school.name}</h3>
+                        <p className="text-xs text-muted-foreground">{school.location}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-xs text-muted-foreground">Students: {school.students || 0}/{school.max_students}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs ${school.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {school.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete School</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this school?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteSchool(school.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
-                    <Button size="sm" className="gradient-hero">
-                      Manage
-                    </Button>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Add School Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New School</DialogTitle>
+            <DialogDescription>Register a new school (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>School Name</Label>
+              <Input
+                value={newSchool.name}
+                onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
+                placeholder="e.g., Springfield High School"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Input
+                value={newSchool.location}
+                onChange={(e) => setNewSchool({ ...newSchool, location: e.target.value })}
+                placeholder="City, Country"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact Email</Label>
+              <Input
+                type="email"
+                value={newSchool.contact_email}
+                onChange={(e) => setNewSchool({ ...newSchool, contact_email: e.target.value })}
+                placeholder="contact@school.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Max Students</Label>
+              <Input
+                type="number"
+                value={newSchool.max_students}
+                onChange={(e) => setNewSchool({ ...newSchool, max_students: parseInt(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="school-active"
+                checked={newSchool.is_active}
+                onCheckedChange={(checked) => setNewSchool({ ...newSchool, is_active: checked })}
+              />
+              <Label htmlFor="school-active">Active School</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddSchool} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -576,7 +1610,13 @@ function SchoolsTab() {
 function ApprovalsTab() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+
+  const filteredApprovals = approvals.filter(approval =>
+    approval.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    approval.created_by_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const fetchApprovals = async () => {
     setLoading(true);
@@ -608,31 +1648,66 @@ function ApprovalsTab() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search approvals..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : approvals.length === 0 ? (
+            ) : filteredApprovals.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No pending approvals</p>
             ) : (
-              approvals.map((approval) => (
-                <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{approval.type}</h3>
-                      <p className="text-xs text-muted-foreground">Created by: {approval.created_by_name}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="text-success">
-                        Approve
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-destructive">
-                        Reject
-                      </Button>
+              <div className="space-y-4">
+                {filteredApprovals.map((approval) => (
+                  <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-lg bg-muted">
+                            {approval.type === 'question' && <FileQuestion className="w-4 h-4 text-primary" />}
+                            {approval.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                            {approval.type === 'user' && <User className="w-4 h-4 text-primary" />}
+                            {approval.type === 'school' && <School className="w-4 h-4 text-primary" />}
+                            {approval.type.includes('delete') && <Trash2 className="w-4 h-4 text-destructive" />}
+                            {approval.type.includes('role') && <User className="w-4 h-4 text-warning" />}
+                          </div>
+                          <h3 className="font-medium">{approval.type}</h3>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Created by: {approval.created_by_name || 'Unknown'}</p>
+                        <p className="text-xs text-muted-foreground">Date: {new Date(approval.created_at).toLocaleString()}</p>
+                        {approval.type === 'question' && (
+                          <p className="text-sm mt-2">Question: {approval.data?.question_text || 'N/A'}</p>
+                        )}
+                        {approval.type === 'competition' && (
+                          <p className="text-sm mt-2">Competition: {approval.data?.name || 'N/A'}</p>
+                        )}
+                        {approval.type === 'user' && (
+                          <p className="text-sm mt-2">User: {approval.data?.email || 'N/A'}</p>
+                        )}
+                        {approval.type === 'school' && (
+                          <p className="text-sm mt-2">School: {approval.data?.name || 'N/A'}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="text-success">
+                          <CheckCircle className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-destructive">
+                          <XCircle className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </CardContent>

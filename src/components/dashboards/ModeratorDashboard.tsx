@@ -32,7 +32,10 @@ import {
   Trash2,
   Upload,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MultipleChoice,
+  Pencil,
+  BookOpen
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -46,6 +49,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {
@@ -117,12 +121,13 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
     { id: 'overview', icon: Users, label: 'Overview' },
     { id: 'schools', icon: School, label: 'Schools' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
-    { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'question-sets', icon: LayoutTemplate, label: 'Question Sets' },
+    { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'avatars', icon: User, label: 'Avatars' },
     { id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
+    { id: 'preview', icon: Eye, label: 'Preview Views' },
   ];
 
   return (
@@ -177,12 +182,13 @@ export default function ModeratorDashboard() {
       {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} loading={loading} />}
       {activeTab === 'schools' && <SchoolsTab />}
       {activeTab === 'competitions' && <CompetitionsTab />}
-      {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'question-sets' && <QuestionSetsTab />}
+      {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'avatars' && <AvatarsTab />}
       {activeTab === 'approvals' && <ApprovalsTab />}
       {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'preview' && <PreviewViewsTab />}
       {activeTab === 'profile' && <ProfileView />}
     </DashboardLayout>
   );
@@ -198,22 +204,25 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
   const competitions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS);
   const questions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
   const pending = localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS);
+  const questionSets = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS);
 
   const stats = {
     totalUsers: users.length,
     activeCompetitions: competitions.length,
     totalQuestions: questions.length,
+    totalQuestionSets: questionSets.length,
     pendingReviews: pending.length
   };
 
   const quickActions = [
     { id: 'schools', icon: School, title: 'Manage Schools', description: 'Configure school access' },
     { id: 'competitions', icon: Trophy, title: 'Manage Competitions', description: 'Create and edit competitions' },
-    { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'question-sets', icon: LayoutTemplate, title: 'Question Sets', description: 'Organize questions into sets' },
+    { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'avatars', icon: User, title: 'Manage Avatars', description: 'Upload and manage avatars' },
     { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
+    { id: 'preview', icon: Eye, title: 'Preview Views', description: 'View as different roles' },
   ];
 
   return (
@@ -226,7 +235,7 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
           title="Total Users"
           value={stats.totalUsers.toLocaleString()}
@@ -240,16 +249,22 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
           className="bg-accent/10 border-accent/20"
         />
         <StatCard
+          title="Question Sets"
+          value={stats.totalQuestionSets.toString()}
+          icon={LayoutTemplate}
+          className="bg-success/10 border-success/20"
+        />
+        <StatCard
           title="Total Questions"
           value={stats.totalQuestions.toLocaleString()}
           icon={FileQuestion}
-          className="bg-success/10 border-success/20"
+          className="bg-warning/10 border-warning/20"
         />
         <StatCard
           title="Pending Approvals"
           value={stats.pendingReviews.toString()}
           icon={Clock}
-          className="bg-warning/10 border-warning/20"
+          className="bg-destructive/10 border-destructive/20"
         />
       </div>
 
@@ -523,7 +538,7 @@ function SchoolsTab() {
 
       {/* Add School Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New School</DialogTitle>
             <DialogDescription>Register a new educational institution (requires admin approval)</DialogDescription>
@@ -641,19 +656,20 @@ function CompetitionsTab() {
     start_date: '',
     end_date: '',
     is_active: true,
-    max_participants: 100,
-    current_participants: 0,
     category: '',
     difficulty: 'medium',
+    question_set_id: '',
     created_at: '',
     updated_at: ''
   });
+  const [questionSets, setQuestionSets] = useState([]);
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load competitions from local storage
+  // Load competitions and question sets from local storage
   useEffect(() => {
     setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
   }, []);
 
   const filteredCompetitions = competitions.filter(competition =>
@@ -703,10 +719,9 @@ function CompetitionsTab() {
         start_date: '',
         end_date: '',
         is_active: true,
-        max_participants: 100,
-        current_participants: 0,
         category: '',
         difficulty: 'medium',
+        question_set_id: '',
         created_at: '',
         updated_at: ''
       });
@@ -790,7 +805,7 @@ function CompetitionsTab() {
                           <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                             {competition.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
+                          <span className="text-xs text-muted-foreground">Category: {competition.category}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -833,7 +848,7 @@ function CompetitionsTab() {
 
       {/* Add Competition Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Competition</DialogTitle>
             <DialogDescription>Create a new learning competition (requires admin approval)</DialogDescription>
@@ -901,13 +916,20 @@ function CompetitionsTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Max Participants</Label>
-              <Input
-                type="number"
-                value={newCompetition.max_participants}
-                onChange={(e) => setNewCompetition({ ...newCompetition, max_participants: parseInt(e.target.value) || 0 })}
-                placeholder="100"
-              />
+              <Label>Question Set</Label>
+              <Select
+                value={newCompetition.question_set_id}
+                onValueChange={(value) => setNewCompetition({ ...newCompetition, question_set_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionSets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
@@ -921,6 +943,278 @@ function CompetitionsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleAddCompetition} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Question Sets Tab Component
+function QuestionSetsTab() {
+  const [questionSets, setQuestionSets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newQuestionSet, setNewQuestionSet] = useState({
+    id: '',
+    name: '',
+    description: '',
+    category: '',
+    question_type: 'mcq', // 'mcq' or 'written'
+    questions: [],
+    created_at: '',
+    updated_at: ''
+  });
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load question sets from local storage
+  useEffect(() => {
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+  }, []);
+
+  const filteredQuestionSets = questionSets.filter(qs =>
+    qs.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    qs.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAddQuestionSet = async () => {
+    // Validate required fields
+    if (!newQuestionSet.name) {
+      toast({ title: 'Question set name is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `qset-${Date.now()}`;
+      const questionSetToAdd = {
+        ...newQuestionSet,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Create pending approval for question set
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'question_set',
+        data: questionSetToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+
+      toast({ title: 'Question set submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewQuestionSet({
+        id: '',
+        name: '',
+        description: '',
+        category: '',
+        question_type: 'mcq',
+        questions: [],
+        created_at: '',
+        updated_at: ''
+      });
+    } catch (error) {
+      toast({ title: 'Error submitting question set', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteQuestionSet = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for question set deletion
+      const questionSetToDelete = questionSets.find(set => set.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'question_set_delete',
+        data: { question_set_id: id, question_set_name: questionSetToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+
+      toast({ title: 'Question set deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Question Sets</h1>
+          <p className="text-muted-foreground">Organize questions into sets for competitions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Question Set
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Question Sets List</CardTitle>
+          <CardDescription>All question sets for organizing competition questions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search question sets..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredQuestionSets.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No question sets found</p>
+            ) : (
+              <div className="space-y-4">
+                {filteredQuestionSets.map((questionSet) => (
+                  <div key={questionSet.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{questionSet.name}</h3>
+                        <p className="text-xs text-muted-foreground">{questionSet.description}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
+                            {questionSet.question_type === 'mcq' ? 'Multiple Choice' : 'Written Answers'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Questions: {questionSet.questions?.length || 0}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Question Set</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this question set?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteQuestionSet(questionSet.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Question Set Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Question Set</DialogTitle>
+            <DialogDescription>Create a new question set for organizing competition questions (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question Set Name *</Label>
+              <Input
+                value={newQuestionSet.name}
+                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, name: e.target.value })}
+                placeholder="e.g., Math Addition"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newQuestionSet.description}
+                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, description: e.target.value })}
+                placeholder="Describe the question set..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Input
+                value={newQuestionSet.category}
+                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, category: e.target.value })}
+                placeholder="e.g., Math, Science, etc."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <RadioGroup
+                value={newQuestionSet.question_type}
+                onValueChange={(value) => setNewQuestionSet({ ...newQuestionSet, question_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="mcq" id="mcq" />
+                  <Label htmlFor="mcq" className="flex items-center gap-2">
+                    <MultipleChoice className="w-4 h-4" />
+                    Multiple Choice
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="written" id="written" />
+                  <Label htmlFor="written" className="flex items-center gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Written Answers
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddQuestionSet} disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -952,15 +1246,19 @@ function QuestionsTab() {
     difficulty: 'medium',
     points: 10,
     explanation: '',
+    question_set_id: '',
+    question_type: 'mcq',
     created_at: '',
     updated_at: ''
   });
+  const [questionSets, setQuestionSets] = useState([]);
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load questions from local storage
+  // Load questions and question sets from local storage
   useEffect(() => {
     setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
   }, []);
 
   const filteredQuestions = questions.filter(question =>
@@ -1012,6 +1310,8 @@ function QuestionsTab() {
         difficulty: 'medium',
         points: 10,
         explanation: '',
+        question_set_id: '',
+        question_type: 'mcq',
         created_at: '',
         updated_at: ''
       });
@@ -1093,6 +1393,9 @@ function QuestionsTab() {
                         <p className="text-xs text-muted-foreground mt-1">Category: {question.category} • Difficulty: {question.difficulty}</p>
                         <div className="flex items-center gap-4 mt-2">
                           <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
+                            {question.question_type === 'mcq' ? 'MCQ' : 'Written'}
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -1135,12 +1438,54 @@ function QuestionsTab() {
 
       {/* Add Question Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Question</DialogTitle>
             <DialogDescription>Create a new competition question (requires admin approval)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question Set *</Label>
+              <Select
+                value={newQuestion.question_set_id}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_set_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionSets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">You must create a question set first before adding questions</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <RadioGroup
+                value={newQuestion.question_type}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="mcq" id="mcq-question" />
+                  <Label htmlFor="mcq-question" className="flex items-center gap-2">
+                    <MultipleChoice className="w-4 h-4" />
+                    Multiple Choice
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="written" id="written-question" />
+                  <Label htmlFor="written-question" className="flex items-center gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Written Answers
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-2">
               <Label>Question Text *</Label>
               <Textarea
@@ -1150,30 +1495,34 @@ function QuestionsTab() {
                 rows={3}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Options</Label>
-              {newQuestion.options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...newQuestion.options];
-                      newOptions[index] = e.target.value;
-                      setNewQuestion({ ...newQuestion, options: newOptions });
-                    }}
-                    placeholder={`Option ${index + 1}`}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
-                    className={newQuestion.correct_answer === option ? 'bg-success/10 border-success' : ''}
-                  >
-                    {newQuestion.correct_answer === option ? '✓ Correct' : 'Mark Correct'}
-                  </Button>
-                </div>
-              ))}
-            </div>
+
+            {newQuestion.question_type === 'mcq' && (
+              <div className="space-y-2">
+                <Label>Options</Label>
+                {newQuestion.options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions[index] = e.target.value;
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
+                      className={newQuestion.correct_answer === option ? 'bg-success/10 border-success' : ''}
+                    >
+                      {newQuestion.correct_answer === option ? '✓ Correct' : 'Mark Correct'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
@@ -1229,464 +1578,6 @@ function QuestionsTab() {
                 </>
               ) : (
                 'Submit for Approval'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// Question Sets Tab Component
-function QuestionSetsTab() {
-  const [questionSets, setQuestionSets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newQuestionSet, setNewQuestionSet] = useState({
-    id: '',
-    name: '',
-    description: '',
-    category: '',
-    questions: [],
-    created_at: '',
-    updated_at: ''
-  });
-  const { toast } = useToast();
-
-  // Load question sets from local storage
-  useEffect(() => {
-    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
-  }, []);
-
-  const filteredQuestionSets = questionSets.filter(qs =>
-    qs.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    qs.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleAddQuestionSet = async () => {
-    // Validate required fields
-    if (!newQuestionSet.name) {
-      toast({ title: 'Question set name is required', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Generate ID
-      const newId = `qset-${Date.now()}`;
-      const questionSetToAdd = {
-        ...newQuestionSet,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTION_SETS, questionSetToAdd);
-      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
-
-      toast({ title: 'Question set added successfully!' });
-      setIsAddDialogOpen(false);
-      setNewQuestionSet({
-        id: '',
-        name: '',
-        description: '',
-        category: '',
-        questions: [],
-        created_at: '',
-        updated_at: ''
-      });
-    } catch (error) {
-      toast({ title: 'Error adding question set', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteQuestionSet = async (id: string) => {
-    setLoading(true);
-    try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.QUESTION_SETS, id);
-      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
-
-      toast({ title: 'Question set deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting question set', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Question Sets</h1>
-          <p className="text-muted-foreground">Organize questions into sets for competitions</p>
-        </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Question Set
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Question Sets List</CardTitle>
-          <CardDescription>All question sets for organizing competition questions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search question sets..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : filteredQuestionSets.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No question sets found</p>
-            ) : (
-              <div className="space-y-4">
-                {filteredQuestionSets.map((questionSet) => (
-                  <div key={questionSet.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{questionSet.name}</h3>
-                        <p className="text-xs text-muted-foreground">{questionSet.description}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
-                          <span className="text-xs text-muted-foreground">Questions: {questionSet.questions?.length || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Question Set</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this question set? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteQuestionSet(questionSet.id)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Question Set Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Question Set</DialogTitle>
-            <DialogDescription>Create a new question set for organizing competition questions</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Question Set Name *</Label>
-              <Input
-                value={newQuestionSet.name}
-                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, name: e.target.value })}
-                placeholder="e.g., Math Addition"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Textarea
-                value={newQuestionSet.description}
-                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, description: e.target.value })}
-                placeholder="Describe the question set..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input
-                value={newQuestionSet.category}
-                onChange={(e) => setNewQuestionSet({ ...newQuestionSet, category: e.target.value })}
-                placeholder="e.g., Math, Science, etc."
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddQuestionSet} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Question Set'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-// Avatars Tab Component
-function AvatarsTab() {
-  const [avatars, setAvatars] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newAvatar, setNewAvatar] = useState({
-    id: '',
-    name: '',
-    image_url: '',
-    category: 'default',
-    created_at: '',
-    updated_at: ''
-  });
-  const [filePreview, setFilePreview] = useState<string | null>(null);
-  const { toast } = useToast();
-
-  // Load avatars from local storage
-  useEffect(() => {
-    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
-  }, []);
-
-  const filteredAvatars = avatars.filter(avatar =>
-    avatar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    avatar.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFilePreview(event.target?.result as string);
-        setNewAvatar({ ...newAvatar, image_url: event.target?.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleAddAvatar = async () => {
-    // Validate required fields
-    if (!newAvatar.name || !newAvatar.image_url) {
-      toast({ title: 'Name and image are required', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Generate ID
-      const newId = `avatar-${Date.now()}`;
-      const avatarToAdd = {
-        ...newAvatar,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.AVATARS, avatarToAdd);
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
-
-      toast({ title: 'Avatar added successfully!' });
-      setIsAddDialogOpen(false);
-      setNewAvatar({
-        id: '',
-        name: '',
-        image_url: '',
-        category: 'default',
-        created_at: '',
-        updated_at: ''
-      });
-      setFilePreview(null);
-    } catch (error) {
-      toast({ title: 'Error adding avatar', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteAvatar = async (id: string) => {
-    setLoading(true);
-    try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.AVATARS, id);
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
-
-      toast({ title: 'Avatar deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Avatars</h1>
-          <p className="text-muted-foreground">Manage user avatars</p>
-        </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Avatar
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Avatars List</CardTitle>
-          <CardDescription>All available avatars for users</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search avatars..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : filteredAvatars.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No avatars found</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {filteredAvatars.map((avatar) => (
-                  <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex flex-col items-center gap-3">
-                      <img
-                        src={avatar.image_url}
-                        alt={avatar.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      <div className="text-center">
-                        <h3 className="font-medium text-sm">{avatar.name}</h3>
-                        <p className="text-xs text-muted-foreground">{avatar.category}</p>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this avatar? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteAvatar(avatar.id)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Avatar Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Avatar</DialogTitle>
-            <DialogDescription>Upload a new avatar image</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Avatar Name *</Label>
-              <Input
-                value={newAvatar.name}
-                onChange={(e) => setNewAvatar({ ...newAvatar, name: e.target.value })}
-                placeholder="e.g., Student Avatar"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input
-                value={newAvatar.category}
-                onChange={(e) => setNewAvatar({ ...newAvatar, category: e.target.value })}
-                placeholder="e.g., default, student, teacher"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Avatar Image *</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="cursor-pointer"
-                />
-                {filePreview && (
-                  <div className="w-16 h-16 rounded-full overflow-hidden">
-                    <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddAvatar} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Avatar'
               )}
             </Button>
           </DialogFooter>
@@ -1762,12 +1653,23 @@ function UsersTab() {
         updated_at: new Date().toISOString()
       };
 
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, userToAdd);
+      // Create pending approval for user
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'user',
+        data: userToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({
-        title: 'User added successfully!',
+        title: 'User submitted for admin approval!',
         description: `Password: ${userToAdd.password}`
       });
       setIsAddDialogOpen(false);
@@ -1826,16 +1728,24 @@ function UsersTab() {
         });
       }
 
-      // Add all users to local storage
-      usersToAdd.forEach(user => {
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, user);
-      });
+      // Create pending approval for bulk users
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'bulk_users',
+        data: usersToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
 
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({
-        title: `Bulk users added successfully!`,
-        description: `${usersToAdd.length} users added with auto-generated passwords.`
+        title: `Bulk users submitted for admin approval!`,
+        description: `${usersToAdd.length} users submitted with auto-generated passwords.`
       });
       setIsBulkAddDialogOpen(false);
       setBulkUsers('');
@@ -1848,12 +1758,25 @@ function UsersTab() {
   const handleDeleteUser = async (id: string) => {
     setLoading(true);
     try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.USERS, id);
+      // Create pending approval for user deletion
+      const userToDelete = users.find(user => user.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'user_delete',
+        data: { user_id: id, user_email: userToDelete?.email },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
-      toast({ title: 'User deleted successfully!' });
+      toast({ title: 'User deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
     } catch (error) {
-      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1865,19 +1788,29 @@ function UsersTab() {
       const userToUpdate = users.find(user => user.id === userId);
       if (!userToUpdate) return;
 
-      const updatedUser = {
-        ...userToUpdate,
-        role: newRole,
-        updated_at: new Date().toISOString()
+      // Create pending approval for role change
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'user_role_change',
+        data: {
+          user_id: userId,
+          old_role: userToUpdate.role,
+          new_role: newRole,
+          user_email: userToUpdate.email
+        },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
       };
 
-      // Update in local storage
-      localStorageCRUD.update(LOCAL_STORAGE_KEYS.USERS, userId, updatedUser);
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
-      toast({ title: 'User role updated successfully!' });
+      toast({ title: 'Role change submitted for admin approval!', description: 'An admin will review this shortly.' });
     } catch (error) {
-      toast({ title: 'Error updating user role', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting role change request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -2001,7 +1934,7 @@ function UsersTab() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete User</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to delete this user? This action cannot be undone.
+                                    This action will be submitted for admin approval. Are you sure you want to request deletion of this user?
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -2010,7 +1943,7 @@ function UsersTab() {
                                     className="bg-destructive hover:bg-destructive/90"
                                     onClick={() => handleDeleteUser(user.id)}
                                   >
-                                    Delete
+                                    Request Deletion
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -2029,10 +1962,10 @@ function UsersTab() {
 
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription>Create a new user account</DialogDescription>
+            <DialogDescription>Create a new user account (requires admin approval)</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -2103,10 +2036,10 @@ function UsersTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
+                  Submitting...
                 </>
               ) : (
-                'Add User'
+                'Submit for Approval'
               )}
             </Button>
           </DialogFooter>
@@ -2115,10 +2048,10 @@ function UsersTab() {
 
       {/* Bulk Add Users Dialog */}
       <Dialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Add Users</DialogTitle>
-            <DialogDescription>Add multiple users at once (one email per line)</DialogDescription>
+            <DialogDescription>Add multiple users at once (one email per line) - requires admin approval</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -2148,10 +2081,274 @@ function UsersTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
+                  Submitting...
                 </>
               ) : (
-                'Add Users'
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Avatars Tab Component
+function AvatarsTab() {
+  const [avatars, setAvatars] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newAvatar, setNewAvatar] = useState({
+    id: '',
+    name: '',
+    image_url: '',
+    category: 'default',
+    created_at: '',
+    updated_at: ''
+  });
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load avatars from local storage
+  useEffect(() => {
+    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+  }, []);
+
+  const filteredAvatars = avatars.filter(avatar =>
+    avatar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    avatar.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFilePreview(event.target?.result as string);
+        setNewAvatar({ ...newAvatar, image_url: event.target?.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddAvatar = async () => {
+    // Validate required fields
+    if (!newAvatar.name || !newAvatar.image_url) {
+      toast({ title: 'Name and image are required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `avatar-${Date.now()}`;
+      const avatarToAdd = {
+        ...newAvatar,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Create pending approval for avatar
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'avatar',
+        data: avatarToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+
+      toast({ title: 'Avatar submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewAvatar({
+        id: '',
+        name: '',
+        image_url: '',
+        category: 'default',
+        created_at: '',
+        updated_at: ''
+      });
+      setFilePreview(null);
+    } catch (error) {
+      toast({ title: 'Error submitting avatar', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteAvatar = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for avatar deletion
+      const avatarToDelete = avatars.find(avatar => avatar.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'avatar_delete',
+        data: { avatar_id: id, avatar_name: avatarToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+
+      toast({ title: 'Avatar deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Avatars</h1>
+          <p className="text-muted-foreground">Manage user avatars</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Avatar
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Avatars List</CardTitle>
+          <CardDescription>All available avatars for users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search avatars..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredAvatars.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No avatars found</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {filteredAvatars.map((avatar) => (
+                  <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex flex-col items-center gap-3">
+                      <img
+                        src={avatar.image_url}
+                        alt={avatar.name}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                      <div className="text-center">
+                        <h3 className="font-medium text-sm">{avatar.name}</h3>
+                        <p className="text-xs text-muted-foreground">{avatar.category}</p>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this avatar?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteAvatar(avatar.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Avatar Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Avatar</DialogTitle>
+            <DialogDescription>Upload a new avatar image (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Avatar Name *</Label>
+              <Input
+                value={newAvatar.name}
+                onChange={(e) => setNewAvatar({ ...newAvatar, name: e.target.value })}
+                placeholder="e.g., Student Avatar"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Input
+                value={newAvatar.category}
+                onChange={(e) => setNewAvatar({ ...newAvatar, category: e.target.value })}
+                placeholder="e.g., default, student, teacher"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Avatar Image *</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                {filePreview && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden">
+                    <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddAvatar} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
               )}
             </Button>
           </DialogFooter>
@@ -2317,28 +2514,9 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Mock data for messages
-      const mockMessages = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          senderEmail: 'john@example.com',
-          subject: 'Question about competition',
-          content: 'Hello, I have a question about the upcoming math competition...',
-          date: '2025-06-01',
-          read: false
-        },
-        {
-          id: '2',
-          sender: 'Jane Smith',
-          senderEmail: 'jane@example.com',
-          subject: 'Technical issue',
-          content: 'I am having trouble accessing the practice questions...',
-          date: '2025-05-30',
-          read: true
-        }
-      ];
-      setMessages(mockMessages);
+      // Load messages from local storage
+      const messagesData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES);
+      setMessages(messagesData);
     } catch (error) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
@@ -2366,6 +2544,13 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
+      // Only admins can delete messages
+      if (profile?.role !== 'admin') {
+        toast({ title: 'Only admins can delete messages', variant: 'destructive' });
+        return;
+      }
+
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.MESSAGES, messageId);
       setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
@@ -2436,30 +2621,32 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {profile?.role === 'admin' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this message? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteMessage(message.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </button>
                     ))
@@ -2517,6 +2704,118 @@ function MessagesTab() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Preview Views Tab Component
+function PreviewViewsTab() {
+  const [activePreview, setActivePreview] = useState('student');
+  const { setCurrentView } = useAuth();
+  const { toast } = useToast();
+
+  const handlePreview = (role: string) => {
+    setCurrentView(role as any);
+    setActivePreview(role);
+    toast({
+      title: 'Preview Mode Activated',
+      description: `You are now viewing the platform as a ${role}`
+    });
+  };
+
+  const handleExitPreview = () => {
+    setCurrentView(null);
+    setActivePreview('student');
+    toast({
+      title: 'Preview Mode Deactivated',
+      description: 'You are now viewing with your actual role'
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Preview Views</h1>
+        <p className="text-muted-foreground">View the platform from different user perspectives</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Role Preview</CardTitle>
+          <CardDescription>Select a role to preview the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => handlePreview('student')}
+              className={`p-6 rounded-xl border-2 transition-all ${activePreview === 'student' ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-primary/50 hover:bg-primary/5'}`}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-medium">Student View</h3>
+                <p className="text-xs text-muted-foreground text-center">See what students experience</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handlePreview('teacher')}
+              className={`p-6 rounded-xl border-2 transition-all ${activePreview === 'teacher' ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-primary/50 hover:bg-primary/5'}`}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-medium">Teacher View</h3>
+                <p className="text-xs text-muted-foreground text-center">See what teachers experience</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="mt-6 flex justify-center">
+            <Button
+              onClick={handleExitPreview}
+              variant="outline"
+              className="gap-2"
+            >
+              <EyeOff className="w-4 h-4" />
+              Exit Preview Mode
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preview Instructions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Use the preview mode to see how the platform appears to different user roles. This helps you understand the user experience and test features.
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Click on any role card to activate preview mode</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>The entire dashboard will refresh to show the selected role's view</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Click "Exit Preview Mode" to return to your actual role</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Preview mode doesn't affect actual user data or permissions</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

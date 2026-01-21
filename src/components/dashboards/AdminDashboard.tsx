@@ -33,7 +33,16 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Mail,
+  Settings,
+  ToggleLeft,
+  ToggleRight,
+  List,
+  Type,
+  MultipleChoice,
+  Pencil,
+  BookOpen
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -47,6 +56,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {
@@ -58,7 +68,8 @@ const LOCAL_STORAGE_KEYS = {
   MESSAGES: 'lumora_messages',
   AVATARS: 'lumora_avatars',
   BADGES: 'lumora_badges',
-  QUESTION_SETS: 'lumora_question_sets'
+  QUESTION_SETS: 'lumora_question_sets',
+  SETTINGS: 'lumora_settings'
 };
 
 // Generate random password
@@ -118,12 +129,14 @@ function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiv
     { id: 'overview', icon: Users, label: 'Overview' },
     { id: 'schools', icon: School, label: 'Schools' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
-    { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'question-sets', icon: LayoutTemplate, label: 'Question Sets' },
+    { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'avatars', icon: User, label: 'Avatars' },
     { id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'preview', icon: Eye, label: 'Preview Views' },
   ];
 
   return (
@@ -178,12 +191,14 @@ export default function AdminDashboard() {
       {activeTab === 'overview' && <AdminOverviewTab setActiveTab={setActiveTab} loading={loading} />}
       {activeTab === 'schools' && <SchoolsTab />}
       {activeTab === 'competitions' && <CompetitionsTab />}
-      {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'question-sets' && <QuestionSetsTab />}
+      {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'avatars' && <AvatarsTab />}
       {activeTab === 'approvals' && <ApprovalsTab />}
       {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'settings' && <SettingsTab />}
+      {activeTab === 'preview' && <PreviewViewsTab />}
       {activeTab === 'profile' && <ProfileView />}
     </DashboardLayout>
   );
@@ -199,22 +214,25 @@ function AdminOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: strin
   const competitions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS);
   const questions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
   const pending = localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS);
+  const questionSets = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS);
 
   const stats = {
     totalUsers: users.length,
     activeCompetitions: competitions.length,
     totalQuestions: questions.length,
+    totalQuestionSets: questionSets.length,
     pendingReviews: pending.length
   };
 
   const quickActions = [
     { id: 'schools', icon: School, title: 'Manage Schools', description: 'Configure school access' },
     { id: 'competitions', icon: Trophy, title: 'Manage Competitions', description: 'Create and edit competitions' },
-    { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'question-sets', icon: LayoutTemplate, title: 'Question Sets', description: 'Organize questions into sets' },
+    { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'avatars', icon: User, title: 'Manage Avatars', description: 'Upload and manage avatars' },
     { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
+    { id: 'settings', icon: Settings, title: 'Platform Settings', description: 'Configure platform features' },
   ];
 
   return (
@@ -227,7 +245,7 @@ function AdminOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: strin
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard
           title="Total Users"
           value={stats.totalUsers.toLocaleString()}
@@ -241,16 +259,22 @@ function AdminOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: strin
           className="bg-accent/10 border-accent/20"
         />
         <StatCard
+          title="Question Sets"
+          value={stats.totalQuestionSets.toString()}
+          icon={LayoutTemplate}
+          className="bg-success/10 border-success/20"
+        />
+        <StatCard
           title="Total Questions"
           value={stats.totalQuestions.toLocaleString()}
           icon={FileQuestion}
-          className="bg-success/10 border-success/20"
+          className="bg-warning/10 border-warning/20"
         />
         <StatCard
           title="Pending Approvals"
           value={stats.pendingReviews.toString()}
           icon={Clock}
-          className="bg-warning/10 border-warning/20"
+          className="bg-destructive/10 border-destructive/20"
         />
       </div>
 
@@ -500,7 +524,7 @@ function SchoolsTab() {
 
       {/* Add School Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New School</DialogTitle>
             <DialogDescription>Register a new educational institution</DialogDescription>
@@ -618,18 +642,19 @@ function CompetitionsTab() {
     start_date: '',
     end_date: '',
     is_active: true,
-    max_participants: 100,
-    current_participants: 0,
     category: '',
     difficulty: 'medium',
+    question_set_id: '',
     created_at: '',
     updated_at: ''
   });
+  const [questionSets, setQuestionSets] = useState([]);
   const { toast } = useToast();
 
-  // Load competitions from local storage
+  // Load competitions and question sets from local storage
   useEffect(() => {
     setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
   }, []);
 
   const filteredCompetitions = competitions.filter(competition =>
@@ -668,10 +693,9 @@ function CompetitionsTab() {
         start_date: '',
         end_date: '',
         is_active: true,
-        max_participants: 100,
-        current_participants: 0,
         category: '',
         difficulty: 'medium',
+        question_set_id: '',
         created_at: '',
         updated_at: ''
       });
@@ -742,7 +766,7 @@ function CompetitionsTab() {
                           <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                             {competition.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
+                          <span className="text-xs text-muted-foreground">Category: {competition.category}</span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -785,7 +809,7 @@ function CompetitionsTab() {
 
       {/* Add Competition Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Competition</DialogTitle>
             <DialogDescription>Create a new learning competition</DialogDescription>
@@ -853,13 +877,20 @@ function CompetitionsTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Max Participants</Label>
-              <Input
-                type="number"
-                value={newCompetition.max_participants}
-                onChange={(e) => setNewCompetition({ ...newCompetition, max_participants: parseInt(e.target.value) || 0 })}
-                placeholder="100"
-              />
+              <Label>Question Set</Label>
+              <Select
+                value={newCompetition.question_set_id}
+                onValueChange={(value) => setNewCompetition({ ...newCompetition, question_set_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionSets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
@@ -889,282 +920,6 @@ function CompetitionsTab() {
   );
 }
 
-// Questions Tab Component
-function QuestionsTab() {
-  const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newQuestion, setNewQuestion] = useState({
-    id: '',
-    text: '',
-    options: ['', '', '', ''],
-    correct_answer: '',
-    category: '',
-    difficulty: 'medium',
-    points: 10,
-    explanation: '',
-    created_at: '',
-    updated_at: ''
-  });
-  const { toast } = useToast();
-
-  // Load questions from local storage
-  useEffect(() => {
-    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-  }, []);
-
-  const filteredQuestions = questions.filter(question =>
-    question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    question.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleAddQuestion = async () => {
-    // Validate required fields
-    if (!newQuestion.text || !newQuestion.correct_answer) {
-      toast({ title: 'Question text and correct answer are required', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Generate ID
-      const newId = `question-${Date.now()}`;
-      const questionToAdd = {
-        ...newQuestion,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, questionToAdd);
-      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-
-      toast({ title: 'Question added successfully!' });
-      setIsAddDialogOpen(false);
-      setNewQuestion({
-        id: '',
-        text: '',
-        options: ['', '', '', ''],
-        correct_answer: '',
-        category: '',
-        difficulty: 'medium',
-        points: 10,
-        explanation: '',
-        created_at: '',
-        updated_at: ''
-      });
-    } catch (error) {
-      toast({ title: 'Error adding question', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteQuestion = async (id: string) => {
-    setLoading(true);
-    try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.QUESTIONS, id);
-      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-
-      toast({ title: 'Question deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Questions</h1>
-          <p className="text-muted-foreground">Manage competition questions</p>
-        </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Question
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Questions List</CardTitle>
-          <CardDescription>All available questions for competitions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search questions..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : filteredQuestions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No questions found</p>
-            ) : (
-              <div className="space-y-4">
-                {filteredQuestions.map((question) => (
-                  <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{question.text}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">Category: {question.category} • Difficulty: {question.difficulty}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4">
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete this question? This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteQuestion(question.id)}
-                              >
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Question Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New Question</DialogTitle>
-            <DialogDescription>Create a new competition question</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Question Text *</Label>
-              <Textarea
-                value={newQuestion.text}
-                onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
-                placeholder="What is the capital of France?"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Options</Label>
-              {newQuestion.options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={option}
-                    onChange={(e) => {
-                      const newOptions = [...newQuestion.options];
-                      newOptions[index] = e.target.value;
-                      setNewQuestion({ ...newQuestion, options: newOptions });
-                    }}
-                    placeholder={`Option ${index + 1}`}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
-                    className={newQuestion.correct_answer === option ? 'bg-success/10 border-success' : ''}
-                  >
-                    {newQuestion.correct_answer === option ? '✓ Correct' : 'Mark Correct'}
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Input
-                  value={newQuestion.category}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
-                  placeholder="e.g., Math, Science, etc."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Difficulty</Label>
-                <Select
-                  value={newQuestion.difficulty}
-                  onValueChange={(value) => setNewQuestion({ ...newQuestion, difficulty: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select difficulty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Points</Label>
-              <Input
-                type="number"
-                value={newQuestion.points}
-                onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 0 })}
-                placeholder="10"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Explanation</Label>
-              <Textarea
-                value={newQuestion.explanation}
-                onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
-                placeholder="Explain why this answer is correct..."
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddQuestion} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                'Add Question'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
 // Question Sets Tab Component
 function QuestionSetsTab() {
   const [questionSets, setQuestionSets] = useState([]);
@@ -1176,6 +931,7 @@ function QuestionSetsTab() {
     name: '',
     description: '',
     category: '',
+    question_type: 'mcq', // 'mcq' or 'written'
     questions: [],
     created_at: '',
     updated_at: ''
@@ -1221,6 +977,7 @@ function QuestionSetsTab() {
         name: '',
         description: '',
         category: '',
+        question_type: 'mcq',
         questions: [],
         created_at: '',
         updated_at: ''
@@ -1290,6 +1047,9 @@ function QuestionSetsTab() {
                         <p className="text-xs text-muted-foreground">{questionSet.description}</p>
                         <div className="flex items-center gap-4 mt-2">
                           <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
+                            {questionSet.question_type === 'mcq' ? 'Multiple Choice' : 'Written Answers'}
+                          </span>
                           <span className="text-xs text-muted-foreground">Questions: {questionSet.questions?.length || 0}</span>
                         </div>
                       </div>
@@ -1333,7 +1093,7 @@ function QuestionSetsTab() {
 
       {/* Add Question Set Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Question Set</DialogTitle>
             <DialogDescription>Create a new question set for organizing competition questions</DialogDescription>
@@ -1364,6 +1124,29 @@ function QuestionSetsTab() {
                 placeholder="e.g., Math, Science, etc."
               />
             </div>
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <RadioGroup
+                value={newQuestionSet.question_type}
+                onValueChange={(value) => setNewQuestionSet({ ...newQuestionSet, question_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="mcq" id="mcq" />
+                  <Label htmlFor="mcq" className="flex items-center gap-2">
+                    <MultipleChoice className="w-4 h-4" />
+                    Multiple Choice
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="written" id="written" />
+                  <Label htmlFor="written" className="flex items-center gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Written Answers
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
@@ -1384,93 +1167,106 @@ function QuestionSetsTab() {
   );
 }
 
-// Avatars Tab Component
-function AvatarsTab() {
-  const [avatars, setAvatars] = useState([]);
+// Questions Tab Component
+function QuestionsTab() {
+  const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newAvatar, setNewAvatar] = useState({
+  const [newQuestion, setNewQuestion] = useState({
     id: '',
-    name: '',
-    image_url: '',
-    category: 'default',
+    text: '',
+    options: ['', '', '', ''],
+    correct_answer: '',
+    category: '',
+    difficulty: 'medium',
+    points: 10,
+    explanation: '',
+    question_set_id: '',
+    question_type: 'mcq',
     created_at: '',
     updated_at: ''
   });
-  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [questionSets, setQuestionSets] = useState([]);
   const { toast } = useToast();
 
-  // Load avatars from local storage
+  // Load questions and question sets from local storage
   useEffect(() => {
-    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
   }, []);
 
-  const filteredAvatars = avatars.filter(avatar =>
-    avatar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    avatar.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredQuestions = questions.filter(question =>
+    question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    question.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setFilePreview(event.target?.result as string);
-        setNewAvatar({ ...newAvatar, image_url: event.target?.result as string });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleAddAvatar = async () => {
+  const handleAddQuestion = async () => {
     // Validate required fields
-    if (!newAvatar.name || !newAvatar.image_url) {
-      toast({ title: 'Name and image are required', variant: 'destructive' });
+    if (!newQuestion.text || !newQuestion.correct_answer) {
+      toast({ title: 'Question text and correct answer are required', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
     try {
       // Generate ID
-      const newId = `avatar-${Date.now()}`;
-      const avatarToAdd = {
-        ...newAvatar,
+      const newId = `question-${Date.now()}`;
+      const questionToAdd = {
+        ...newQuestion,
         id: newId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
       // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.AVATARS, avatarToAdd);
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, questionToAdd);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
-      toast({ title: 'Avatar added successfully!' });
+      // Update the question set to include this question
+      if (newQuestion.question_set_id) {
+        const questionSet = questionSets.find(set => set.id === newQuestion.question_set_id);
+        if (questionSet) {
+          const updatedSet = {
+            ...questionSet,
+            questions: [...(questionSet.questions || []), newId]
+          };
+          localStorageCRUD.update(LOCAL_STORAGE_KEYS.QUESTION_SETS, questionSet.id, updatedSet);
+          setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+        }
+      }
+
+      toast({ title: 'Question added successfully!' });
       setIsAddDialogOpen(false);
-      setNewAvatar({
+      setNewQuestion({
         id: '',
-        name: '',
-        image_url: '',
-        category: 'default',
+        text: '',
+        options: ['', '', '', ''],
+        correct_answer: '',
+        category: '',
+        difficulty: 'medium',
+        points: 10,
+        explanation: '',
+        question_set_id: '',
+        question_type: 'mcq',
         created_at: '',
         updated_at: ''
       });
-      setFilePreview(null);
     } catch (error) {
-      toast({ title: 'Error adding avatar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error adding question', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
-  const handleDeleteAvatar = async (id: string) => {
+  const handleDeleteQuestion = async (id: string) => {
     setLoading(true);
     try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.AVATARS, id);
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.QUESTIONS, id);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
-      toast({ title: 'Avatar deleted successfully!' });
+      toast({ title: 'Question deleted successfully!' });
     } catch (error) {
-      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1479,26 +1275,26 @@ function AvatarsTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-display font-bold">Avatars</h1>
-          <p className="text-muted-foreground">Manage user avatars</p>
+          <h1 className="text-2xl font-display font-bold">Questions</h1>
+          <p className="text-muted-foreground">Manage competition questions</p>
         </div>
         <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
           <Plus className="w-4 h-4 mr-2" />
-          Add Avatar
+          Add Question
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Avatars List</CardTitle>
-          <CardDescription>All available avatars for users</CardDescription>
+          <CardTitle>Questions List</CardTitle>
+          <CardDescription>All available questions for competitions</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search avatars..."
+                placeholder="Search questions..."
                 className="pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -1509,23 +1305,24 @@ function AvatarsTab() {
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : filteredAvatars.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No avatars found</p>
+            ) : filteredQuestions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No questions found</p>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {filteredAvatars.map((avatar) => (
-                  <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex flex-col items-center gap-3">
-                      <img
-                        src={avatar.image_url}
-                        alt={avatar.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
-                      <div className="text-center">
-                        <h3 className="font-medium text-sm">{avatar.name}</h3>
-                        <p className="text-xs text-muted-foreground">{avatar.category}</p>
+              <div className="space-y-4">
+                {filteredQuestions.map((question) => (
+                  <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{question.text}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Category: {question.category} • Difficulty: {question.difficulty}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-accent/10 text-accent">
+                            {question.question_type === 'mcq' ? 'MCQ' : 'Written'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex gap-2 mt-2">
+                      <div className="flex gap-2 ml-4">
                         <Button size="sm" variant="outline" className="h-8 w-8 p-0">
                           <Edit className="w-3 h-3" />
                         </Button>
@@ -1537,16 +1334,16 @@ function AvatarsTab() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
+                              <AlertDialogTitle>Delete Question</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete this avatar? This action cannot be undone.
+                                Are you sure you want to delete this question? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
                                 className="bg-destructive hover:bg-destructive/90"
-                                onClick={() => handleDeleteAvatar(avatar.id)}
+                                onClick={() => handleDeleteQuestion(question.id)}
                               >
                                 Delete
                               </AlertDialogAction>
@@ -1563,57 +1360,148 @@ function AvatarsTab() {
         </CardContent>
       </Card>
 
-      {/* Add Avatar Dialog */}
+      {/* Add Question Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add New Avatar</DialogTitle>
-            <DialogDescription>Upload a new avatar image</DialogDescription>
+            <DialogTitle>Add New Question</DialogTitle>
+            <DialogDescription>Create a new competition question</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Avatar Name *</Label>
-              <Input
-                value={newAvatar.name}
-                onChange={(e) => setNewAvatar({ ...newAvatar, name: e.target.value })}
-                placeholder="e.g., Student Avatar"
+              <Label>Question Set *</Label>
+              <Select
+                value={newQuestion.question_set_id}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_set_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select question set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionSets.map((set) => (
+                    <SelectItem key={set.id} value={set.id}>{set.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">You must create a question set first before adding questions</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <RadioGroup
+                value={newQuestion.question_type}
+                onValueChange={(value) => setNewQuestion({ ...newQuestion, question_type: value })}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="mcq" id="mcq-question" />
+                  <Label htmlFor="mcq-question" className="flex items-center gap-2">
+                    <MultipleChoice className="w-4 h-4" />
+                    Multiple Choice
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="written" id="written-question" />
+                  <Label htmlFor="written-question" className="flex items-center gap-2">
+                    <Pencil className="w-4 h-4" />
+                    Written Answers
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Question Text *</Label>
+              <Textarea
+                value={newQuestion.text}
+                onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
+                placeholder="What is the capital of France?"
+                rows={3}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input
-                value={newAvatar.category}
-                onChange={(e) => setNewAvatar({ ...newAvatar, category: e.target.value })}
-                placeholder="e.g., default, student, teacher"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Avatar Image *</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="cursor-pointer"
-                />
-                {filePreview && (
-                  <div className="w-16 h-16 rounded-full overflow-hidden">
-                    <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+
+            {newQuestion.question_type === 'mcq' && (
+              <div className="space-y-2">
+                <Label>Options</Label>
+                {newQuestion.options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions[index] = e.target.value;
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                      placeholder={`Option ${index + 1}`}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
+                      className={newQuestion.correct_answer === option ? 'bg-success/10 border-success' : ''}
+                    >
+                      {newQuestion.correct_answer === option ? '✓ Correct' : 'Mark Correct'}
+                    </Button>
                   </div>
-                )}
+                ))}
               </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input
+                  value={newQuestion.category}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
+                  placeholder="e.g., Math, Science, etc."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={newQuestion.difficulty}
+                  onValueChange={(value) => setNewQuestion({ ...newQuestion, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                value={newQuestion.points}
+                onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 0 })}
+                placeholder="10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Explanation</Label>
+              <Textarea
+                value={newQuestion.explanation}
+                onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
+                placeholder="Explain why this answer is correct..."
+                rows={3}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAddAvatar} disabled={loading}>
+            <Button onClick={handleAddQuestion} disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Adding...
                 </>
               ) : (
-                'Add Avatar'
+                'Add Question'
               )}
             </Button>
           </DialogFooter>
@@ -1956,7 +1844,7 @@ function UsersTab() {
 
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>Create a new user account</DialogDescription>
@@ -2042,7 +1930,7 @@ function UsersTab() {
 
       {/* Bulk Add Users Dialog */}
       <Dialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Add Users</DialogTitle>
             <DialogDescription>Add multiple users at once (one email per line)</DialogDescription>
@@ -2079,6 +1967,245 @@ function UsersTab() {
                 </>
               ) : (
                 'Add Users'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Avatars Tab Component
+function AvatarsTab() {
+  const [avatars, setAvatars] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newAvatar, setNewAvatar] = useState({
+    id: '',
+    name: '',
+    image_url: '',
+    category: 'default',
+    created_at: '',
+    updated_at: ''
+  });
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // Load avatars from local storage
+  useEffect(() => {
+    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+  }, []);
+
+  const filteredAvatars = avatars.filter(avatar =>
+    avatar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    avatar.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFilePreview(event.target?.result as string);
+        setNewAvatar({ ...newAvatar, image_url: event.target?.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddAvatar = async () => {
+    // Validate required fields
+    if (!newAvatar.name || !newAvatar.image_url) {
+      toast({ title: 'Name and image are required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `avatar-${Date.now()}`;
+      const avatarToAdd = {
+        ...newAvatar,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.AVATARS, avatarToAdd);
+      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+
+      toast({ title: 'Avatar added successfully!' });
+      setIsAddDialogOpen(false);
+      setNewAvatar({
+        id: '',
+        name: '',
+        image_url: '',
+        category: 'default',
+        created_at: '',
+        updated_at: ''
+      });
+      setFilePreview(null);
+    } catch (error) {
+      toast({ title: 'Error adding avatar', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteAvatar = async (id: string) => {
+    setLoading(true);
+    try {
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.AVATARS, id);
+      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+
+      toast({ title: 'Avatar deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Avatars</h1>
+          <p className="text-muted-foreground">Manage user avatars</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Avatar
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Avatars List</CardTitle>
+          <CardDescription>All available avatars for users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search avatars..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredAvatars.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No avatars found</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {filteredAvatars.map((avatar) => (
+                  <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex flex-col items-center gap-3">
+                      <img
+                        src={avatar.image_url}
+                        alt={avatar.name}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                      <div className="text-center">
+                        <h3 className="font-medium text-sm">{avatar.name}</h3>
+                        <p className="text-xs text-muted-foreground">{avatar.category}</p>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this avatar? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteAvatar(avatar.id)}
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Avatar Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Avatar</DialogTitle>
+            <DialogDescription>Upload a new avatar image</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Avatar Name *</Label>
+              <Input
+                value={newAvatar.name}
+                onChange={(e) => setNewAvatar({ ...newAvatar, name: e.target.value })}
+                placeholder="e.g., Student Avatar"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Input
+                value={newAvatar.category}
+                onChange={(e) => setNewAvatar({ ...newAvatar, category: e.target.value })}
+                placeholder="e.g., default, student, teacher"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Avatar Image *</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                {filePreview && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden">
+                    <img src={filePreview} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddAvatar} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                'Add Avatar'
               )}
             </Button>
           </DialogFooter>
@@ -2244,28 +2371,9 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Mock data for messages
-      const mockMessages = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          senderEmail: 'john@example.com',
-          subject: 'Question about competition',
-          content: 'Hello, I have a question about the upcoming math competition...',
-          date: '2025-06-01',
-          read: false
-        },
-        {
-          id: '2',
-          sender: 'Jane Smith',
-          senderEmail: 'jane@example.com',
-          subject: 'Technical issue',
-          content: 'I am having trouble accessing the practice questions...',
-          date: '2025-05-30',
-          read: true
-        }
-      ];
-      setMessages(mockMessages);
+      // Load messages from local storage
+      const messagesData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES);
+      setMessages(messagesData);
     } catch (error) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
@@ -2293,6 +2401,13 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
+      // Only admins can delete messages
+      if (profile?.role !== 'admin') {
+        toast({ title: 'Only admins can delete messages', variant: 'destructive' });
+        return;
+      }
+
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.MESSAGES, messageId);
       setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
@@ -2340,57 +2455,59 @@ function MessagesTab() {
                       <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                     </div>
                   ) : filteredMessages.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No messages found</p>
-                  ) : (
-                    filteredMessages.map((message) => (
-                      <button
-                        key={message.id}
-                        onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{message.sender}</p>
-                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                      <p className="text-center text-muted-foreground py-4">No messages found</p>
+                    ) : (
+                      filteredMessages.map((message) => (
+                        <button
+                          key={message.id}
+                          onClick={() => setSelectedMessage(message)}
+                          className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {message.sender.split(' ').map(n => n[0]).join('')}
                             </div>
-                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                            {!message.read && (
-                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium truncate">{message.sender}</p>
+                                <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                              <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                              {!message.read && (
+                                <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                              )}
+                            </div>
+                            {profile?.role === 'admin' && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this message? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive hover:bg-destructive/90"
+                                      onClick={() => handleDeleteMessage(message.id)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             )}
                           </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </button>
-                    ))
-                  )}
+                        </button>
+                      ))
+                    )}
                 </div>
               </div>
             </CardContent>
@@ -2448,6 +2565,290 @@ function MessagesTab() {
   );
 }
 
+// Settings Tab Component
+function SettingsTab() {
+  const [settings, setSettings] = useState({
+    enable1v1Challenges: false,
+    enableStudentMessaging: true,
+    enableTeacherMessaging: true,
+    enableCompetitions: true,
+    enablePracticeMode: true,
+    enableLeaderboards: true
+  });
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  // Load settings from local storage
+  useEffect(() => {
+    const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEYS.SETTINGS);
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (error) {
+        console.error('Error parsing settings:', error);
+      }
+    }
+  }, []);
+
+  const handleSettingChange = (setting: string, value: boolean) => {
+    const updatedSettings = { ...settings, [setting]: value };
+    setSettings(updatedSettings);
+    localStorage.setItem(LOCAL_STORAGE_KEYS.SETTINGS, JSON.stringify(updatedSettings));
+    toast({ title: 'Settings updated successfully!' });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Platform Settings</h1>
+        <p className="text-muted-foreground">Configure platform features and behavior</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Feature Toggles</CardTitle>
+            <CardDescription>Enable or disable platform features</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">1v1 Challenges</h3>
+                  <p className="text-xs text-muted-foreground">Allow students to challenge each other</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enable1v1Challenges}
+                onCheckedChange={(checked) => handleSettingChange('enable1v1Challenges', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Student Messaging</h3>
+                  <p className="text-xs text-muted-foreground">Allow students to send messages</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enableStudentMessaging}
+                onCheckedChange={(checked) => handleSettingChange('enableStudentMessaging', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Teacher Messaging</h3>
+                  <p className="text-xs text-muted-foreground">Allow teachers to send messages</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enableTeacherMessaging}
+                onCheckedChange={(checked) => handleSettingChange('enableTeacherMessaging', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <Trophy className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Competitions</h3>
+                  <p className="text-xs text-muted-foreground">Enable competition functionality</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enableCompetitions}
+                onCheckedChange={(checked) => handleSettingChange('enableCompetitions', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Practice Mode</h3>
+                  <p className="text-xs text-muted-foreground">Allow students to practice questions</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enablePracticeMode}
+                onCheckedChange={(checked) => handleSettingChange('enablePracticeMode', checked)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border/50">
+              <div className="flex items-center gap-3">
+                <CheckSquare className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Leaderboards</h3>
+                  <p className="text-xs text-muted-foreground">Show student rankings</p>
+                </div>
+              </div>
+              <Switch
+                checked={settings.enableLeaderboards}
+                onCheckedChange={(checked) => handleSettingChange('enableLeaderboards', checked)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Platform Information</CardTitle>
+            <CardDescription>Current platform status</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Total Users</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS).length}</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Total Competitions</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS).length}</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Total Questions</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS).length}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Preview Views Tab Component
+function PreviewViewsTab() {
+  const [activePreview, setActivePreview] = useState('student');
+  const { setCurrentView } = useAuth();
+  const { toast } = useToast();
+
+  const handlePreview = (role: string) => {
+    setCurrentView(role as any);
+    setActivePreview(role);
+    toast({
+      title: 'Preview Mode Activated',
+      description: `You are now viewing the platform as a ${role}`
+    });
+  };
+
+  const handleExitPreview = () => {
+    setCurrentView(null);
+    setActivePreview('student');
+    toast({
+      title: 'Preview Mode Deactivated',
+      description: 'You are now viewing with your actual role'
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Preview Views</h1>
+        <p className="text-muted-foreground">View the platform from different user perspectives</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Role Preview</CardTitle>
+          <CardDescription>Select a role to preview the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => handlePreview('student')}
+              className={`p-6 rounded-xl border-2 transition-all ${activePreview === 'student' ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-primary/50 hover:bg-primary/5'}`}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-medium">Student View</h3>
+                <p className="text-xs text-muted-foreground text-center">See what students experience</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handlePreview('teacher')}
+              className={`p-6 rounded-xl border-2 transition-all ${activePreview === 'teacher' ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-primary/50 hover:bg-primary/5'}`}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-medium">Teacher View</h3>
+                <p className="text-xs text-muted-foreground text-center">See what teachers experience</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handlePreview('moderator')}
+              className={`p-6 rounded-xl border-2 transition-all ${activePreview === 'moderator' ? 'border-primary bg-primary/10' : 'border-border/50 hover:border-primary/50 hover:bg-primary/5'}`}
+            >
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-full gradient-hero flex items-center justify-center">
+                  <User className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <h3 className="font-medium">Moderator View</h3>
+                <p className="text-xs text-muted-foreground text-center">See what moderators experience</p>
+              </div>
+            </button>
+          </div>
+
+          <div className="mt-6 flex justify-center">
+            <Button
+              onClick={handleExitPreview}
+              variant="outline"
+              className="gap-2"
+            >
+              <EyeOff className="w-4 h-4" />
+              Exit Preview Mode
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preview Instructions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Use the preview mode to see how the platform appears to different user roles. This helps you understand the user experience and test features.
+            </p>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Click on any role card to activate preview mode</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>The entire dashboard will refresh to show the selected role's view</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Click "Exit Preview Mode" to return to your actual role</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary">•</span>
+                <span>Preview mode doesn't affect actual user data or permissions</span>
+              </li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // Profile View Component
 function ProfileView() {
   const { profile } = useAuth();
@@ -2490,17 +2891,17 @@ function ProfileView() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Users Managed</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS).length}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Organized</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS).length}</p>
             </div>
 
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Questions Approved</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS).length}</p>
             </div>
           </CardContent>
         </Card>

@@ -2536,3 +2536,6 @@ function ProfileView() {
     </div>
   );
 }
+
+// Export the AdminDashboard as default
+export default AdminDashboard;

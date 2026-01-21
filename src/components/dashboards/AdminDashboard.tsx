@@ -56,67 +56,6 @@ const LOCAL_STORAGE_KEYS = {
   COMPETITIONS: 'lumora_competitions',
   QUESTIONS: 'lumora_questions',
   QUESTION_SETS: 'lumora_question_sets',
-I understand the issue. The error indicates that the `AdminDashboard` component is not being exported as a default export. Let me fix this by ensuring all dashboard components have proper exports.
-
-<dyad-write path="src/components/dashboards/AdminDashboard.tsx" description="Fixing AdminDashboard export">
-import { useState, useEffect } from 'react';
-import { DashboardLayout } from './DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Users,
-  Trophy,
-  FileQuestion,
-  CheckSquare,
-  Clock,
-  LayoutTemplate,
-  School,
-  Search,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
-  MessageSquare,
-  RefreshCw,
-  Loader2,
-  Eye,
-  EyeOff,
-  User,
-  Lock,
-  Unlock,
-  Calendar,
-  ChevronRight,
-  Crown,
-  Medal,
-  Star,
-  Plus,
-  Edit,
-  Trash2,
-  Upload,
-  ChevronDown,
-  ChevronUp,
-  List,
-  AlertTriangle,
-  Settings
-} from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import { localStorageCRUD } from '@/lib/localStorageCRUD';
-
-const LOCAL_STORAGE_KEYS = {
-  USERS: 'lumora_users',
-  SCHOOLS: 'lumora_schools',
-  COMPETITIONS: 'lumora_competitions',
-  QUESTIONS: 'lumora_questions',
-  QUESTION_SETS: 'lumora_question_sets',
   AVATARS: 'lumora_avatars',
   APPROVALS: 'lumora_approvals',
   MESSAGES: 'lumora_messages',

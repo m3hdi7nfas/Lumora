@@ -138,16 +138,18 @@ export default function AdminDashboard() {
       title="Lumora Admin Dashboard"
       sidebar={<AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <AdminOverviewTab setActiveTab={setActiveTab} showAds={showAds} handleAdsToggle={handleAdsToggle} loading={loading} />}
-      {activeTab === 'competitions' && <CompetitionsTab />}
-      {activeTab === 'questions' && <QuestionsTab />}
-      {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'schools' && <SchoolsTab />}
-      {activeTab === 'approvals' && <ApprovalsTab />}
-      {activeTab === 'messages' && <MessagesTab />}
-      {activeTab === 'avatars' && <AvatarsTab />}
-      {activeTab === 'badges' && <BadgesTab />}
-      {activeTab === 'profile' && <ProfileView />}
+      <div className="p-6">
+        {activeTab === 'overview' && <AdminOverviewTab setActiveTab={setActiveTab} showAds={showAds} handleAdsToggle={handleAdsToggle} loading={loading} />}
+        {activeTab === 'competitions' && <CompetitionsTab />}
+        {activeTab === 'questions' && <QuestionsTab />}
+        {activeTab === 'users' && <UsersTab />}
+        {activeTab === 'schools' && <SchoolsTab />}
+        {activeTab === 'approvals' && <ApprovalsTab />}
+        {activeTab === 'messages' && <MessagesTab />}
+        {activeTab === 'avatars' && <AvatarsTab />}
+        {activeTab === 'badges' && <BadgesTab />}
+        {activeTab === 'profile' && <ProfileView />}
+      </div>
     </DashboardLayout>
   );
 }

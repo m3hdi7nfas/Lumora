@@ -7,7 +7,7 @@ export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGl
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
       <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-4">
+        <Link to="/" className="flex items-center gap-6">
           <Logo size="lg" textSize="lg" />
         </Link>
 

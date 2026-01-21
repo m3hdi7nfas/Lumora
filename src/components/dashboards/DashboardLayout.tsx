@@ -110,7 +110,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
 
-            <Link to="/" className="flex items-center gap-2">
+            <Link to="/" className="flex items-center gap-6">
               <Logo size="md" textSize="md" />
             </Link>
           </div>

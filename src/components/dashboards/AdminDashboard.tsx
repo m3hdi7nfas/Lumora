@@ -2152,7 +2152,7 @@ function AvatarsTab() {
                     <img
                       src={avatar.image_url}
                       alt={avatar.name}
-                      className="w-16 h-16 rounded-full object-cover mx-auto mb-2 border-2 border-border"
+                      className="w-16 h-16 mx-auto mb-2 border-2 border-border rounded-full object-cover"
                     />
                     <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <AlertDialog>

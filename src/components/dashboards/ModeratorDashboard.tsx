@@ -128,7 +128,7 @@ export default function ModeratorDashboard() {
       title="Lumora Moderator Dashboard"
       sidebar={<ModeratorSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} />}
+      {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} showAds={showAds} handleAdsToggle={handleAdsToggle} loading={loading} />}
       {activeTab === 'competitions' && <CompetitionsTab />}
       {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'users' && <UsersTab />}
@@ -141,7 +141,7 @@ export default function ModeratorDashboard() {
 }
 
 // Moderator Overview Component
-function ModeratorOverviewTab({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading }: { setActiveTab: (tab: string) => void, showAds: boolean, handleAdsToggle: (checked: boolean) => void, loading: boolean }) {
   const { toast } = useToast();
   const { profile } = useAuth();
 

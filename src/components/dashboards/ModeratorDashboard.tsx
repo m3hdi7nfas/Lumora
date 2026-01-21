@@ -49,10 +49,10 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
   const { profile } = useAuth();
   const navItems = [
     { id: 'overview', icon: Users, label: 'Overview' },
+    { id: 'schools', icon: School, label: 'Schools' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
     { id: 'questions', icon: FileQuestion, label: 'Questions' },
     { id: 'users', icon: Users, label: 'Users' },
-    { id: 'schools', icon: School, label: 'Schools' },
     { id: 'approvals', icon: CheckSquare, label: 'Approvals' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
   ];
@@ -129,10 +129,10 @@ export default function ModeratorDashboard() {
       sidebar={<ModeratorSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
       {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} showAds={showAds} handleAdsToggle={handleAdsToggle} loading={loading} />}
+      {activeTab === 'schools' && <SchoolsTab />}
       {activeTab === 'competitions' && <CompetitionsTab />}
       {activeTab === 'questions' && <QuestionsTab />}
       {activeTab === 'users' && <UsersTab />}
-      {activeTab === 'schools' && <SchoolsTab />}
       {activeTab === 'approvals' && <ApprovalsTab />}
       {activeTab === 'messages' && <MessagesTab />}
       {activeTab === 'profile' && <ProfileView />}
@@ -180,10 +180,10 @@ function ModeratorOverviewTab({ setActiveTab, showAds, handleAdsToggle, loading 
   });
 
   const quickActions = [
+    { id: 'schools', icon: School, title: 'Manage Schools', description: 'Configure school access' },
     { id: 'competitions', icon: Trophy, title: 'Manage Competitions', description: 'Create and edit competitions' },
     { id: 'questions', icon: FileQuestion, title: 'Review Questions', description: 'Approve pending questions' },
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
-    { id: 'schools', icon: School, title: 'School Settings', description: 'Configure school access' },
     { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
   ];
 

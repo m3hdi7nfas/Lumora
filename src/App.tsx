@@ -10,7 +10,7 @@ import MinimalTest from "./test/MinimalTest";
 import { futureConfig } from "./routerConfig";
 import { initializeLocalStorage } from "./lib/initializeLocalStorage";
 import { useEffect } from "react";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 

@@ -121,7 +121,7 @@ export default function Login() {
             <Link to="/" className="inline-flex items-center gap-6 justify-center mb-1">
               <Logo size="lg" textSize="lg" />
             </Link>
-            <CardTitle className="text-2xl font-display">Welcome to Lumora</CardTitle>
+            <CardTitle className="text-2xl font-display">Welcome!</CardTitle>
             <CardDescription className="text-sm">
               Sign in to continue your learning journey
             </CardDescription>

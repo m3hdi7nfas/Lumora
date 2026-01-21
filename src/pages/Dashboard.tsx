@@ -9,76 +9,36 @@ import StudentDashboard from '@/components/dashboards/StudentDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
-interface DashboardErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-  errorInfo?: React.ErrorInfo;
-}
-
-class DashboardErrorBoundary extends React.Component<{ children: React.ReactNode }, DashboardErrorBoundaryState> {
-  constructor(props: { children: React.ReactNode }) {
+class DashboardErrorBoundary extends React.Component {
+  constructor(props) {
     super(props);
-    this.state = { hasError: false, error: undefined, errorInfo: undefined };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
-    return {
-      hasError: true,
-      error: error
-    };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error: error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error, errorInfo) {
     console.error("Dashboard Error:", error, errorInfo);
-    this.setState({ errorInfo });
   }
-
-  handleReload = () => {
-    window.location.reload();
-  };
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-          <div className="max-w-md w-full space-y-6 text-center">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-destructive">Oops! Something went wrong</h2>
-              <p className="text-muted-foreground">
-                We encountered an unexpected error. Don't worry, we're on it!
-              </p>
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-4 text-left">
-              <p className="text-sm font-medium mb-2">Error Details:</p>
-              <p className="text-sm text-muted-foreground mb-1">
-                <strong>Message:</strong> {this.state.error?.message || 'Unknown error'}
-              </p>
-              {this.state.errorInfo && (
-                <p className="text-sm text-muted-foreground">
-                  <strong>Component:</strong> {this.state.errorInfo.componentStack.split('\n')[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={this.handleReload}
-                className="w-full gradient-hero px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Refresh Application
-              </button>
-              <button
-                onClick={() => window.location.href = '/'}
-                className="w-full px-4 py-2 border border-border/50 rounded-lg hover:bg-muted transition-colors"
-              >
-                Return to Home
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              If the problem persists, please contact support.
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold text-destructive">Dashboard Error</h2>
+            <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Error: {this.state.error?.message || 'Unknown error'}
             </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Refresh Page
+            </button>
           </div>
         </div>
       );

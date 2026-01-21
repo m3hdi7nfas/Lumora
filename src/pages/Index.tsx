@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { AdBox } from '@/components/ads/AdBox';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { profile } = useAuth();

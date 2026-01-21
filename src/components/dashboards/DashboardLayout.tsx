@@ -1,8 +1,28 @@
-// ... (keep existing imports)
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Menu, X, Bell, Search, User, ChevronDown, Settings, LogOut, Moon, Sun, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2, Upload, ChevronDown as ChevronDownIcon, ChevronUp } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from 'next-themes';
+import { Logo } from '@/components/ui/Logo';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import { ProfileDialog } from '@/components/profile/ProfileDialog';
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  sidebar: React.ReactNode;
+  title: string;
+  onNavItemClick?: (itemId: string) => void;
+}
 
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileDialogOpen, setProfileDialogOpen] = useState(false); // Renamed from profileOpen
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { signOut, profile } = useAuth();

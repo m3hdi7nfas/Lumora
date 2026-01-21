@@ -7,10 +7,10 @@ export const defaultSiteContent = {
         cta_primary: "Get Started",
         cta_secondary: "Learn More",
         stats: {
-            students: "10K+",
-            competitions: "500+",
-            questions: "50K+",
-            answers: "1M+"
+            students: "1000+",
+            competitions: "100+",
+            questions: "10K+",
+            answers: "Expected"
         }
     },
     features: [

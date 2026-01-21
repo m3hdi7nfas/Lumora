@@ -9,7 +9,8 @@ export function initializeLocalStorage() {
     MESSAGES: 'lumora_messages',
     AVATARS: 'lumora_avatars',
     BADGES: 'lumora_badges',
-    SETTINGS: 'lumora_settings'
+    SETTINGS: 'lumora_settings',
+    QUESTION_SETS: 'lumora_question_sets'
   };
 
   // Check and initialize each storage key

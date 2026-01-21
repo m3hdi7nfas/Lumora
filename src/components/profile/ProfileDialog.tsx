@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -20,14 +20,19 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    const { data: avatars } = useQuery({
-        queryKey: ['avatars'],
-        queryFn: async () => {
-            const { data, error } = await supabase.from('avatars').select('*');
-            if (error) throw error;
-            return data;
-        },
-    });
+    // Load avatars from local storage
+    const [avatars, setAvatars] = useState([]);
+
+    useEffect(() => {
+        const storedAvatars = localStorage.getItem('lumora_avatars');
+        if (storedAvatars) {
+            try {
+                setAvatars(JSON.parse(storedAvatars));
+            } catch (e) {
+                console.error('Error parsing avatars:', e);
+            }
+        }
+    }, []);
 
     const updateProfile = useMutation({
         mutationFn: async () => {
@@ -38,8 +43,21 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 updated_at: new Date().toISOString(),
             };
 
-            const { error } = await supabase.from('profiles').upsert(updates);
-            if (error) throw error;
+            // Update in local storage
+            const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
+            const updatedUsers = users.map(user =>
+                user.id === profile?.id ? { ...user, ...updates } : user
+            );
+            localStorage.setItem('lumora_users', JSON.stringify(updatedUsers));
+
+            // Update current user in local storage
+            const currentUser = JSON.parse(localStorage.getItem('lumora_current_user') || '{}');
+            if (currentUser.profile) {
+                currentUser.profile = { ...currentUser.profile, ...updates };
+                localStorage.setItem('lumora_current_user', JSON.stringify(currentUser));
+            }
+
+            return { success: true };
         },
         onSuccess: () => {
             toast({ title: 'Profile updated successfully' });
@@ -64,13 +82,10 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 username = `${adj}-${noun}${num}`;
 
                 // Check if username exists
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id')
-                    .eq('display_name', username)
-                    .single();
+                const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
+                const existingUser = users.find(u => u.display_name === username);
 
-                if (error || !data) {
+                if (!existingUser) {
                     isUnique = true;
                 }
                 attempts++;

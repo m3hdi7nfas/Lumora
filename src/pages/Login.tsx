@@ -217,8 +217,7 @@ export default function Login() {
 
             <div className="text-center space-y-2">
               <p className="text-center text-xs text-muted-foreground">
-                Don't have an account?{' '}
-                <span className="text-primary font-medium">Contact your school administrator</span>
+                Don't have an account?
               </p>
               <Button
                 variant="link"
@@ -229,16 +228,6 @@ export default function Login() {
                 <Mail className="w-3 h-3 mr-1" />
                 Contact Administration
               </Button>
-            </div>
-
-            {/* School Information */}
-            <div className="mt-6 pt-4 border-t border-border/50 text-center">
-              <h3 className="font-medium mb-2">Lumora Education Platform</h3>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>123 Education Street</p>
-                <p>Knowledge City, United States</p>
-                <p>Contact: support@lumora.com</p>
-              </div>
             </div>
           </CardContent>
         </Card>

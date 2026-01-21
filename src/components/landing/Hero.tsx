@@ -109,6 +109,7 @@ export function Hero({
                 label="Competitions"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.competitions', val)}
+                prizeText="Expected"
               />
               <StatCard
                 icon={Star}
@@ -118,11 +119,11 @@ export function Hero({
                 onSave={(val) => updateContent?.('stats.questions', val)}
               />
               <StatCard
-                icon={Zap}
-                value={content.stats.answers}
-                label="Answers"
+                icon={Users}
+                value={content.stats.schools}
+                label="Schools"
                 isEditingGlobal={isEditingGlobal}
-                onSave={(val) => updateContent?.('stats.answers', val)}
+                onSave={(val) => updateContent?.('stats.schools', val)}
               />
             </div>
           </ScrollAnimation>
@@ -137,13 +138,15 @@ function StatCard({
   value,
   label,
   isEditingGlobal,
-  onSave
+  onSave,
+  prizeText
 }: {
   icon: any;
   value: string;
   label: string;
   isEditingGlobal?: boolean;
   onSave?: (val: string) => void;
+  prizeText?: string;
 }) {
   return (
     <div className="p-6 rounded-2xl glass hover:shadow-card transition-all">
@@ -160,6 +163,13 @@ function StatCard({
         )}
       </div>
       <div className="text-muted-foreground">{label}</div>
+      {prizeText && (
+        <div className="mt-2">
+          <span className="inline-block px-2 py-1 rounded-full text-xs bg-gold/10 text-gold border border-gold/20">
+            {prizeText}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,93 +3,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import ModeratorDashboard from '@/components/dashboards/ModeratorDashboard';
-import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
-import StudentDashboard from '@/components/dashboards/StudentDashboard';
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import { Button } from '@/components/ui/button';
 import ErrorBoundary from '@/components/ErrorBoundary';
 
-interface DashboardErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-  errorInfo?: React.ErrorInfo;
-}
-
-class DashboardErrorBoundary extends React.Component<{ children: React.ReactNode }, DashboardErrorBoundaryState> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: undefined, errorInfo: undefined };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return {
-      hasError: true,
-      error: error
-    };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Dashboard Error:", error, errorInfo);
-    this.setState({ errorInfo });
-  }
-
-  handleReload = () => {
-    window.location.reload();
-  };
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
-          <div className="max-w-md w-full space-y-6 text-center">
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-destructive">Oops! Something went wrong</h2>
-              <p className="text-muted-foreground">
-                We encountered an unexpected error. Don't worry, we're on it!
-              </p>
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-4 text-left">
-              <p className="text-sm font-medium mb-2">Error Details:</p>
-              <p className="text-sm text-muted-foreground mb-1">
-                <strong>Message:</strong> {this.state.error?.message || 'Unknown error'}
-              </p>
-              {this.state.errorInfo && (
-                <p className="text-sm text-muted-foreground">
-                  <strong>Component:</strong> {this.state.errorInfo.componentStack.split('\n')[0]}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <button
-                onClick={this.handleReload}
-                className="w-full gradient-hero px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Refresh Application
-              </button>
-              <button
-                onClick={() => window.location.href = '/'}
-                className="w-full px-4 py-2 border border-border/50 rounded-lg hover:bg-muted transition-colors"
-              >
-                Return to Home
-              </button>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              If the problem persists, please contact support.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
 export default function Dashboard() {
-  const { user, profile, loading, currentView } = useAuth();
+  const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
   const [profileTimeout, setProfileTimeout] = useState(false);
   const [dashboardError, setDashboardError] = useState<Error | null>(null);
@@ -141,32 +59,19 @@ export default function Dashboard() {
     );
   }
 
-  // Determine which dashboard to show based on currentView or profile role
-  const effectiveRole = currentView || profile.role;
-
-  // Debug log to see what role we're getting
-  console.log('Effective role:', effectiveRole);
-  console.log('Profile role:', profile.role);
-  console.log('Current view:', currentView);
-
-  // Wrap dashboards in error boundaries
+  // Determine which dashboard to show based on profile role
   const renderDashboard = () => {
     try {
-      switch (effectiveRole) {
+      switch (profile.role) {
         case 'admin':
-          console.log('Rendering AdminDashboard');
           return <AdminDashboard />;
         case 'moderator':
-          console.log('Rendering ModeratorDashboard');
           return <ModeratorDashboard />;
         case 'teacher':
-          console.log('Rendering TeacherDashboard');
           return <TeacherDashboard />;
         case 'student':
-          console.log('Rendering StudentDashboard');
           return <StudentDashboard />;
         default:
-          console.log('Defaulting to TeacherDashboard');
           return <TeacherDashboard />;
       }
     } catch (error) {
@@ -197,8 +102,213 @@ export default function Dashboard() {
   }
 
   return (
-    <DashboardErrorBoundary>
-      {renderDashboard()}
-    </DashboardErrorBoundary>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-background">
+        {/* Demo buttons at the top */}
+        <div className="p-4 border-b border-border/50">
+          <div className="flex gap-2 mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('lumora_current_view', 'admin');
+                window.location.reload();
+              }}
+            >
+              Admin View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('lumora_current_view', 'moderator');
+                window.location.reload();
+              }}
+            >
+              Moderator View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('lumora_current_view', 'teacher');
+                window.location.reload();
+              }}
+            >
+              Teacher View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem('lumora_current_view', 'student');
+                window.location.reload();
+              }}
+            >
+              Student View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem('lumora_current_view');
+                window.location.reload();
+              }}
+            >
+              Reset View
+            </Button>
+          </div>
+        </div>
+
+        {/* Main dashboard content */}
+        <div className="p-6">
+          {renderDashboard()}
+        </div>
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+// Dashboard components
+function AdminDashboard() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Manage all users</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Schools</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Manage educational institutions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Competitions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Manage competitions</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function ModeratorDashboard() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-primary">Moderator Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Content Review</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Review and approve content</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Reports</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>View system reports</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function TeacherDashboard() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-primary">Teacher Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Classes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Manage your classes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Assignments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Create and grade assignments</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function StudentDashboard() {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-primary">Student Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>My Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>View your enrolled courses</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Assignments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>View and submit assignments</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Card component for consistency
+function Card({ children }) {
+  return (
+    <div className="bg-card rounded-lg border border-border/50 p-6 shadow-sm">
+      {children}
+    </div>
+  );
+}
+
+function CardHeader({ children }) {
+  return (
+    <div className="mb-4">
+      {children}
+    </div>
+  );
+}
+
+function CardTitle({ children }) {
+  return (
+    <h3 className="text-xl font-semibold">{children}</h3>
+  );
+}
+
+function CardContent({ children }) {
+  return (
+    <div className="text-muted-foreground">
+      {children}
+    </div>
   );
 }

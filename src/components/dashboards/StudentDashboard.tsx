@@ -314,7 +314,7 @@ function CompetitionsTab() {
                           <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                             {competition.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}</span>
+                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
                         </div>
                       </div>
                       <Button size="sm" className="gradient-hero">
@@ -337,15 +337,6 @@ function ChallengesTab() {
   const [challenges, setChallenges] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { profile } = useAuth();
-
-  // Check if 1v1 challenges are enabled
-  const settings = localStorage.getItem('lumora_settings') ? JSON.parse(localStorage.getItem('lumora_settings')) : {};
-  const enable1v1 = settings.enable1v1Challenges || false;
-
-  // Check if there are any questions available
-  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
-  const hasQuestions = questions.length > 0;
 
   const fetchChallenges = async () => {
     setLoading(true);
@@ -370,13 +361,9 @@ function ChallengesTab() {
           <h1 className="text-2xl font-display font-bold">Challenges</h1>
           <p className="text-muted-foreground">Complete challenges to earn extra points</p>
         </div>
-        <Button
-          className="gradient-hero"
-          disabled={!enable1v1 || !hasQuestions}
-          title={!enable1v1 ? '1v1 Challenges are disabled by admin' : !hasQuestions ? 'No questions available for challenges' : ''}
-        >
+        <Button className="gradient-hero">
           <Users className="w-4 h-4 mr-2" />
-          {enable1v1 && hasQuestions ? '1v1 Friend' : 'COMING SOON'}
+          1v1 Friend
         </Button>
       </div>
 
@@ -578,12 +565,6 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
-      // Only admins can delete messages
-      if (profile?.role !== 'admin') {
-        toast({ title: 'Only admins can delete messages', variant: 'destructive' });
-        return;
-      }
-
       setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
@@ -654,32 +635,30 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          {profile?.role === 'admin' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this message? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteMessage(message.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </button>
                     ))

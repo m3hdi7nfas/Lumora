@@ -12,8 +12,6 @@ import { Logo } from '@/components/ui/Logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { ProfileDialog } from '@/components/profile/ProfileDialog';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -26,7 +24,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [messagesOpen, setMessagesOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { signOut, profile } = useAuth();
   const navigate = useNavigate();
@@ -59,12 +56,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   // Handle profile click - only open dialog when "Profile" is clicked
   const handleProfileClick = () => {
     setProfileDialogOpen(true);
-  };
-
-  // Handle open inbox
-  const handleOpenInbox = () => {
-    setMessagesOpen(true);
-    setNotificationsOpen(false);
   };
 
   return (
@@ -126,14 +117,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                       <p className="text-xs text-muted-foreground">1 day ago</p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-3"
-                    onClick={handleOpenInbox}
-                  >
-                    Open Inbox
-                  </Button>
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -191,19 +174,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
           {children}
         </div>
       </div>
-
-      {/* Messages Dialog - for inbox */}
-      <Dialog open={messagesOpen} onOpenChange={setMessagesOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Messages</DialogTitle>
-            <DialogDescription>Your communications</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-center text-muted-foreground">Messages inbox content would appear here</p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Profile Dialog - only opens when Profile is clicked */}
       <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />

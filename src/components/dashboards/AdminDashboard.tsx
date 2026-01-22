@@ -2455,59 +2455,59 @@ function MessagesTab() {
                       <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                     </div>
                   ) : filteredMessages.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No messages found</p>
-                  ) : (
-                    filteredMessages.map((message) => (
-                      <button
-                        key={message.id}
-                        onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{message.sender}</p>
-                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                      <p className="text-center text-muted-foreground py-4">No messages found</p>
+                    ) : (
+                      filteredMessages.map((message) => (
+                        <button
+                          key={message.id}
+                          onClick={() => setSelectedMessage(message)}
+                          className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {message.sender.split(' ').map(n => n[0]).join('')}
                             </div>
-                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                            {!message.read && (
-                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium truncate">{message.sender}</p>
+                                <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                              <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                              {!message.read && (
+                                <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                              )}
+                            </div>
+                            {profile?.role === 'admin' && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete this message? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive hover:bg-destructive/90"
+                                      onClick={() => handleDeleteMessage(message.id)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             )}
                           </div>
-                          {profile?.role === 'admin' && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this message? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteMessage(message.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
-                        </div>
-                      </button>
-                    ))
-                  )}
+                        </button>
+                      ))
+                    )}
                 </div>
               </div>
             </CardContent>

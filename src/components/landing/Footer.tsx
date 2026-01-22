@@ -29,11 +29,9 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
               />
             </span>
           </Link>
-
           <p className="text-muted-foreground text-sm flex items-center gap-1">
             Made with <Heart className="w-4 h-4 text-destructive fill-current" /> for education
           </p>
-
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <button
               onClick={() => setAboutOpen(true)}

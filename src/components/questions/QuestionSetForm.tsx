@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 
@@ -139,7 +139,7 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
               <Checkbox
                 id="is_timed"
                 checked={formData.is_timed}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_timed: checked })}
+                onCheckedChange={(checked) => setFormData({ ...formData, is_timed: Boolean(checked) })}
               />
               <Label htmlFor="is_timed" className="font-medium">
                 Enable Timer for this Question Set
@@ -173,7 +173,7 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
                   <Checkbox
                     id="auto_submit"
                     checked={formData.auto_submit}
-                    onCheckedChange={(checked) => setFormData({ ...formData, auto_submit: checked })}
+                    onCheckedChange={(checked) => setFormData({ ...formData, auto_submit: Boolean(checked) })}
                   />
                   <Label htmlFor="auto_submit" className="font-medium">
                     Auto-submit when time expires
@@ -213,7 +213,7 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
               <Switch
                 id="allow_redo"
                 checked={formData.allow_redo}
-                onCheckedChange={(checked) => setFormData({ ...formData, allow_redo: checked })}
+                onCheckedChange={(checked) => setFormData({ ...formData, allow_redo: Boolean(checked) })}
               />
               <Label htmlFor="allow_redo" className="font-medium">
                 Allow Students to Redo This Question Set

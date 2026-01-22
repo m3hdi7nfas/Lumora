@@ -174,7 +174,7 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Answers</Label>
-                                        <Input value={content.hero.stats.answers} onChange={(e) => updateHero('stats.answers', e.target.value)} />
+                                        <Input value={content.hero.stats.answers || ''} onChange={(e) => updateHero('stats.answers', e.target.value)} />
                                     </div>
                                 </div>
                             </CardContent>

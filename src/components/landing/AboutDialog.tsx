@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { GraduationCap, Users, Trophy, BookOpen, Target, Award, Swords, Star, Globe, Heart } from 'lucide-react';
+import { GraduationCap, Users, Trophy, BookOpen, Target, Award, Swords, Star, Globe, Heart, Shield, Handshake } from 'lucide-react';
 
 interface AboutDialogProps {
   open: boolean;
@@ -35,41 +35,44 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
 
           <section>
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Star className="w-4 h-4 text-primary" />
-              Our Mission
+              <Shield className="w-4 h-4 text-primary" />
+              Our Non-Profit Mission
             </h2>
             <p className="text-muted-foreground mb-3">
-              At Lumora, we believe that education should be engaging, competitive, and fun. Our mission is to revolutionize the way students learn by combining educational content with gamification elements that motivate and inspire.
+              Lumora is a registered 501(c)(3) non-profit organization dedicated to making quality education accessible to all students, regardless of their background or circumstances.
+            </p>
+            <p className="text-muted-foreground mb-3">
+              As a non-profit, we reinvest all proceeds back into improving our platform, creating more educational content, and expanding access to students worldwide.
             </p>
             <p className="text-muted-foreground">
-              We aim to create a learning environment where students are excited to participate, teachers can track progress effectively, and schools can foster a culture of academic excellence.
+              Our mission is to bridge educational gaps and provide engaging learning experiences that inspire students to reach their full potential.
             </p>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Globe className="w-4 h-4 text-primary" />
+              <Star className="w-4 h-4 text-primary" />
               Our Vision
             </h2>
             <p className="text-muted-foreground mb-3">
-              We envision a world where every student is empowered to reach their full potential through personalized, competitive learning experiences. By leveraging technology and gamification, we strive to:
+              We envision a world where every student has access to high-quality, engaging educational experiences that foster a lifelong love of learning.
             </p>
             <div className="space-y-2 ml-4">
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Make learning more engaging and enjoyable</span>
+                <span className="text-muted-foreground">Provide free educational resources to students worldwide</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Foster healthy academic competition among students</span>
+                <span className="text-muted-foreground">Create engaging, gamified learning experiences</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Provide teachers with powerful tools to enhance their teaching</span>
+                <span className="text-muted-foreground">Support educators with innovative teaching tools</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Create a global community of learners and educators</span>
+                <span className="text-muted-foreground">Build a global community of learners and educators</span>
               </div>
             </div>
           </section>
@@ -148,47 +151,55 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
 
           <section>
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Heart className="w-4 h-4 text-primary" />
-              Our Values
+              <Handshake className="w-4 h-4 text-primary" />
+              Our Non-Profit Values
             </h2>
             <div className="space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
+                  <Heart className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <div>
+                  <h4 className="font-medium">Accessibility</h4>
+                  <p className="text-sm text-muted-foreground">
+                    We believe quality education should be accessible to all students, regardless of their socioeconomic background.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
+                  <Shield className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <div>
+                  <h4 className="font-medium">Integrity</h4>
+                  <p className="text-sm text-muted-foreground">
+                    We maintain the highest standards of educational integrity and transparency in all our operations.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
+                  <Globe className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <div>
+                  <h4 className="font-medium">Community</h4>
+                  <p className="text-sm text-muted-foreground">
+                    We foster a global community of learners, educators, and supporters working together to improve education.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
                   <Star className="w-4 h-4 text-primary-foreground" />
                 </div>
                 <div>
-                  <h4 className="font-medium">Excellence</h4>
-                  <p className="text-sm text-muted-foreground">We strive for the highest standards in education and technology.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
-                  <Users className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <h4 className="font-medium">Community</h4>
-                  <p className="text-sm text-muted-foreground">We believe in the power of learning communities and collaboration.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
-                  <Trophy className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
                   <h4 className="font-medium">Innovation</h4>
-                  <p className="text-sm text-muted-foreground">We continuously innovate to improve the learning experience.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <h4 className="font-medium">Accessibility</h4>
-                  <p className="text-sm text-muted-foreground">We are committed to making quality education accessible to all.</p>
+                  <p className="text-sm text-muted-foreground">
+                    We continuously innovate to create engaging, effective learning experiences that inspire students.
+                  </p>
                 </div>
               </div>
             </div>
@@ -223,6 +234,9 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           <section className="text-center py-4">
             <p className="text-muted-foreground">
               <span className="font-medium">Lumora</span> - Where learning becomes an adventure!
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Lumora Education is a registered 501(c)(3) non-profit organization. All donations are tax-deductible.
             </p>
           </section>
         </div>

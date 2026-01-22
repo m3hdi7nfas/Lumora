@@ -6,6 +6,7 @@ import { PrivacyDialog } from './PrivacyDialog';
 import { TermsDialog } from './TermsDialog';
 import { AboutDialog } from './AboutDialog';
 import { Logo } from '@/components/ui/Logo';
+import { Shield, Heart } from 'lucide-react';
 
 export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGlobal?: boolean; updateContent?: (path: string, val: any) => void }) {
   const [contactOpen, setContactOpen] = useState(false);
@@ -21,9 +22,10 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
             <Logo size="lg" textSize="lg" />
           </Link>
 
-          <p className="text-muted-foreground text-sm flex items-center gap-1">
-            Made with ❤️ for education
-          </p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Shield className="w-4 h-4" />
+            <span>Lumora is a registered Non-Profit Organization</span>
+          </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <button
@@ -51,6 +53,11 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
               Terms
             </button>
           </div>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-border/50 text-center text-sm text-muted-foreground">
+          <p>© {new Date().getFullYear()} Lumora Education. All rights reserved.</p>
+          <p className="mt-1">A 501(c)(3) non-profit organization dedicated to educational excellence.</p>
         </div>
       </div>
 

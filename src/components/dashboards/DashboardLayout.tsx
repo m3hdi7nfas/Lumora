@@ -9,9 +9,11 @@ import { Menu, X, Bell, Search, User, ChevronDown, Settings, LogOut, Moon, Sun, 
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
 import { Logo } from '@/components/ui/Logo';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { ProfileDialog } from '@/components/profile/ProfileDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -23,12 +25,22 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { signOut, profile } = useAuth();
+  const [showAds, setShowAds] = useState(true);
+  const { signOut, profile, setCurrentView, isAdmin, isAdminOrModerator } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
+
+  // Load ad setting from localStorage
+  useEffect(() => {
+    const savedShowAds = localStorage.getItem('showAds');
+    if (savedShowAds !== null) {
+      setShowAds(savedShowAds === 'true');
+    }
+  }, []);
 
   // Handle sidebar toggle
   const handleSidebarToggle = () => {
@@ -56,6 +68,34 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   // Handle profile click - only open dialog when "Profile" is clicked
   const handleProfileClick = () => {
     setProfileDialogOpen(true);
+  };
+
+  // Handle settings click
+  const handleSettingsClick = () => {
+    setSettingsDialogOpen(true);
+  };
+
+  // Handle ad toggle
+  const handleAdToggle = (checked: boolean) => {
+    setShowAds(checked);
+    localStorage.setItem('showAds', checked.toString());
+    window.dispatchEvent(new CustomEvent('adsSettingChanged', {
+      detail: { showAds: checked }
+    }));
+    toast({
+      title: 'Ad visibility updated',
+      description: `Ads are now ${checked ? 'visible' : 'hidden'} for users`
+    });
+  };
+
+  // Handle view switching
+  const handleViewSwitch = (role: 'admin' | 'moderator' | 'teacher' | 'student' | null) => {
+    setCurrentView(role);
+    toast({
+      title: 'View switched',
+      description: `Now viewing as ${role || 'yourself'}`
+    });
+    setSettingsDialogOpen(false);
   };
 
   return (
@@ -137,10 +177,11 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                   <User className="w-4 h-4 mr-2" />
                   Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setNotificationsOpen(false)}>
+                <DropdownMenuItem onClick={handleSettingsClick}>
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
@@ -177,6 +218,158 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
 
       {/* Profile Dialog - only opens when Profile is clicked */}
       <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
+
+      {/* Settings Dialog */}
+      <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>Configure your account and platform settings</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Theme Settings */}
+            <div className="space-y-4">
+              <h3 className="font-medium">Theme Settings</h3>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card">
+                <Label htmlFor="theme-toggle" className="text-sm font-medium">
+                  Dark Mode
+                </Label>
+                <Switch
+                  id="theme-toggle"
+                  checked={theme === 'dark'}
+                  onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                />
+              </div>
+            </div>
+
+            {/* Admin/Moderator View Switching */}
+            {isAdminOrModerator && (
+              <div className="space-y-4">
+                <h3 className="font-medium">View Switching</h3>
+                <p className="text-sm text-muted-foreground">
+                  Switch views to test different user experiences
+                </p>
+
+                <div className="space-y-3">
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between"
+                      onClick={() => handleViewSwitch('admin')}
+                    >
+                      <span>Admin View</span>
+                      {profile?.role === 'admin' && currentView === 'admin' && (
+                        <CheckCircle className="w-4 h-4 text-success" />
+                      )}
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => handleViewSwitch('moderator')}
+                  >
+                    <span>Moderator View</span>
+                    {currentView === 'moderator' && (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => handleViewSwitch('teacher')}
+                  >
+                    <span>Teacher View</span>
+                    {currentView === 'teacher' && (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => handleViewSwitch('student')}
+                  >
+                    <span>Student View</span>
+                    {currentView === 'student' && (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => handleViewSwitch(null)}
+                  >
+                    <span>My Original View</span>
+                    {!currentView && (
+                      <CheckCircle className="w-4 h-4 text-success" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Admin-only Settings */}
+            {isAdmin && (
+              <div className="space-y-4">
+                <h3 className="font-medium">Admin Settings</h3>
+
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card">
+                  <Label htmlFor="ad-toggle" className="text-sm font-medium">
+                    Show Ads to Users
+                  </Label>
+                  <Switch
+                    id="ad-toggle"
+                    checked={showAds}
+                    onCheckedChange={handleAdToggle}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Platform Information */}
+            <div className="space-y-4">
+              <h3 className="font-medium">Platform Information</h3>
+              <Card className="border-primary/50">
+                <CardContent className="pt-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
+                        <Crown className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Lumora is a Non-Profit Organization</p>
+                        <p className="text-sm text-muted-foreground">
+                          We are dedicated to providing free, high-quality educational resources to students worldwide.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
+                        <Shield className="w-4 h-4 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Our Mission</p>
+                        <p className="text-sm text-muted-foreground">
+                          To make education accessible, engaging, and competitive for all students.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setSettingsDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

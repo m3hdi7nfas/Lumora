@@ -40,15 +40,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 
-// Teacher Sidebar Component
 function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
   const navItems = [
-    { id: 'overview', icon: Users, label: 'Overview' },
-    { id: 'competitions', icon: Trophy, label: 'Competitions' },
-    { id: 'challenges', icon: BarChart3, label: 'Challenges' },
-    { id: 'leaderboard', icon: TrendingUp, label: 'Leaderboard' },
-    { id: 'messages', icon: MessageSquare, label: 'Messages' },
+    { id: 'overview', icon: BarChart3, label: 'Overview' },
+    { id: 'students', icon: Users, label: 'Students' },
+    { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
+    { id: 'messages', icon: MessageSquare, label: 'Inbox' },
   ];
 
   return (
@@ -73,7 +71,7 @@ function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
         <div className="p-4 rounded-2xl bg-muted/30">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
-              {profile?.display_name?.substring(0, 2).toUpperCase() || 'TE'}
+              {profile?.display_name?.substring(0, 2).toUpperCase() || 'TD'}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{profile?.display_name || 'Teacher'}</p>
@@ -90,284 +88,166 @@ function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
   );
 }
 
+export default function TeacherDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+
+  return (
+    <DashboardLayout
+      title="Lumora Teacher Dashboard"
+      sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+    >
+      {activeTab === 'overview' && <TeacherOverview setActiveTab={setActiveTab} />}
+      {activeTab === 'students' && <StudentsTab />}
+      {activeTab === 'leaderboard' && <TeacherLeaderboardTab />}
+      {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'profile' && <ProfileView />}
+    </DashboardLayout>
+  );
+}
+
 // Teacher Overview Component
-function TeacherOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
+function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
 
-  // Get stats from local storage
-  const competitions = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
+  // Fetch stats from database
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['teacher-stats'],
+    queryFn: async () => {
+      try {
+        // Get students for this teacher
+        const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
+        if (studentsError) throw studentsError;
 
-  const stats = {
-    totalCompetitions: competitions.length,
-    totalQuestions: questions.length,
-    score: profile?.score || 0,
-    progress: profile?.progress || 0
-  };
+        // Get competitions
+        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
+        if (compError) throw compError;
+
+        return {
+          totalStudents: students.length,
+          activeStudents: students.length,
+          competitions: competitions.length,
+          questionsAnswered: 0, // This would come from a more complex query
+          avgScore: 0, // This would come from a more complex query
+          recentActivity: []
+        };
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        return {
+          totalStudents: 0,
+          activeStudents: 0,
+          competitions: 0,
+          questionsAnswered: 0,
+          avgScore: 0,
+          recentActivity: []
+        };
+      }
+    }
+  });
 
   const quickActions = [
-    { id: 'competitions', icon: Trophy, title: 'Join Competitions', description: 'Participate in learning challenges' },
-    { id: 'challenges', icon: BarChart3, title: 'Complete Challenges', description: 'Earn extra points and badges' },
-    { id: 'leaderboard', icon: TrendingUp, title: 'View Leaderboard', description: 'See how you rank against others' },
+    { id: 'students', icon: Users, title: 'View Students', description: 'Check student progress' },
+    { id: 'leaderboard', icon: Trophy, title: 'Class Leaderboard', description: 'See top performers' },
+    { id: 'messages', icon: MessageSquare, title: 'Student Messages', description: 'Read student communications' },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
-          <p className="text-muted-foreground">Track your learning progress and achievements</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
+        <p className="text-muted-foreground">Overview of your class performance and activities</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Teacher - Can access all schools and competitions</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          title="Total Competitions"
-          value={stats.totalCompetitions.toString()}
-          icon={Trophy}
+          title="Total Students"
+          value={stats?.totalStudents?.toString() || '0'}
+          icon={Users}
           className="bg-primary/10 border-primary/20"
+          loading={statsLoading}
         />
         <StatCard
-          title="Total Questions"
-          value={stats.totalQuestions.toLocaleString()}
-          icon={BarChart3}
-          className="bg-accent/10 border-accent/20"
-        />
-        <StatCard
-          title="Your Score"
-          value={stats.score.toLocaleString()}
-          icon={Star}
+          title="Active Students"
+          value={stats?.activeStudents?.toString() || '0'}
+          icon={CheckCircle}
           className="bg-success/10 border-success/20"
+          loading={statsLoading}
         />
         <StatCard
-          title="Progress"
-          value={`${stats.progress}%`}
-          icon={TrendingUp}
+          title="Competitions"
+          value={stats?.competitions?.toString() || '0'}
+          icon={Trophy}
+          className="bg-accent/10 border-accent/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Avg. Score"
+          value={`${stats?.avgScore || 0}%`}
+          icon={BarChart3}
           className="bg-warning/10 border-warning/20"
+          loading={statsLoading}
         />
       </div>
 
-      {/* Quick Actions and Recent Activity in 2 columns */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common teacher tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {quickActions.map((action, index) => (
-                <button
-                  key={action.id}
-                  onClick={() => setActiveTab(action.id)}
-                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-lg bg-muted">
-                      <action.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{action.title}</h3>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest learning events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-center text-muted-foreground py-4">No recent activity</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
-  return (
-    <Card className={className}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
-          </div>
-          <div className="p-2 rounded-lg bg-card">
-            <Icon className="w-6 h-6 text-primary" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Competitions Tab Component
-function CompetitionsTab() {
-  const [competitions, setCompetitions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const { toast } = useToast();
-
-  const fetchCompetitions = async () => {
-    setLoading(true);
-    try {
-      // Fetch competitions from local storage
-      const competitionsData = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-      setCompetitions(competitionsData);
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const filteredCompetitions = competitions.filter(competition =>
-    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  useEffect(() => {
-    fetchCompetitions();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Competitions</h1>
-          <p className="text-muted-foreground">Join learning competitions</p>
-        </div>
-      </div>
-
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Competitions List</CardTitle>
-          <CardDescription>Available competitions to join</CardDescription>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common teacher tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search competitions..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : filteredCompetitions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No competitions found</p>
-            ) : (
-              <div className="space-y-4">
-                {filteredCompetitions.map((competition) => (
-                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{competition.name}</h3>
-                        <p className="text-xs text-muted-foreground">{competition.description}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                            {competition.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
-                        </div>
-                      </div>
-                      <Button size="sm" className="gradient-hero">
-                        Join
-                      </Button>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => setActiveTab(action.id)}
+                className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-muted">
+                    <action.icon className="w-5 h-5 text-primary" />
                   </div>
-                ))}
-              </div>
-            )}
+                  <div>
+                    <h3 className="font-medium">{action.title}</h3>
+                    <p className="text-xs text-muted-foreground">{action.description}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         </CardContent>
       </Card>
-    </div>
-  );
-}
 
-// Challenges Tab Component
-function ChallengesTab() {
-  const [challenges, setChallenges] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-
-  const fetchChallenges = async () => {
-    setLoading(true);
-    try {
-      // Fetch challenges from local storage - now empty by default
-      const challengesData = localStorage.getItem('lumora_challenges') ? JSON.parse(localStorage.getItem('lumora_challenges')) : [];
-      setChallenges(challengesData);
-    } catch (error) {
-      toast({ title: 'Error fetching challenges', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchChallenges();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Challenges</h1>
-          <p className="text-muted-foreground">Complete challenges to earn extra points</p>
-        </div>
-        <Button className="gradient-hero">
-          <Users className="w-4 h-4 mr-2" />
-          1v1 Friend
-        </Button>
-      </div>
-
+      {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Available Challenges</CardTitle>
-          <CardDescription>Complete these to earn points and badges</CardDescription>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Latest class events</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : challenges.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No challenges available</p>
+            {!stats || stats.recentActivity?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
-              challenges.map((challenge) => (
-                <div key={challenge.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-medium">{challenge.name}</h3>
-                      <p className="text-xs text-muted-foreground">{challenge.description}</p>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{challenge.category}</span>
-                        <span className="px-2 py-1 rounded-full text-xs bg-success/10 text-success">{challenge.points} pts</span>
-                      </div>
-                    </div>
-                    <Button size="sm" className="gradient-hero">
-                      Start
-                    </Button>
+              stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                    {activity.type === 'student' && <Users className="w-4 h-4 text-primary" />}
+                    {activity.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
+                    {activity.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
                   </div>
                 </div>
               ))
@@ -379,20 +259,366 @@ function ChallengesTab() {
   );
 }
 
-// Leaderboard Tab Component
-function LeaderboardTab() {
-  const [leaderboardData, setLeaderboardData] = useState([]);
-  const [loading, setLoading] = useState(false);
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
+  return (
+    <Card className={className}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
+          </div>
+          <div className="p-2 rounded-lg bg-card">
+            <Icon className="w-6 h-6 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Students Tab Component
+function StudentsTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('all');
   const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const queryClient = useQueryClient();
+
+  const filteredStudents = students.filter(student =>
+    (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedClass === 'all' || student.class === selectedClass)
+  );
+
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      // Fetch students - if admin/moderator viewing as teacher, show all students
+      let query = supabase.from('profiles').select('*').eq('role', 'student');
+
+      if (!isAdminOrModerator || !currentView) {
+        // Regular teacher can only see students from their school
+        // query = query.eq('school_id', profile?.school_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editingStudent.name) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('profiles').update({
+        display_name: editingStudent.name,
+        is_active: editingStudent.is_active
+      }).eq('id', editingStudent.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Student updated successfully!' });
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error updating student', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', studentId);
+      if (error) throw error;
+
+      toast({ title: 'Student deleted successfully!' });
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error deleting student', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStudents();
+    fetchClasses();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Student Management</h1>
+          <p className="text-muted-foreground">View and manage your students</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Unlock className="w-4 h-4" />
+              <span>Admin/Moderator View - Can see all schools</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search students..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filter by class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {classes.map(cls => (
+                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Students List</CardTitle>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No students found</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Name</th>
+                    <th className="p-3 text-left font-medium">Class</th>
+                    <th className="p-3 text-left font-medium">School</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Status</th>
+                    <th className="p-3 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium">{student.display_name || 'No name'}</p>
+                            <p className="text-xs text-muted-foreground">{student.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.class || 'N/A'}</td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress || 0}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {student.is_active ? 'active' : 'inactive'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setEditingStudent(student)}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this student? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Student Dialog */}
+      {editingStudent && (
+        <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Student</DialogTitle>
+              <DialogDescription>Update student information</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={editingStudent.display_name || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, display_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={editingStudent.email || ''}
+                  disabled
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="is-active"
+                  checked={editingStudent.is_active}
+                  onCheckedChange={(checked) => setEditingStudent({ ...editingStudent, is_active: checked })}
+                />
+                <Label htmlFor="is-active">Active Student</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingStudent(null)}>Cancel</Button>
+              <Button onClick={handleUpdateStudent} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Student'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+// Teacher Leaderboard Tab Component
+function TeacherLeaderboardTab() {
+  const [selectedCompetition, setSelectedCompetition] = useState('all');
+  const [selectedClass, setSelectedClass] = useState('all');
+  const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [competitions, setCompetitions] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [leaderboardData, setLeaderboardData] = useState([]);
+
+  const badgeColors = {
+    gold: 'bg-gold text-gold-foreground',
+    silver: 'bg-silver text-silver-foreground',
+    bronze: 'bg-bronze text-bronze-foreground',
+    none: 'bg-muted text-muted-foreground'
+  };
+
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
 
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
-      // Fetch leaderboard data from local storage
-      const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
-      // Sort by score descending
-      const sortedUsers = usersData.sort((a, b) => (b.score || 0) - (a.score || 0));
-      setLeaderboardData(sortedUsers);
+      // Fetch students with scores
+      let query = supabase.from('profiles').select('*').eq('role', 'student').order('score', { ascending: false });
+
+      if (!isAdminOrModerator || !currentView) {
+        // Regular teacher can only see students from their school
+        // query = query.eq('school_id', profile?.school_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      setLeaderboardData(data || []);
     } catch (error) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
     }
@@ -400,20 +626,56 @@ function LeaderboardTab() {
   };
 
   useEffect(() => {
+    fetchCompetitions();
+    fetchClasses();
     fetchLeaderboard();
   }, []);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
-        <p className="text-muted-foreground">See how you rank against others</p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Class Leaderboard</h1>
+          <p className="text-muted-foreground">Track your students' performance</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Unlock className="w-4 h-4" />
+              <span>Admin/Moderator View - Can see all competitions</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Select competition" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Competitions</SelectItem>
+              {competitions.map(comp => (
+                <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Select class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {classes.map(cls => (
+                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Student Rankings</CardTitle>
-          <CardDescription>Top performers across all competitions</CardDescription>
+          <CardTitle>Student Performance</CardTitle>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'} scores and progress</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -429,8 +691,10 @@ function LeaderboardTab() {
                   <tr className="border-b border-border">
                     <th className="p-3 text-left font-medium">Rank</th>
                     <th className="p-3 text-left font-medium">Student</th>
+                    <th className="p-3 text-left font-medium">School</th>
                     <th className="p-3 text-left font-medium">Score</th>
                     <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Achievement</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -445,6 +709,7 @@ function LeaderboardTab() {
                           <span>{student.display_name || 'No name'}</span>
                         </div>
                       </td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
                       <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
@@ -457,6 +722,11 @@ function LeaderboardTab() {
                           <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
                       </td>
+                      <td className="p-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
+                          {index + 1}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -465,6 +735,26 @@ function LeaderboardTab() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Class Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground py-4">No class statistics available</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Performers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center text-muted-foreground py-4">No top performers data available</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -478,7 +768,8 @@ function MessagesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { profile } = useAuth();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+  const queryClient = useQueryClient();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -489,28 +780,17 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Mock data for messages
-      const mockMessages = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          senderEmail: 'john@example.com',
-          subject: 'Question about competition',
-          content: 'Hello, I have a question about the upcoming math competition...',
-          date: '2025-06-01',
-          read: false
-        },
-        {
-          id: '2',
-          sender: 'Jane Smith',
-          senderEmail: 'jane@example.com',
-          subject: 'Technical issue',
-          content: 'I am having trouble accessing the practice questions...',
-          date: '2025-05-30',
-          read: true
-        }
-      ];
-      setMessages(mockMessages);
+      // Fetch messages - if admin/moderator viewing as teacher, show all messages
+      let query = supabase.from('messages').select('*').eq('receiver_id', profile?.id);
+
+      if (isAdminOrModerator && currentView) {
+        // Admin/moderator can see all messages
+        query = supabase.from('messages').select('*');
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setMessages(data || []);
     } catch (error) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
@@ -528,7 +808,7 @@ function MessagesTab() {
         receiver_id: selectedMessage.senderEmail,
         sender_id: profile?.email,
         subject: `Re: ${selectedMessage.subject}`
-      } as any);
+      });
 
       if (error) throw error;
 
@@ -544,11 +824,14 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+      if (error) throw error;
+
+      toast({ title: 'Message deleted successfully!' });
       setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
       }
-      toast({ title: 'Message deleted successfully!' });
     } catch (error) {
       toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
     }
@@ -563,7 +846,13 @@ function MessagesTab() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold">Messages</h1>
-        <p className="text-muted-foreground">Your communications</p>
+        <p className="text-muted-foreground">Student communications</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Teacher - Can see messages from all students</span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -740,42 +1029,22 @@ function ProfileView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Score</p>
-              <p className="text-2xl font-bold">{profile?.score?.toLocaleString() || '0'}</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Progress</p>
-              <p className="text-2xl font-bold">{profile?.progress?.toLocaleString() || '0'}%</p>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Competitions Joined</p>
+              <p className="text-sm text-muted-foreground">Students Taught</p>
               <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Organized</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Avg. Class Score</p>
+              <p className="text-2xl font-bold">0%</p>
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
-  );
-}
-
-export default function TeacherDashboard() {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-
-  return (
-    <DashboardLayout
-      title="Lumora Teacher Dashboard"
-      sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
-    >
-      {activeTab === 'overview' && <TeacherOverviewTab setActiveTab={setActiveTab} loading={loading} />}
-      {activeTab === 'competitions' && <CompetitionsTab />}
-      {activeTab === 'challenges' && <ChallengesTab />}
-      {activeTab === 'leaderboard' && <LeaderboardTab />}
-      {activeTab === 'messages' && <MessagesTab />}
-      {activeTab === 'profile' && <ProfileView />}
-    </DashboardLayout>
   );
 }

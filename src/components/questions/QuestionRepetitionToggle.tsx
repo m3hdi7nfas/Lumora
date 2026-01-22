@@ -48,7 +48,7 @@ export function QuestionRepetitionToggle({
         .update({
           allow_repetition: checked,
           updated_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', questionId);
 
       if (error) {

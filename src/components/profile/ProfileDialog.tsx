@@ -105,7 +105,7 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Profile</DialogTitle>
                     <DialogDescription>Update your personal information and settings.</DialogDescription>
@@ -114,7 +114,7 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 <div className="space-y-6 py-4">
                     <div className="space-y-2">
                         <Label>Email</Label>
-                        <Input value={profile?.email} disabled className="bg-muted" />
+                        <Input value={profile?.email || ''} disabled className="bg-muted" />
                     </div>
 
                     <div className="space-y-2">

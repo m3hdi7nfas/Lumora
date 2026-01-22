@@ -50,6 +50,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
 
   // Clear preloaded notifications - start with empty array
   const [notifications, setNotifications] = useState([]);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleSignOut = async () => {

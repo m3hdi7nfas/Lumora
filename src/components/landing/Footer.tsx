@@ -1,4 +1,3 @@
-import { GraduationCap, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EditableText } from './EditableText';
 import { useState } from 'react';
@@ -6,6 +5,7 @@ import { ContactDialog } from './ContactDialog';
 import { PrivacyDialog } from './PrivacyDialog';
 import { TermsDialog } from './TermsDialog';
 import { AboutDialog } from './AboutDialog';
+import { Logo } from '@/components/ui/Logo';
 
 export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGlobal?: boolean; updateContent?: (path: string, val: any) => void }) {
   const [contactOpen, setContactOpen] = useState(false);
@@ -18,20 +18,11 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
       <div className="container">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <Link to="/" className="flex items-center gap-2">
-            <div className="p-2 rounded-xl gradient-hero">
-              <img src="/logo.png" alt="Lumora Logo" className="w-5 h-5" />
-            </div>
-            <span className="font-display font-bold">
-              <EditableText
-                value="Lumora"
-                isEditingGlobal={isEditingGlobal}
-                onSave={(val) => updateContent?.('siteName', val)}
-              />
-            </span>
+            <Logo size="lg" textSize="lg" />
           </Link>
 
           <p className="text-muted-foreground text-sm flex items-center gap-1">
-            Made with <Heart className="w-4 h-4 text-destructive fill-current" /> for education
+            Made with ❤️ for education
           </p>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">

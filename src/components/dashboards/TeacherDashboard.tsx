@@ -769,7 +769,6 @@ function MessagesTab() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
-  const queryClient = useQueryClient();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||

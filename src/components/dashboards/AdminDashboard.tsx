@@ -1,117 +1,96 @@
-// ... (keep existing imports and code until SchoolsTab)
+import { useState, useEffect } from 'react';
+import { DashboardLayout } from './DashboardLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Users,
+  BarChart3,
+  Trophy,
+  Search,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  RefreshCw,
+  Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  Unlock,
+  Calendar,
+  ChevronRight,
+  Crown,
+  Medal,
+  Star,
+  Plus,
+  Edit,
+  Trash2,
+  Upload,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/AuthContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
 
-function SchoolsTab() {
-  // ... (keep existing state)
-  const [newSchool, setNewSchool] = useState({
-    id: '',
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    country: '',
-    postal_code: '',
-    contact_email: '',
-    contact_phone: '',
-    is_active: true,
-    created_at: '',
-    updated_at: ''
-  });
+// Local storage utilities
+const LOCAL_STORAGE_KEYS = {
+  USERS: 'lumora_users',
+  SCHOOLS: 'lumora_schools',
+  COMPETITIONS: 'lumora_competitions',
+  APPROVALS: 'lumora_approvals',
+  MESSAGES: 'lumora_messages'
+};
 
-  // ... (keep existing code)
-
-  const handleAddSchool = async () => {
-    // Validate required fields
-    if (!newSchool.name) {
-      toast({ title: 'School name is required', variant: 'destructive' });
-      return;
-    }
-
-    setLoading(true);
+const localStorageCRUD = {
+  get: (key: string) => {
     try {
-      // Generate ID
-      const newId = `school-${Date.now()}`;
-      const schoolToAdd = {
-        ...newSchool,
-        id: newId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.SCHOOLS, schoolToAdd);
-      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
-
-      toast({ title: 'School added successfully!' });
-      setIsAddDialogOpen(false);
-      setNewSchool({
-        id: '',
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        country: '',
-        postal_code: '',
-        contact_email: '',
-        contact_phone: '',
-        is_active: true,
-        created_at: '',
-        updated_at: ''
-      });
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
     } catch (error) {
-      toast({ title: 'Error adding school', description: error.message, variant: 'destructive' });
+      console.error(`Error reading ${key} from localStorage:`, error);
+      return [];
     }
-    setLoading(false);
-  };
+  },
 
-  // ... (keep rest of the code)
-}
-
-// ... (keep other functions until UsersTab)
-
-function UsersTab() {
-  // ... (keep existing state)
-  const [newUser, setNewUser] = useState({
-    id: '',
-    email: '',
-    display_name: '',
-    role: 'student',
-    school_id: '',
-    password: '',
-    is_active: true,
-    score: 0,
-    progress: 0,
-    avatar_id: null,
-    created_at: '',
-    updated_at: ''
-  });
-
-  // ... (keep existing code)
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    setLoading(true);
+  set: (key: string, data: any) => {
     try {
-      // Find the user and update their role
-      const userToUpdate = users.find(user => user.id === userId);
-      if (!userToUpdate) return;
-
-      const updatedUser = {
-        ...userToUpdate,
-        role: newRole,
-        updated_at: new Date().toISOString()
-      };
-
-      // Update in local storage
-      localStorageCRUD.update(LOCAL_STORAGE_KEYS.USERS, userId, updatedUser);
-      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
-
-      toast({ title: 'User role updated successfully!' });
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
     } catch (error) {
-      toast({ title: 'Error updating user role', description: error.message, variant: 'destructive' });
+      console.error(`Error writing ${key} to localStorage:`, error);
+      return false;
     }
-    setLoading(false);
-  };
+  },
 
-  // ... (keep rest of the code)
-}
+  add: (key: string, item: any) => {
+    const items = localStorageCRUD.get(key);
+    items.push(item);
+    return localStorageCRUD.set(key, items);
+  },
 
-// ... (keep rest of the file)
+  update: (key: string, id: string, updates: any) => {
+    const items = localStorageCRUD.get(key);
+    const updatedItems = items.map((item: any) => item.id === id ? { ...item, ...updates } : item);
+    return localStorageCRUD.set(key, updatedItems);
+  },
+
+  remove: (key: string, id: string) => {
+    const items = localStorageCRUD.get(key);
+    const filteredItems = items.filter((item: any) => item.id !== id);
+    return localStorageCRUD.set(key, filteredItems);
+  }
+};
+
+// ... rest of the file remains the same

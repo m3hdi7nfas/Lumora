@@ -1930,7 +1930,7 @@ function UsersTab() {
                           <Select
                             value={user.role}
                             onValueChange={(selectedValue) => handleRoleChange(user.id, selectedValue)}
-                            disabled={user.id === profile?.id || (selectedValue === 'admin' && profile?.role !== 'admin')}
+                            disabled={user.id === profile?.id}
                           >
                             <SelectTrigger className="w-[120px] h-8">
                               <SelectValue placeholder={user.role} />

@@ -2,38 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Users,
-  Trophy,
-  FileQuestion,
-  CheckSquare,
-  Clock,
-  LayoutTemplate,
-  School,
-  Search,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
-  MessageSquare,
-  RefreshCw,
-  Loader2,
-  Eye,
-  EyeOff,
-  User,
-  Lock,
-  Unlock,
-  Calendar,
-  ChevronRight,
-  Crown,
-  Medal,
-  Star,
-  Plus,
-  Edit,
-  Trash2,
-  Upload,
-  ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+import { Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, Search, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, User, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -81,7 +50,6 @@ const localStorageCRUD = {
       return [];
     }
   },
-
   set: (key, data) => {
     try {
       localStorage.setItem(key, JSON.stringify(data));
@@ -91,19 +59,16 @@ const localStorageCRUD = {
       return false;
     }
   },
-
   add: (key, item) => {
     const items = localStorageCRUD.get(key);
     items.push(item);
     return localStorageCRUD.set(key, items);
   },
-
   update: (key, id, updates) => {
     const items = localStorageCRUD.get(key);
     const updatedItems = items.map(item => item.id === id ? { ...item, ...updates } : item);
     return localStorageCRUD.set(key, updatedItems);
   },
-
   remove: (key, id) => {
     const items = localStorageCRUD.get(key);
     const filteredItems = items.filter(item => item.id !== id);
@@ -132,17 +97,17 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-              ? 'bg-primary text-primary-foreground shadow-card'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              activeTab === item.id
+                ? 'bg-primary text-primary-foreground shadow-card'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
-
       <div className="mt-auto pt-6 border-t border-border/50">
         <div className="p-4 rounded-2xl bg-muted/30">
           <div className="flex items-center gap-3 mb-3">
@@ -224,35 +189,13 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
           <p className="text-muted-foreground">Full control over platform activity and settings</p>
         </div>
       </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Users"
-          value={stats.totalUsers.toLocaleString()}
-          icon={Users}
-          className="bg-primary/10 border-primary/20"
-        />
-        <StatCard
-          title="Active Competitions"
-          value={stats.activeCompetitions.toString()}
-          icon={Trophy}
-          className="bg-accent/10 border-accent/20"
-        />
-        <StatCard
-          title="Total Questions"
-          value={stats.totalQuestions.toLocaleString()}
-          icon={FileQuestion}
-          className="bg-success/10 border-success/20"
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={stats.pendingReviews.toString()}
-          icon={Clock}
-          className="bg-warning/10 border-warning/20"
-        />
+        <StatCard title="Total Users" value={stats.totalUsers.toLocaleString()} icon={Users} className="bg-primary/10 border-primary/20" />
+        <StatCard title="Active Competitions" value={stats.activeCompetitions.toString()} icon={Trophy} className="bg-accent/10 border-accent/20" />
+        <StatCard title="Total Questions" value={stats.totalQuestions.toLocaleString()} icon={FileQuestion} className="bg-success/10 border-success/20" />
+        <StatCard title="Pending Approvals" value={stats.pendingReviews.toString()} icon={Clock} className="bg-warning/10 border-warning/20" />
       </div>
-
       {/* Quick Actions and Recent Activity in 2 columns */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Quick Actions */}
@@ -267,7 +210,9 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
                 <button
                   key={action.id}
                   onClick={() => setActiveTab(action.id)}
-                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''}`}
+                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${
+                    index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''
+                  }`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="p-3 rounded-lg bg-muted">
@@ -283,7 +228,6 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
             </div>
           </CardContent>
         </Card>
-
         {/* Recent Activity */}
         <Card>
           <CardHeader>
@@ -386,7 +330,11 @@ function SchoolsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
 
-      toast({ title: 'School submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'School submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
+
       setIsAddDialogOpen(false);
       setNewSchool({
         id: '',
@@ -416,7 +364,10 @@ function SchoolsTab() {
       const approvalItem = {
         id: `approval-${Date.now()}`,
         type: 'school_delete',
-        data: { school_id: id, school_name: schoolToDelete?.name },
+        data: {
+          school_id: id,
+          school_name: schoolToDelete?.name
+        },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
         status: 'pending',
@@ -427,7 +378,10 @@ function SchoolsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
 
-      toast({ title: 'School deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'School deletion submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
@@ -446,7 +400,6 @@ function SchoolsTab() {
           Add School
         </Button>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Schools List</CardTitle>
@@ -463,7 +416,6 @@ function SchoolsTab() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -479,7 +431,9 @@ function SchoolsTab() {
                         <h3 className="font-medium">{school.name}</h3>
                         <p className="text-xs text-muted-foreground">{school.city}, {school.country}</p>
                         <div className="flex items-center gap-4 mt-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{school.students || 0} students</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                            {school.students || 0} students
+                          </span>
                           <span className="text-xs text-muted-foreground">Contact: {school.contact_email}</span>
                         </div>
                       </div>
@@ -520,7 +474,6 @@ function SchoolsTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add School Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -694,7 +647,11 @@ function CompetitionsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
 
-      toast({ title: 'Competition submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'Competition submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
+
       setIsAddDialogOpen(false);
       setNewCompetition({
         id: '',
@@ -724,7 +681,10 @@ function CompetitionsTab() {
       const approvalItem = {
         id: `approval-${Date.now()}`,
         type: 'competition_delete',
-        data: { competition_id: id, competition_name: competitionToDelete?.name },
+        data: {
+          competition_id: id,
+          competition_name: competitionToDelete?.name
+        },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
         status: 'pending',
@@ -735,7 +695,10 @@ function CompetitionsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
 
-      toast({ title: 'Competition deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'Competition deletion submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
@@ -754,7 +717,6 @@ function CompetitionsTab() {
           Add Competition
         </Button>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Competitions List</CardTitle>
@@ -771,7 +733,6 @@ function CompetitionsTab() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -787,10 +748,16 @@ function CompetitionsTab() {
                         <h3 className="font-medium">{competition.name}</h3>
                         <p className="text-xs text-muted-foreground">{competition.description}</p>
                         <div className="flex items-center gap-4 mt-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            competition.is_active
+                              ? 'bg-success/10 text-success'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
                             {competition.is_active ? 'Active' : 'Inactive'}
                           </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
+                          <span className="text-xs text-muted-foreground">
+                            Participants: {competition.current_participants || 0}/{competition.max_participants}
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -830,7 +797,6 @@ function CompetitionsTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add Competition Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -1001,7 +967,11 @@ function QuestionsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
-      toast({ title: 'Question submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'Question submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
+
       setIsAddDialogOpen(false);
       setNewQuestion({
         id: '',
@@ -1029,7 +999,10 @@ function QuestionsTab() {
       const approvalItem = {
         id: `approval-${Date.now()}`,
         type: 'question_delete',
-        data: { question_id: id, question_text: questionToDelete?.text },
+        data: {
+          question_id: id,
+          question_text: questionToDelete?.text
+        },
         created_by: profile?.id,
         created_by_name: profile?.display_name || profile?.email,
         status: 'pending',
@@ -1040,7 +1013,10 @@ function QuestionsTab() {
       localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
-      toast({ title: 'Question deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({
+        title: 'Question deletion submitted for admin approval!',
+        description: 'An admin will review this shortly.'
+      });
     } catch (error) {
       toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
@@ -1059,7 +1035,6 @@ function QuestionsTab() {
           Add Question
         </Button>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Questions List</CardTitle>
@@ -1076,7 +1051,6 @@ function QuestionsTab() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -1090,9 +1064,13 @@ function QuestionsTab() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h3 className="font-medium">{question.text}</h3>
-                        <p className="text-xs text-muted-foreground mt-1">Category: {question.category} • Difficulty: {question.difficulty}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Category: {question.category} • Difficulty: {question.difficulty}
+                        </p>
                         <div className="flex items-center gap-4 mt-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                            {question.points} pts
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -1132,7 +1110,6 @@ function QuestionsTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add Question Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -1288,6 +1265,7 @@ function QuestionSetsTab() {
       setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
 
       toast({ title: 'Question set added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewQuestionSet({
         id: '',
@@ -1329,7 +1307,6 @@ function QuestionSetsTab() {
           Add Question Set
         </Button>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Question Sets List</CardTitle>
@@ -1346,7 +1323,6 @@ function QuestionSetsTab() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -1362,8 +1338,12 @@ function QuestionSetsTab() {
                         <h3 className="font-medium">{questionSet.name}</h3>
                         <p className="text-xs text-muted-foreground">{questionSet.description}</p>
                         <div className="flex items-center gap-4 mt-2">
-                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
-                          <span className="text-xs text-muted-foreground">Questions: {questionSet.questions?.length || 0}</span>
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
+                            {questionSet.category}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Questions: {questionSet.questions?.length || 0}
+                          </span>
                         </div>
                       </div>
                       <div className="flex gap-2 ml-4">
@@ -1403,7 +1383,6 @@ function QuestionSetsTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add Question Set Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -1519,6 +1498,7 @@ function AvatarsTab() {
       setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
 
       toast({ title: 'Avatar added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewAvatar({
         id: '',
@@ -1560,7 +1540,6 @@ function AvatarsTab() {
           Add Avatar
         </Button>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Avatars List</CardTitle>
@@ -1577,7 +1556,6 @@ function AvatarsTab() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -1589,11 +1567,7 @@ function AvatarsTab() {
                 {filteredAvatars.map((avatar) => (
                   <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col items-center gap-3">
-                      <img
-                        src={avatar.image_url}
-                        alt={avatar.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
+                      <img src={avatar.image_url} alt={avatar.name} className="w-16 h-16 rounded-full object-cover" />
                       <div className="text-center">
                         <h3 className="font-medium text-sm">{avatar.name}</h3>
                         <p className="text-xs text-muted-foreground">{avatar.category}</p>
@@ -1635,7 +1609,6 @@ function AvatarsTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add Avatar Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -1730,7 +1703,7 @@ function UsersTab() {
   // Add null check for users
   const filteredUsers = (users || []).filter(user =>
     (user?.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     user?.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      user?.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (roleFilter === 'all' || user?.role === roleFilter)
   );
 
@@ -1770,6 +1743,7 @@ function UsersTab() {
         title: 'User added successfully!',
         description: `Password: ${userToAdd.password}`
       });
+
       setIsAddDialogOpen(false);
       setNewUser({
         id: '',
@@ -1837,6 +1811,7 @@ function UsersTab() {
         title: `Bulk users added successfully!`,
         description: `${usersToAdd.length} users added with auto-generated passwords.`
       });
+
       setIsBulkAddDialogOpen(false);
       setBulkUsers('');
     } catch (error) {
@@ -1900,7 +1875,6 @@ function UsersTab() {
           </Button>
         </div>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Users List</CardTitle>
@@ -1931,7 +1905,6 @@ function UsersTab() {
                 </SelectContent>
               </Select>
             </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
@@ -1982,7 +1955,11 @@ function UsersTab() {
                         </td>
                         <td className="p-3 text-muted-foreground">{user.school_id || 'N/A'}</td>
                         <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs capitalize ${
+                            user.is_active
+                              ? 'bg-success/10 text-success'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
                             {user.is_active ? 'active' : 'inactive'}
                           </span>
                         </td>
@@ -2026,7 +2003,6 @@ function UsersTab() {
           </div>
         </CardContent>
       </Card>
-
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
@@ -2112,7 +2088,6 @@ function UsersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       {/* Bulk Add Users Dialog */}
       <Dialog open={isBulkAddDialogOpen} onOpenChange={setIsBulkAddDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -2180,7 +2155,11 @@ function ApprovalsTab() {
       if (!approval) return;
 
       // For moderator dashboard, we can only approve certain types
-      const allowedTypes = ['question', 'question_delete', 'competition', 'competition_delete', 'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete', 'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'];
+      const allowedTypes = [
+        'question', 'question_delete', 'competition', 'competition_delete',
+        'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete',
+        'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'
+      ];
 
       if (!allowedTypes.includes(type)) {
         toast({ title: 'You cannot approve this type of request', variant: 'destructive' });
@@ -2191,7 +2170,10 @@ function ApprovalsTab() {
       localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'approved' });
       setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
 
-      toast({ title: 'Request approved!', description: 'The request has been approved and will be processed.' });
+      toast({
+        title: 'Request approved!',
+        description: 'The request has been approved and will be processed.'
+      });
     } catch (error) {
       toast({ title: 'Error approving request', description: error.message, variant: 'destructive' });
     }
@@ -2205,7 +2187,10 @@ function ApprovalsTab() {
       localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'rejected' });
       setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
 
-      toast({ title: 'Request rejected!', description: 'The request has been rejected.' });
+      toast({
+        title: 'Request rejected!',
+        description: 'The request has been rejected.'
+      });
     } catch (error) {
       toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
     }
@@ -2218,7 +2203,6 @@ function ApprovalsTab() {
         <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
         <p className="text-muted-foreground">Review and approve moderator actions</p>
       </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Approval Requests</CardTitle>
@@ -2238,7 +2222,13 @@ function ApprovalsTab() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${approval.status === 'pending' ? 'bg-warning/10 text-warning' : approval.status === 'approved' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          approval.status === 'pending'
+                            ? 'bg-warning/10 text-warning'
+                            : approval.status === 'approved'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-destructive/10 text-destructive'
+                        }`}>
                           {approval.status}
                         </span>
                         <h3 className="font-medium">{getApprovalTitle(approval.type)}</h3>
@@ -2347,19 +2337,15 @@ function MessagesTab() {
 
   const handleSendReply = async () => {
     if (!replyContent || !selectedMessage) return;
-
     setSendingReply(true);
-
     try {
       // Mock send reply
       await new Promise(resolve => setTimeout(resolve, 1000));
-
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
     } catch (error) {
       toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
     }
-
     setSendingReply(false);
   };
 
@@ -2387,7 +2373,6 @@ function MessagesTab() {
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">User communications</p>
       </div>
-
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <Card>
@@ -2406,7 +2391,6 @@ function MessagesTab() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
-
                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                   {loading ? (
                     <div className="text-center py-4">
@@ -2419,7 +2403,11 @@ function MessagesTab() {
                       <button
                         key={message.id}
                         onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          selectedMessage?.id === message.id
+                            ? 'bg-primary/10 border border-primary'
+                            : 'hover:bg-muted/50'
+                        } ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -2469,7 +2457,6 @@ function MessagesTab() {
             </CardContent>
           </Card>
         </div>
-
         <div className="md:col-span-2">
           {selectedMessage ? (
             <Card>
@@ -2484,7 +2471,6 @@ function MessagesTab() {
                   <div className="p-4 bg-muted/50 rounded-lg">
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
-
                   <div className="space-y-4">
                     <Label>Your Reply</Label>
                     <Textarea
@@ -2493,11 +2479,7 @@ function MessagesTab() {
                       placeholder="Type your reply here..."
                       rows={8}
                     />
-                    <Button
-                      onClick={handleSendReply}
-                      disabled={sendingReply || !replyContent}
-                      className="gradient-hero"
-                    >
+                    <Button onClick={handleSendReply} disabled={sendingReply || !replyContent} className="gradient-hero">
                       {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                       Send Reply
                     </Button>
@@ -2532,7 +2514,6 @@ function ProfileView() {
         <h1 className="text-2xl font-display font-bold">My Profile</h1>
         <p className="text-muted-foreground">Manage your moderator account</p>
       </div>
-
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -2543,19 +2524,16 @@ function ProfileView() {
               <Label>Email</Label>
               <Input value={profile?.email || ''} disabled className="bg-muted" />
             </div>
-
             <div className="space-y-2">
               <Label>Role</Label>
               <Input value={profile?.role || ''} disabled className="bg-muted" />
             </div>
-
             <div className="space-y-2">
               <Label>Display Name</Label>
               <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Quick Stats</CardTitle>
@@ -2565,12 +2543,10 @@ function ProfileView() {
               <p className="text-sm text-muted-foreground">Users Managed</p>
               <p className="text-2xl font-bold">0</p>
             </div>
-
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Competitions Organized</p>
               <p className="text-2xl font-bold">0</p>
             </div>
-
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Questions Approved</p>
               <p className="text-2xl font-bold">0</p>

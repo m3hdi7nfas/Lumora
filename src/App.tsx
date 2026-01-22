@@ -14,4 +14,34 @@ import { futureConfig } from "./routerConfig";
 import { initializeLocalStorage } from "./lib/initializeLocalStorage";
 import { useEffect } from "react";
 
-// ... rest of the file remains the same
+const queryClient = new QueryClient();
+
+export default function App() {
+  useEffect(() => {
+    initializeLocalStorage();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <BrowserRouter future={futureConfig}>
+            <TooltipProvider>
+              <div className="min-h-screen relative">
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+                <Toaster />
+                <Sonner />
+                <ThemeToggle />
+              </div>
+            </TooltipProvider>
+          </BrowserRouter>
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}

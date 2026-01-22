@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, X, Bell, Search, User, ChevronDown, Settings, LogOut, Moon, Sun, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2, Upload, ChevronDown as ChevronDownIcon, ChevronUp, Mail, Shield } from 'lucide-react';
+import { Menu, X, Bell, Search, User, ChevronDown, Settings, LogOut, Moon, Sun, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, CheckCircle, XCircle, MessageSquare, RefreshCw, Loader2, Eye, EyeOff, Lock, Unlock, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Trash2, Upload, ChevronDown as ChevronDownIcon, ChevronUp, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from 'next-themes';
 import { Logo } from '@/components/ui/Logo';
@@ -33,7 +33,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
-  const [currentView, setCurrentViewLocal] = useState<string | null>(null);
 
   // Load ad setting from localStorage
   useEffect(() => {
@@ -85,7 +84,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   // Handle view switching
   const handleViewSwitch = (role: 'admin' | 'moderator' | 'teacher' | 'student' | null) => {
     setCurrentView(role);
-    setCurrentViewLocal(role);
     toast({
       title: 'View switched',
       description: `Now viewing as ${role || 'yourself'}`
@@ -282,7 +280,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                       onClick={() => handleViewSwitch('admin')}
                     >
                       <span>Admin View</span>
-                      {profile?.role === 'admin' && currentViewLocal === 'admin' && (
+                      {profile?.role === 'admin' && currentView === 'admin' && (
                         <CheckCircle className="w-4 h-4 text-success" />
                       )}
                     </Button>
@@ -294,7 +292,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     onClick={() => handleViewSwitch('moderator')}
                   >
                     <span>Moderator View</span>
-                    {currentViewLocal === 'moderator' && (
+                    {currentView === 'moderator' && (
                       <CheckCircle className="w-4 h-4 text-success" />
                     )}
                   </Button>
@@ -305,7 +303,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     onClick={() => handleViewSwitch('teacher')}
                   >
                     <span>Teacher View</span>
-                    {currentViewLocal === 'teacher' && (
+                    {currentView === 'teacher' && (
                       <CheckCircle className="w-4 h-4 text-success" />
                     )}
                   </Button>
@@ -316,7 +314,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     onClick={() => handleViewSwitch('student')}
                   >
                     <span>Student View</span>
-                    {currentViewLocal === 'student' && (
+                    {currentView === 'student' && (
                       <CheckCircle className="w-4 h-4 text-success" />
                     )}
                   </Button>
@@ -327,7 +325,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     onClick={() => handleViewSwitch(null)}
                   >
                     <span>My Original View</span>
-                    {!currentViewLocal && (
+                    {!currentView && (
                       <CheckCircle className="w-4 h-4 text-success" />
                     )}
                   </Button>

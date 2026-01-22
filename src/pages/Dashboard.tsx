@@ -8,22 +8,17 @@ import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
-}
-
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
-  constructor(props: { children: React.ReactNode }) {
+class ErrorBoundary extends React.Component {
+  constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error) {
     return { hasError: true, error: error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+  componentDidCatch(error, errorInfo) {
     console.error("Dashboard Error:", error, errorInfo);
   }
 

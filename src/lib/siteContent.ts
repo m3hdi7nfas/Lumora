@@ -10,8 +10,7 @@ export const defaultSiteContent = {
             students: "1000+",
             competitions: "50+",
             questions: "10K+",
-            schools: "500+",
-            answers: "50K+"
+            schools: "500+"
         }
     },
     features: [

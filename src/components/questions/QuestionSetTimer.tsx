@@ -40,7 +40,7 @@ export function QuestionSetTimer({ durationMinutes, onTimeUp, isActive }: Questi
           toast({
             title: '1 minute remaining!',
             description: 'Your time is almost up.',
-            variant: 'destructive'
+            variant: 'warning'
           });
         }
 
@@ -58,17 +58,17 @@ export function QuestionSetTimer({ durationMinutes, onTimeUp, isActive }: Questi
   };
 
   return (
-    <div className={`p-4 rounded-lg border-2 transition-all ${isWarning ? 'border-destructive bg-destructive/10' : 'border-primary bg-primary/10'}`}>
+    <div className={`p-4 rounded-lg border-2 transition-all ${isWarning ? 'border-warning bg-warning/10' : 'border-primary bg-primary/10'}`}>
       <div className="flex items-center gap-3">
-        <Clock className={`w-6 h-6 ${isWarning ? 'text-destructive' : 'text-primary'}`} />
+        <Clock className={`w-6 h-6 ${isWarning ? 'text-warning' : 'text-primary'}`} />
         <div>
           <p className="text-sm font-medium">Time Remaining</p>
-          <p className={`text-2xl font-bold ${isWarning ? 'text-destructive' : 'text-primary'}`}>
+          <p className={`text-2xl font-bold ${isWarning ? 'text-warning' : 'text-primary'}`}>
             {formatTime(timeLeft)}
           </p>
         </div>
         {isWarning && (
-          <AlertTriangle className="w-6 h-6 text-destructive animate-pulse" />
+          <AlertTriangle className="w-6 h-6 text-warning animate-pulse" />
         )}
       </div>
     </div>

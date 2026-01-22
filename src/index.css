@@ -138,8 +138,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: Arial, sans-serif;
+    @apply bg-background text-foreground font-body antialiased;
   }
 
   /* Custom Scrollbar - Flying Thumb, no track */
@@ -186,8 +185,7 @@
   h4,
   h5,
   h6 {
-    @apply font-sans font-bold tracking-tight;
-    font-family: Arial, sans-serif;
+    @apply font-display font-bold tracking-tight;
   }
 }
 

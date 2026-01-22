@@ -5,6 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import AdminDashboard from '@/components/dashboards/AdminDashboard';
+import ModeratorDashboard from '@/components/dashboards/ModeratorDashboard';
+import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
+import StudentDashboard from '@/components/dashboards/StudentDashboard';
 
 export default function Dashboard() {
   const { user, profile, loading } = useAuth();
@@ -166,149 +170,5 @@ export default function Dashboard() {
         </div>
       </div>
     </ErrorBoundary>
-  );
-}
-
-// Dashboard components
-function AdminDashboard() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary">Admin Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Manage all users</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Schools</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Manage educational institutions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Competitions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Manage competitions</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function ModeratorDashboard() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary">Moderator Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Content Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Review and approve content</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>View system reports</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function TeacherDashboard() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary">Teacher Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Classes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Manage your classes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Assignments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>Create and grade assignments</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function StudentDashboard() {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-primary">Student Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>My Courses</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>View your enrolled courses</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Assignments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>View and submit assignments</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// Card component for consistency
-function Card({ children }) {
-  return (
-    <div className="bg-card rounded-lg border border-border/50 p-6 shadow-sm">
-      {children}
-    </div>
-  );
-}
-
-function CardHeader({ children }) {
-  return (
-    <div className="mb-4">
-      {children}
-    </div>
-  );
-}
-
-function CardTitle({ children }) {
-  return (
-    <h3 className="text-xl font-semibold">{children}</h3>
-  );
-}
-
-function CardContent({ children }) {
-  return (
-    <div className="text-muted-foreground">
-      {children}
-    </div>
   );
 }

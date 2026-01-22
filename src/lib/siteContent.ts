@@ -8,15 +8,15 @@ export const defaultSiteContent = {
         cta_secondary: "Learn More",
         stats: {
             students: "1000+",
-            competitions: "50+",
+            competitions: "100+",
             questions: "10K+",
-            schools: "500+"
+            answers: "Expected"
         }
     },
     features: [
         {
             title: 'Competitions',
-            description: 'Participate in seasonal competitions with your school and compete against others. Expected prizes for top performers!',
+            description: 'Participate in seasonal competitions with your school and compete against others.',
             icon: 'Trophy'
         },
         {

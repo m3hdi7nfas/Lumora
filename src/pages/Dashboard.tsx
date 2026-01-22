@@ -3,18 +3,51 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import ErrorBoundary from '@/components/ErrorBoundary';
-import AdminDashboard from '@/components/dashboards/AdminDashboard';
 import ModeratorDashboard from '@/components/dashboards/ModeratorDashboard';
 import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
+import AdminDashboard from '@/components/dashboards/AdminDashboard';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error: error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Dashboard Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold text-destructive">Something went wrong</h2>
+            <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function Dashboard() {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, currentView } = useAuth();
   const navigate = useNavigate();
   const [profileTimeout, setProfileTimeout] = useState(false);
-  const [dashboardError, setDashboardError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -37,7 +70,7 @@ export default function Dashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -63,112 +96,54 @@ export default function Dashboard() {
     );
   }
 
-  // Determine which dashboard to show based on profile role
+  // Determine which dashboard to show based on currentView or profile role
+  const effectiveRole = currentView || profile.role;
+
+  // Debug log to see what role we're getting
+  console.log('Effective role:', effectiveRole);
+  console.log('Profile role:', profile.role);
+  console.log('Current view:', currentView);
+
+  // Wrap dashboards in error boundaries
   const renderDashboard = () => {
-    try {
-      switch (profile.role) {
-        case 'admin':
-          return <AdminDashboard />;
-        case 'moderator':
-          return <ModeratorDashboard />;
-        case 'teacher':
-          return <TeacherDashboard />;
-        case 'student':
-          return <StudentDashboard />;
-        default:
-          return <TeacherDashboard />;
-      }
-    } catch (error) {
-      console.error('Error rendering dashboard:', error);
-      setDashboardError(error as Error);
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold text-destructive">Dashboard Error</h2>
-            <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Error: {error.message}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
+    switch (effectiveRole) {
+      case 'admin':
+        console.log('Rendering AdminDashboard');
+        return (
+          <ErrorBoundary>
+            <AdminDashboard />
+          </ErrorBoundary>
+        );
+      case 'moderator':
+        console.log('Rendering ModeratorDashboard');
+        return (
+          <ErrorBoundary>
+            <ModeratorDashboard />
+          </ErrorBoundary>
+        );
+      case 'teacher':
+        console.log('Rendering TeacherDashboard');
+        return (
+          <ErrorBoundary>
+            <TeacherDashboard />
+          </ErrorBoundary>
+        );
+      case 'student':
+        console.log('Rendering StudentDashboard');
+        return (
+          <ErrorBoundary>
+            <StudentDashboard />
+          </ErrorBoundary>
+        );
+      default:
+        console.log('Defaulting to TeacherDashboard');
+        return (
+          <ErrorBoundary>
+            <TeacherDashboard />
+          </ErrorBoundary>
+        );
     }
   };
 
-  if (dashboardError) {
-    return renderDashboard();
-  }
-
-  return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-background">
-        {/* Demo buttons at the top */}
-        <div className="p-4 border-b border-border/50">
-          <div className="flex gap-2 mb-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.setItem('lumora_current_view', 'admin');
-                window.location.reload();
-              }}
-            >
-              Admin View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.setItem('lumora_current_view', 'moderator');
-                window.location.reload();
-              }}
-            >
-              Moderator View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.setItem('lumora_current_view', 'teacher');
-                window.location.reload();
-              }}
-            >
-              Teacher View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.setItem('lumora_current_view', 'student');
-                window.location.reload();
-              }}
-            >
-              Student View
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem('lumora_current_view');
-                window.location.reload();
-              }}
-            >
-              Reset View
-            </Button>
-          </div>
-        </div>
-
-        {/* Main dashboard content */}
-        <div className="p-6">
-          {renderDashboard()}
-        </div>
-      </div>
-    </ErrorBoundary>
-  );
+  return renderDashboard();
 }

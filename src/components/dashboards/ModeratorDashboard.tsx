@@ -56,6 +56,7 @@ const LOCAL_STORAGE_KEYS = {
   APPROVALS: 'lumora_approvals',
   MESSAGES: 'lumora_messages',
   AVATARS: 'lumora_avatars',
+  BADGES: 'lumora_badges',
   QUESTION_SETS: 'lumora_question_sets'
 };
 
@@ -318,6 +319,925 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
   );
 }
 
+// Schools Tab Component
+function SchoolsTab() {
+  const [schools, setSchools] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newSchool, setNewSchool] = useState({
+    id: '',
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    postal_code: '',
+    contact_email: '',
+    contact_phone: '',
+    is_active: true,
+    created_at: '',
+    updated_at: ''
+  });
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load schools from local storage
+  useEffect(() => {
+    setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+  }, []);
+
+  const filteredSchools = schools.filter(school =>
+    school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    school.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    school.country.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAddSchool = async () => {
+    // Validate required fields
+    if (!newSchool.name) {
+      toast({ title: 'School name is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `school-${Date.now()}`;
+      const schoolToAdd = {
+        ...newSchool,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Create pending approval for school
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'school',
+        data: schoolToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+
+      toast({ title: 'School submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewSchool({
+        id: '',
+        name: '',
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        postal_code: '',
+        contact_email: '',
+        contact_phone: '',
+        is_active: true,
+        created_at: '',
+        updated_at: ''
+      });
+    } catch (error) {
+      toast({ title: 'Error submitting school', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteSchool = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for school deletion
+      const schoolToDelete = schools.find(school => school.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'school_delete',
+        data: { school_id: id, school_name: schoolToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+
+      toast({ title: 'School deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Schools</h1>
+          <p className="text-muted-foreground">Manage educational institutions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add School
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Schools List</CardTitle>
+          <CardDescription>All registered educational institutions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search schools..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredSchools.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No schools found</p>
+            ) : (
+              <div className="space-y-4">
+                {filteredSchools.map((school) => (
+                  <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{school.name}</h3>
+                        <p className="text-xs text-muted-foreground">{school.city}, {school.country}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{school.students || 0} students</span>
+                          <span className="text-xs text-muted-foreground">Contact: {school.contact_email}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete School</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this school?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteSchool(school.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add School Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New School</DialogTitle>
+            <DialogDescription>Register a new educational institution (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>School Name *</Label>
+              <Input
+                value={newSchool.name}
+                onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
+                placeholder="e.g., Springfield High School"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Address</Label>
+              <Input
+                value={newSchool.address}
+                onChange={(e) => setNewSchool({ ...newSchool, address: e.target.value })}
+                placeholder="123 Education Street"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input
+                  value={newSchool.city}
+                  onChange={(e) => setNewSchool({ ...newSchool, city: e.target.value })}
+                  placeholder="Springfield"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>State/Province</Label>
+                <Input
+                  value={newSchool.state}
+                  onChange={(e) => setNewSchool({ ...newSchool, state: e.target.value })}
+                  placeholder="Illinois"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <Input
+                  value={newSchool.country}
+                  onChange={(e) => setNewSchool({ ...newSchool, country: e.target.value })}
+                  placeholder="United States"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Postal Code</Label>
+                <Input
+                  value={newSchool.postal_code}
+                  onChange={(e) => setNewSchool({ ...newSchool, postal_code: e.target.value })}
+                  placeholder="12345"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Email</Label>
+                <Input
+                  type="email"
+                  value={newSchool.contact_email}
+                  onChange={(e) => setNewSchool({ ...newSchool, contact_email: e.target.value })}
+                  placeholder="contact@school.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact Phone</Label>
+                <Input
+                  value={newSchool.contact_phone}
+                  onChange={(e) => setNewSchool({ ...newSchool, contact_phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-active"
+                checked={newSchool.is_active}
+                onCheckedChange={(checked) => setNewSchool({ ...newSchool, is_active: checked })}
+              />
+              <Label htmlFor="is-active">Active School</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddSchool} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Competitions Tab Component
+function CompetitionsTab() {
+  const [competitions, setCompetitions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newCompetition, setNewCompetition] = useState({
+    id: '',
+    name: '',
+    description: '',
+    start_date: '',
+    end_date: '',
+    is_active: true,
+    max_participants: 100,
+    current_participants: 0,
+    category: '',
+    difficulty: 'medium',
+    created_at: '',
+    updated_at: ''
+  });
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load competitions from local storage
+  useEffect(() => {
+    setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+  }, []);
+
+  const filteredCompetitions = competitions.filter(competition =>
+    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAddCompetition = async () => {
+    // Validate required fields
+    if (!newCompetition.name) {
+      toast({ title: 'Competition name is required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `comp-${Date.now()}`;
+      const competitionToAdd = {
+        ...newCompetition,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Create pending approval for competition
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'competition',
+        data: competitionToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+
+      toast({ title: 'Competition submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewCompetition({
+        id: '',
+        name: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        is_active: true,
+        max_participants: 100,
+        current_participants: 0,
+        category: '',
+        difficulty: 'medium',
+        created_at: '',
+        updated_at: ''
+      });
+    } catch (error) {
+      toast({ title: 'Error submitting competition', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteCompetition = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for competition deletion
+      const competitionToDelete = competitions.find(competition => competition.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'competition_delete',
+        data: { competition_id: id, competition_name: competitionToDelete?.name },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+
+      toast({ title: 'Competition deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Competitions</h1>
+          <p className="text-muted-foreground">Manage learning competitions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Competition
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Competitions List</CardTitle>
+          <CardDescription>All available competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search competitions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredCompetitions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No competitions found</p>
+            ) : (
+              <div className="space-y-4">
+                {filteredCompetitions.map((competition) => (
+                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{competition.name}</h3>
+                        <p className="text-xs text-muted-foreground">{competition.description}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {competition.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Competition</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this competition?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteCompetition(competition.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Competition Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Competition</DialogTitle>
+            <DialogDescription>Create a new learning competition (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Competition Name *</Label>
+              <Input
+                value={newCompetition.name}
+                onChange={(e) => setNewCompetition({ ...newCompetition, name: e.target.value })}
+                placeholder="e.g., Math Olympiad 2025"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                value={newCompetition.description}
+                onChange={(e) => setNewCompetition({ ...newCompetition, description: e.target.value })}
+                placeholder="Describe the competition..."
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.start_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, start_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={newCompetition.end_date}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, end_date: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input
+                  value={newCompetition.category}
+                  onChange={(e) => setNewCompetition({ ...newCompetition, category: e.target.value })}
+                  placeholder="e.g., Math, Science, etc."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={newCompetition.difficulty}
+                  onValueChange={(value) => setNewCompetition({ ...newCompetition, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Max Participants</Label>
+              <Input
+                type="number"
+                value={newCompetition.max_participants}
+                onChange={(e) => setNewCompetition({ ...newCompetition, max_participants: parseInt(e.target.value) || 0 })}
+                placeholder="100"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-active"
+                checked={newCompetition.is_active}
+                onCheckedChange={(checked) => setNewCompetition({ ...newCompetition, is_active: checked })}
+              />
+              <Label htmlFor="is-active">Active Competition</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddCompetition} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Questions Tab Component
+function QuestionsTab() {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({
+    id: '',
+    text: '',
+    options: ['', '', '', ''],
+    correct_answer: '',
+    category: '',
+    difficulty: 'medium',
+    points: 10,
+    explanation: '',
+    created_at: '',
+    updated_at: ''
+  });
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load questions from local storage
+  useEffect(() => {
+    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+  }, []);
+
+  const filteredQuestions = questions.filter(question =>
+    question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    question.category.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAddQuestion = async () => {
+    // Validate required fields
+    if (!newQuestion.text || !newQuestion.correct_answer) {
+      toast({ title: 'Question text and correct answer are required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Generate ID
+      const newId = `question-${Date.now()}`;
+      const questionToAdd = {
+        ...newQuestion,
+        id: newId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Create pending approval for question
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'question',
+        data: questionToAdd,
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+
+      toast({ title: 'Question submitted for admin approval!', description: 'An admin will review this shortly.' });
+      setIsAddDialogOpen(false);
+      setNewQuestion({
+        id: '',
+        text: '',
+        options: ['', '', '', ''],
+        correct_answer: '',
+        category: '',
+        difficulty: 'medium',
+        points: 10,
+        explanation: '',
+        created_at: '',
+        updated_at: ''
+      });
+    } catch (error) {
+      toast({ title: 'Error submitting question', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteQuestion = async (id: string) => {
+    setLoading(true);
+    try {
+      // Create pending approval for question deletion
+      const questionToDelete = questions.find(question => question.id === id);
+      const approvalItem = {
+        id: `approval-${Date.now()}`,
+        type: 'question_delete',
+        data: { question_id: id, question_text: questionToDelete?.text },
+        created_by: profile?.id,
+        created_by_name: profile?.display_name || profile?.email,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+
+      // Add to approvals
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+
+      toast({ title: 'Question deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Questions</h1>
+          <p className="text-muted-foreground">Manage competition questions</p>
+        </div>
+        <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Question
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Questions List</CardTitle>
+          <CardDescription>All available questions for competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search questions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredQuestions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No questions found</p>
+            ) : (
+              <div className="space-y-4">
+                {filteredQuestions.map((question) => (
+                  <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{question.text}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Category: {question.category} • Difficulty: {question.difficulty}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 ml-4">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action will be submitted for admin approval. Are you sure you want to request deletion of this question?
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90"
+                                onClick={() => handleDeleteQuestion(question.id)}
+                              >
+                                Request Deletion
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add Question Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Question</DialogTitle>
+            <DialogDescription>Create a new competition question (requires admin approval)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Question Text *</Label>
+              <Textarea
+                value={newQuestion.text}
+                onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
+                placeholder="What is the capital of France?"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Options</Label>
+              {newQuestion.options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    value={option}
+                    onChange={(e) => {
+                      const newOptions = [...newQuestion.options];
+                      newOptions[index] = e.target.value;
+                      setNewQuestion({ ...newQuestion, options: newOptions });
+                    }}
+                    placeholder={`Option ${index + 1}`}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNewQuestion({ ...newQuestion, correct_answer: option })}
+                    className={newQuestion.correct_answer === option ? 'bg-success/10 border-success' : ''}
+                  >
+                    {newQuestion.correct_answer === option ? '✓ Correct' : 'Mark Correct'}
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input
+                  value={newQuestion.category}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
+                  placeholder="e.g., Math, Science, etc."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Difficulty</Label>
+                <Select
+                  value={newQuestion.difficulty}
+                  onValueChange={(value) => setNewQuestion({ ...newQuestion, difficulty: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select difficulty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="easy">Easy</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="hard">Hard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                value={newQuestion.points}
+                onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 0 })}
+                placeholder="10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Explanation</Label>
+              <Textarea
+                value={newQuestion.explanation}
+                onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
+                placeholder="Explain why this answer is correct..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddQuestion} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit for Approval'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Question Sets Tab Component
 function QuestionSetsTab() {
   const [questionSets, setQuestionSets] = useState([]);
@@ -334,7 +1254,6 @@ function QuestionSetsTab() {
     updated_at: ''
   });
   const { toast } = useToast();
-  const { profile } = useAuth();
 
   // Load question sets from local storage
   useEffect(() => {
@@ -364,22 +1283,11 @@ function QuestionSetsTab() {
         updated_at: new Date().toISOString()
       };
 
-      // Create pending approval for question set
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'question_set',
-        data: questionSetToAdd,
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTION_SETS, questionSetToAdd);
       setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
 
-      toast({ title: 'Question set submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'Question set added successfully!' });
       setIsAddDialogOpen(false);
       setNewQuestionSet({
         id: '',
@@ -391,7 +1299,7 @@ function QuestionSetsTab() {
         updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error submitting question set', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error adding question set', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -399,25 +1307,12 @@ function QuestionSetsTab() {
   const handleDeleteQuestionSet = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for question set deletion
-      const questionSetToDelete = questionSets.find(qs => qs.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'question_set_delete',
-        data: { question_set_id: id, question_set_name: questionSetToDelete?.name },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.QUESTION_SETS, id);
       setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
 
-      toast({ title: 'Question set deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'Question set deleted successfully!' });
     } catch (error) {
-      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error deleting question set', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -485,7 +1380,7 @@ function QuestionSetsTab() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Question Set</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action will be submitted for admin approval. Are you sure you want to request deletion of this question set?
+                                Are you sure you want to delete this question set? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -494,7 +1389,7 @@ function QuestionSetsTab() {
                                 className="bg-destructive hover:bg-destructive/90"
                                 onClick={() => handleDeleteQuestionSet(questionSet.id)}
                               >
-                                Request Deletion
+                                Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -514,7 +1409,7 @@ function QuestionSetsTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Question Set</DialogTitle>
-            <DialogDescription>Create a new question set for organizing competition questions (requires admin approval)</DialogDescription>
+            <DialogDescription>Create a new question set for organizing competition questions</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -549,10 +1444,10 @@ function QuestionSetsTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  Adding...
                 </>
               ) : (
-                'Submit for Approval'
+                'Add Question Set'
               )}
             </Button>
           </DialogFooter>
@@ -578,7 +1473,6 @@ function AvatarsTab() {
   });
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const { toast } = useToast();
-  const { profile } = useAuth();
 
   // Load avatars from local storage
   useEffect(() => {
@@ -620,22 +1514,11 @@ function AvatarsTab() {
         updated_at: new Date().toISOString()
       };
 
-      // Create pending approval for avatar
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'avatar',
-        data: avatarToAdd,
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.AVATARS, avatarToAdd);
       setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
 
-      toast({ title: 'Avatar submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'Avatar added successfully!' });
       setIsAddDialogOpen(false);
       setNewAvatar({
         id: '',
@@ -647,7 +1530,7 @@ function AvatarsTab() {
       });
       setFilePreview(null);
     } catch (error) {
-      toast({ title: 'Error submitting avatar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error adding avatar', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -655,25 +1538,12 @@ function AvatarsTab() {
   const handleDeleteAvatar = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for avatar deletion
-      const avatarToDelete = avatars.find(avatar => avatar.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'avatar_delete',
-        data: { avatar_id: id, avatar_name: avatarToDelete?.name },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.AVATARS, id);
       setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
 
-      toast({ title: 'Avatar deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'Avatar deleted successfully!' });
     } catch (error) {
-      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -742,7 +1612,7 @@ function AvatarsTab() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Avatar</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action will be submitted for admin approval. Are you sure you want to request deletion of this avatar?
+                                Are you sure you want to delete this avatar? This action cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -751,7 +1621,7 @@ function AvatarsTab() {
                                 className="bg-destructive hover:bg-destructive/90"
                                 onClick={() => handleDeleteAvatar(avatar.id)}
                               >
-                                Request Deletion
+                                Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
@@ -771,7 +1641,7 @@ function AvatarsTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Avatar</DialogTitle>
-            <DialogDescription>Upload a new avatar image (requires admin approval)</DialogDescription>
+            <DialogDescription>Upload a new avatar image</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -813,10 +1683,10 @@ function AvatarsTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  Adding...
                 </>
               ) : (
-                'Submit for Approval'
+                'Add Avatar'
               )}
             </Button>
           </DialogFooter>
@@ -892,23 +1762,12 @@ function UsersTab() {
         updated_at: new Date().toISOString()
       };
 
-      // Create pending approval for user creation
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'user',
-        data: userToAdd,
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      // Add to local storage
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, userToAdd);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({
-        title: 'User creation submitted for admin approval!',
+        title: 'User added successfully!',
         description: `Password: ${userToAdd.password}`
       });
       setIsAddDialogOpen(false);
@@ -927,7 +1786,7 @@ function UsersTab() {
         updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error submitting user', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error adding user', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -967,29 +1826,21 @@ function UsersTab() {
         });
       }
 
-      // Create pending approval for bulk user creation
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'bulk_users',
-        data: { users: usersToAdd },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
+      // Add all users to local storage
+      usersToAdd.forEach(user => {
+        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, user);
+      });
 
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
       toast({
-        title: `Bulk user creation submitted for admin approval!`,
-        description: `${usersToAdd.length} users will be reviewed by an admin.`
+        title: `Bulk users added successfully!`,
+        description: `${usersToAdd.length} users added with auto-generated passwords.`
       });
       setIsBulkAddDialogOpen(false);
       setBulkUsers('');
     } catch (error) {
-      toast({ title: 'Error submitting bulk users', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error adding bulk users', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -997,25 +1848,12 @@ function UsersTab() {
   const handleDeleteUser = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for user deletion
-      const userToDelete = users.find(user => user.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'user_delete',
-        data: { user_id: id, user_email: userToDelete?.email, user_name: userToDelete?.display_name },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.USERS, id);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
-      toast({ title: 'User deletion submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'User deleted successfully!' });
     } catch (error) {
-      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1023,31 +1861,23 @@ function UsersTab() {
   const handleRoleChange = async (userId: string, newRole: string) => {
     setLoading(true);
     try {
-      // Create pending approval for role change
+      // Find the user and update their role
       const userToUpdate = users.find(user => user.id === userId);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'user_role_change',
-        data: {
-          user_id: userId,
-          current_role: userToUpdate?.role,
-          new_role: newRole,
-          user_email: userToUpdate?.email,
-          user_name: userToUpdate?.display_name
-        },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
+      if (!userToUpdate) return;
+
+      const updatedUser = {
+        ...userToUpdate,
+        role: newRole,
+        updated_at: new Date().toISOString()
       };
 
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
+      // Update in local storage
+      localStorageCRUD.update(LOCAL_STORAGE_KEYS.USERS, userId, updatedUser);
       setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
 
-      toast({ title: 'Role change submitted for admin approval!', description: 'An admin will review this shortly.' });
+      toast({ title: 'User role updated successfully!' });
     } catch (error) {
-      toast({ title: 'Error submitting role change', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error updating user role', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1171,7 +2001,7 @@ function UsersTab() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Delete User</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    This action will be submitted for admin approval. Are you sure you want to request deletion of this user?
+                                    Are you sure you want to delete this user? This action cannot be undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -1180,7 +2010,7 @@ function UsersTab() {
                                     className="bg-destructive hover:bg-destructive/90"
                                     onClick={() => handleDeleteUser(user.id)}
                                   >
-                                    Request Deletion
+                                    Delete
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -1202,7 +2032,7 @@ function UsersTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription>Create a new user account (requires admin approval)</DialogDescription>
+            <DialogDescription>Create a new user account</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1273,10 +2103,10 @@ function UsersTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  Adding...
                 </>
               ) : (
-                'Submit for Approval'
+                'Add User'
               )}
             </Button>
           </DialogFooter>
@@ -1318,10 +2148,10 @@ function UsersTab() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  Adding...
                 </>
               ) : (
-                'Submit for Approval'
+                'Add Users'
               )}
             </Button>
           </DialogFooter>
@@ -1331,5 +2161,423 @@ function UsersTab() {
   );
 }
 
-// Rest of the file remains the same...
-// (Keeping the existing SchoolsTab, CompetitionsTab, QuestionsTab, ApprovalsTab, MessagesTab, and ProfileView components)
+// Approvals Tab Component
+function ApprovalsTab() {
+  const [approvals, setApprovals] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  // Load approvals from local storage
+  useEffect(() => {
+    setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+  }, []);
+
+  const handleApprove = async (id: string, type: string) => {
+    setLoading(true);
+    try {
+      const approval = approvals.find(a => a.id === id);
+      if (!approval) return;
+
+      // For moderator dashboard, we can only approve certain types
+      const allowedTypes = ['question', 'question_delete', 'competition', 'competition_delete', 'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete', 'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'];
+
+      if (!allowedTypes.includes(type)) {
+        toast({ title: 'You cannot approve this type of request', variant: 'destructive' });
+        return;
+      }
+
+      // Update the approval status
+      localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'approved' });
+      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+
+      toast({ title: 'Request approved!', description: 'The request has been approved and will be processed.' });
+    } catch (error) {
+      toast({ title: 'Error approving request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleReject = async (id: string) => {
+    setLoading(true);
+    try {
+      // Update the approval status
+      localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'rejected' });
+      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
+
+      toast({ title: 'Request rejected!', description: 'The request has been rejected.' });
+    } catch (error) {
+      toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
+        <p className="text-muted-foreground">Review and approve moderator actions</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Approval Requests</CardTitle>
+          <CardDescription>Requests that need your review</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : approvals.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No pending approvals</p>
+            ) : (
+              approvals.map((approval) => (
+                <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${approval.status === 'pending' ? 'bg-warning/10 text-warning' : approval.status === 'approved' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                          {approval.status}
+                        </span>
+                        <h3 className="font-medium">{getApprovalTitle(approval.type)}</h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Requested by: {approval.created_by_name}</p>
+                      <p className="text-xs text-muted-foreground">Date: {new Date(approval.created_at).toLocaleString()}</p>
+                    </div>
+                    <div className="flex gap-2 ml-4">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleApprove(approval.id, approval.type)}
+                        disabled={approval.status !== 'pending'}
+                      >
+                        <CheckCircle className="w-3 h-3 text-success" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => handleReject(approval.id)}
+                        disabled={approval.status !== 'pending'}
+                      >
+                        <XCircle className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function getApprovalTitle(type: string) {
+  const titles = {
+    'question': 'New Question',
+    'question_delete': 'Delete Question',
+    'competition': 'New Competition',
+    'competition_delete': 'Delete Competition',
+    'school': 'New School',
+    'school_delete': 'Delete School',
+    'user': 'New User',
+    'user_delete': 'Delete User',
+    'avatar': 'New Avatar',
+    'avatar_delete': 'Delete Avatar',
+    'question_set': 'New Question Set',
+    'question_set_delete': 'Delete Question Set',
+    'bulk_users': 'Bulk User Creation',
+    'user_role_change': 'User Role Change'
+  };
+  return titles[type] || type;
+}
+
+// Messages Tab Component
+function MessagesTab() {
+  const [messages, setMessages] = useState([]);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+  const { profile } = useAuth();
+
+  const filteredMessages = messages.filter(message =>
+    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    message.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      // Mock data for messages
+      const mockMessages = [
+        {
+          id: '1',
+          sender: 'John Doe',
+          senderEmail: 'john@example.com',
+          subject: 'Question about competition',
+          content: 'Hello, I have a question about the upcoming math competition...',
+          date: '2025-06-01',
+          read: false
+        },
+        {
+          id: '2',
+          sender: 'Jane Smith',
+          senderEmail: 'jane@example.com',
+          subject: 'Technical issue',
+          content: 'I am having trouble accessing the practice questions...',
+          date: '2025-05-30',
+          read: true
+        }
+      ];
+      setMessages(mockMessages);
+    } catch (error) {
+      toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleSendReply = async () => {
+    if (!replyContent || !selectedMessage) return;
+
+    setSendingReply(true);
+
+    try {
+      // Mock send reply
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      toast({ title: 'Reply sent successfully!' });
+      setReplyContent('');
+    } catch (error) {
+      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
+    }
+
+    setSendingReply(false);
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    setLoading(true);
+    try {
+      setMessages(messages.filter(msg => msg.id !== messageId));
+      if (selectedMessage?.id === messageId) {
+        setSelectedMessage(null);
+      }
+      toast({ title: 'Message deleted successfully!' });
+    } catch (error) {
+      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Messages</h1>
+        <p className="text-muted-foreground">User communications</p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inbox</CardTitle>
+              <CardDescription>Your messages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search messages..."
+                    className="pl-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                  {loading ? (
+                    <div className="text-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    </div>
+                  ) : filteredMessages.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No messages found</p>
+                  ) : (
+                    filteredMessages.map((message) => (
+                      <button
+                        key={message.id}
+                        onClick={() => setSelectedMessage(message)}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {message.sender.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium truncate">{message.sender}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
+                            {!message.read && (
+                              <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
+                            )}
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="md:col-span-2">
+          {selectedMessage ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{selectedMessage.subject}</CardTitle>
+                <CardDescription>
+                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">{selectedMessage.content}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent}
+                      className="gradient-hero"
+                    >
+                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reply
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <p>Select a message to view details</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Profile View Component
+function ProfileView() {
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your moderator account</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Users Managed</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Organized</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Questions Approved</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -1,23 +1,21 @@
-const handleSendReply = async () => {
-    if (!replyContent || !selectedMessage) return;
+// ... (keep all existing code at the end of the file)
 
-    setSendingReply(true);
+export default function TeacherDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-    try {
-      const { error } = await supabase.from('messages').insert({
-        content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
-        sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
-      } as any);
-
-      if (error) throw error;
-
-      toast({ title: 'Reply sent successfully!' });
-      setReplyContent('');
-    } catch (error) {
-      toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
-    }
-
-    setSendingReply(false);
-};
+  return (
+    <DashboardLayout
+      title="Lumora Teacher Dashboard"
+      sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+    >
+      {activeTab === 'overview' && <TeacherOverviewTab setActiveTab={setActiveTab} loading={loading} />}
+      {activeTab === 'competitions' && <CompetitionsTab />}
+      {activeTab === 'challenges' && <ChallengesTab />}
+      {activeTab === 'leaderboard' && <LeaderboardTab />}
+      {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'profile' && <ProfileView />}
+    </DashboardLayout>
+  );
+}

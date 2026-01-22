@@ -8,7 +8,7 @@ export const defaultSiteContent = {
         cta_secondary: "Learn More",
         stats: {
             students: "1000+",
-            competitions: "50+",
+            competitions: "100+",
             questions: "10K+",
             schools: "500+"
         }

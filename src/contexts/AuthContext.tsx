@@ -108,8 +108,7 @@ const DEMO_ACCOUNTS = {
 // Local storage utilities for users
 const LOCAL_STORAGE_KEYS = {
   USERS: 'lumora_users',
-  CURRENT_USER: 'lumora_current_user',
-  SESSIONS: 'lumora_sessions'
+  CURRENT_USER: 'lumora_current_user'
 };
 
 const localStorageCRUD = {

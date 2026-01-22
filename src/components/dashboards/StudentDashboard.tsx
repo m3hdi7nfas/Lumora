@@ -3,59 +3,45 @@ import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Users,
   Trophy,
-  FileQuestion,
-  CheckSquare,
-  Clock,
-  LayoutTemplate,
-  School,
-  Search,
-  TrendingUp,
-  CheckCircle,
-  XCircle,
-  MessageSquare,
-  RefreshCw,
-  Loader2,
-  Eye,
-  EyeOff,
+  BookOpen,
+  Award,
+  Swords,
+  Mail,
   User,
   Lock,
-  Unlock,
   Calendar,
   ChevronRight,
   Crown,
   Medal,
   Star,
-  Plus,
-  Edit,
-  Trash2,
-  Upload,
-  ChevronDown,
-  ChevronUp
+  RefreshCw,
+  Eye,
+  EyeOff,
+  Loader2,
+  Users,
+  Search,
+  Unlock
 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/contexts/AuthContext';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/integrations/supabase/client';
 
 function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
   const navItems = [
-    { id: 'overview', icon: Users, label: 'Overview' },
+    { id: 'overview', icon: BookOpen, label: 'My Learning' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
-    { id: 'challenges', icon: FileQuestion, label: 'Challenges' },
-    { id: 'leaderboard', icon: CheckSquare, label: 'Leaderboard' },
-    { id: 'messages', icon: MessageSquare, label: 'Messages' },
+    { id: 'challenges', icon: Swords, label: 'Challenges' },
+    { id: 'badges', icon: Award, label: 'My Badges' },
+    { id: 'messages', icon: Mail, label: 'Messages' },
   ];
 
   return (
@@ -89,7 +75,7 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
           </div>
           <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setActiveTab('profile')}>
             <User className="w-3 h-3 mr-2" />
-            Profile Settings
+            My Profile
           </Button>
         </div>
       </div>
@@ -99,139 +85,167 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
 
 export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
   return (
     <DashboardLayout
       title="Lumora Student Dashboard"
       sidebar={<StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {activeTab === 'overview' && <StudentOverviewTab setActiveTab={setActiveTab} loading={loading} />}
+      {activeTab === 'overview' && <StudentOverview />}
       {activeTab === 'competitions' && <CompetitionsTab />}
       {activeTab === 'challenges' && <ChallengesTab />}
-      {activeTab === 'leaderboard' && <LeaderboardTab />}
+      {activeTab === 'badges' && <BadgesTab />}
       {activeTab === 'messages' && <MessagesTab />}
-      {activeTab === 'profile' && <ProfileView />}
+      {activeTab === 'profile' && <ProfileTab />}
     </DashboardLayout>
   );
 }
 
 // Student Overview Component
-function StudentOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
-  const { toast } = useToast();
+function StudentOverview() {
   const { profile } = useAuth();
+  const { toast } = useToast();
 
-  // Get stats from local storage
-  const competitions = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
+  // Fetch student stats
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['student-stats'],
+    queryFn: async () => {
+      try {
+        // Get student data
+        const { data: student, error: studentError } = await supabase.from('profiles').select('*').eq('id', profile?.id).single();
+        if (studentError) throw studentError;
 
-  const stats = {
-    totalCompetitions: competitions.length,
-    totalQuestions: questions.length,
-    score: profile?.score || 0,
-    progress: profile?.progress || 0
-  };
-
-  const quickActions = [
-    { id: 'competitions', icon: Trophy, title: 'Join Competitions', description: 'Participate in learning challenges' },
-    { id: 'challenges', icon: FileQuestion, title: 'Complete Challenges', description: 'Earn extra points and badges' },
-    { id: 'leaderboard', icon: CheckSquare, title: 'View Leaderboard', description: 'See how you rank against others' },
-  ];
+        return {
+          totalScore: student.score || 0,
+          competitionsEntered: 0,
+          badgesEarned: 0,
+          questionsAnswered: 0,
+          rank: 0
+        };
+      } catch (error) {
+        console.error('Error fetching student stats:', error);
+        return {
+          totalScore: 0,
+          competitionsEntered: 0,
+          badgesEarned: 0,
+          questionsAnswered: 0,
+          rank: 0
+        };
+      }
+    }
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Student Dashboard</h1>
-          <p className="text-muted-foreground">Track your learning progress and achievements</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-display font-bold">My Learning Journey</h1>
+        <p className="text-muted-foreground">Track your progress and achievements</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
-          title="Total Competitions"
-          value={stats.totalCompetitions.toString()}
-          icon={Trophy}
-          className="bg-primary/10 border-primary/20"
-        />
-        <StatCard
-          title="Total Questions"
-          value={stats.totalQuestions.toLocaleString()}
-          icon={FileQuestion}
-          className="bg-accent/10 border-accent/20"
-        />
-        <StatCard
-          title="Your Score"
-          value={stats.score.toLocaleString()}
+          title="Total Score"
+          value={stats?.totalScore?.toLocaleString() || '0'}
           icon={Star}
-          className="bg-success/10 border-success/20"
+          className="bg-primary/10 border-primary/20"
+          loading={statsLoading}
         />
         <StatCard
-          title="Progress"
-          value={`${stats.progress}%`}
-          icon={TrendingUp}
+          title="Competitions"
+          value={stats?.competitionsEntered?.toString() || '0'}
+          icon={Trophy}
+          className="bg-accent/10 border-accent/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Badges Earned"
+          value={stats?.badgesEarned?.toString() || '0'}
+          icon={Award}
+          className="bg-success/10 border-success/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Questions Answered"
+          value={stats?.questionsAnswered?.toLocaleString() || '0'}
+          icon={BookOpen}
           className="bg-warning/10 border-warning/20"
+          loading={statsLoading}
         />
       </div>
 
-      {/* Quick Actions and Recent Activity in 2 columns */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common student tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {quickActions.map((action, index) => (
-                <button
-                  key={action.id}
-                  onClick={() => setActiveTab(action.id)}
-                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-lg bg-muted">
-                      <action.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{action.title}</h3>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
-                    </div>
-                  </div>
-                </button>
-              ))}
+      {/* Progress Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle>My Progress</CardTitle>
+          <CardDescription>Learning journey overview</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                  <Medal className="w-6 h-6 text-gold" />
+                </div>
+                <div>
+                  <p className="font-medium">Overall Progress</p>
+                  <p className="text-sm text-muted-foreground">Based on completed activities</p>
+                </div>
+              </div>
+              <span className="text-2xl font-bold">{stats?.progress || 0}%</span>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest learning events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            <div className="w-full h-2 bg-muted rounded-full">
+              <div
+                className="h-2 bg-primary rounded-full"
+                style={{ width: `${stats?.progress || 0}%` }}
+              />
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Current Rank</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold">{stats?.rank || 0}</span>
+                  <span className="text-sm text-muted-foreground">out of 100</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Next Milestone</p>
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-gold" />
+                  <span className="text-sm">500 points - Math Master</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Your latest learning activities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-center text-muted-foreground py-4">No recent activity</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
   return (
     <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
           </div>
           <div className="p-2 rounded-lg bg-card">
             <Icon className="w-6 h-6 text-primary" />
@@ -246,25 +260,19 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
 function CompetitionsTab() {
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const fetchCompetitions = async () => {
     setLoading(true);
     try {
-      // Fetch competitions from local storage
-      const competitionsData = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-      setCompetitions(competitionsData);
+      const { data, error } = await supabase.from('competitions').select('*');
+      if (error) throw error;
+      setCompetitions(data || []);
     } catch (error) {
       toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
-
-  const filteredCompetitions = competitions.filter(competition =>
-    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   useEffect(() => {
     fetchCompetitions();
@@ -272,58 +280,44 @@ function CompetitionsTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Competitions</h1>
-          <p className="text-muted-foreground">Join learning competitions</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Competitions</h1>
+        <p className="text-muted-foreground">Join competitions to earn points and badges</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Competitions List</CardTitle>
-          <CardDescription>Available competitions to join</CardDescription>
+          <CardTitle>Available Competitions</CardTitle>
+          <CardDescription>Competitions you can participate in</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search competitions..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
             {loading ? (
               <div className="text-center py-4">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : filteredCompetitions.length === 0 ? (
+            ) : competitions.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No competitions found</p>
             ) : (
-              <div className="space-y-4">
-                {filteredCompetitions.map((competition) => (
-                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{competition.name}</h3>
-                        <p className="text-xs text-muted-foreground">{competition.description}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                            {competition.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
-                        </div>
+              competitions.map((competition) => (
+                <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">{competition.name}</h3>
+                      <p className="text-xs text-muted-foreground">{competition.description}</p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {competition.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">Participants: {competition.participants || 0}/{competition.max_participants}</span>
                       </div>
-                      <Button size="sm" className="gradient-hero">
-                        Join
-                      </Button>
                     </div>
+                    <Button size="sm" className="gradient-hero">
+                      Join
+                    </Button>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             )}
           </div>
         </CardContent>
@@ -341,9 +335,13 @@ function ChallengesTab() {
   const fetchChallenges = async () => {
     setLoading(true);
     try {
-      // Fetch challenges from local storage - now empty by default
-      const challengesData = localStorage.getItem('lumora_challenges') ? JSON.parse(localStorage.getItem('lumora_challenges')) : [];
-      setChallenges(challengesData);
+      // Mock data for challenges
+      const mockChallenges = [
+        { id: '1', name: 'Daily Math Challenge', description: 'Solve 10 math problems daily', points: 50, category: 'math' },
+        { id: '2', name: 'Science Quiz', description: 'Answer 15 science questions', points: 75, category: 'science' },
+        { id: '3', name: 'History Trivia', description: 'Complete history trivia', points: 60, category: 'history' },
+      ];
+      setChallenges(mockChallenges);
     } catch (error) {
       toast({ title: 'Error fetching challenges', description: error.message, variant: 'destructive' });
     }
@@ -356,15 +354,9 @@ function ChallengesTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Challenges</h1>
-          <p className="text-muted-foreground">Complete challenges to earn extra points</p>
-        </div>
-        <Button className="gradient-hero">
-          <Users className="w-4 h-4 mr-2" />
-          1v1 Friend
-        </Button>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Challenges</h1>
+        <p className="text-muted-foreground">Complete challenges to earn extra points</p>
       </div>
 
       <Card>
@@ -379,7 +371,7 @@ function ChallengesTab() {
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
             ) : challenges.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No challenges available</p>
+              <p className="text-center text-muted-foreground py-4">No challenges found</p>
             ) : (
               challenges.map((challenge) => (
                 <div key={challenge.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
@@ -406,88 +398,73 @@ function ChallengesTab() {
   );
 }
 
-// Leaderboard Tab Component
-function LeaderboardTab() {
-  const [leaderboardData, setLeaderboardData] = useState([]);
+// Badges Tab Component
+function BadgesTab() {
+  const [badges, setBadges] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const fetchLeaderboard = async () => {
+  const fetchBadges = async () => {
     setLoading(true);
     try {
-      // Fetch leaderboard data from local storage
-      const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
-      // Sort by score descending
-      const sortedUsers = usersData.sort((a, b) => (b.score || 0) - (a.score || 0));
-      setLeaderboardData(sortedUsers);
+      // Mock data for badges
+      const mockBadges = [
+        { id: '1', name: 'Math Master', description: 'Complete 50 math questions', earned: true, category: 'math' },
+        { id: '2', name: 'Science Explorer', description: 'Complete 30 science questions', earned: false, category: 'science' },
+        { id: '3', name: 'History Buff', description: 'Complete 25 history questions', earned: false, category: 'history' },
+        { id: '4', name: 'Quick Learner', description: 'Answer 10 questions correctly in a row', earned: true, category: 'general' },
+      ];
+      setBadges(mockBadges);
     } catch (error) {
-      toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error fetching badges', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchLeaderboard();
+    fetchBadges();
   }, []);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
-        <p className="text-muted-foreground">See how you rank against others</p>
+        <h1 className="text-2xl font-display font-bold">My Badges</h1>
+        <p className="text-muted-foreground">Earn badges by completing challenges and competitions</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Student Rankings</CardTitle>
-          <CardDescription>Top performers across all competitions</CardDescription>
+          <CardTitle>My Badges Collection</CardTitle>
+          <CardDescription>Show off your achievements</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {loading ? (
-              <div className="text-center py-4">
+              <div className="text-center py-4 col-span-full">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            ) : leaderboardData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : badges.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4 col-span-full">No badges found</p>
             ) : (
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="p-3 text-left font-medium">Rank</th>
-                    <th className="p-3 text-left font-medium">Student</th>
-                    <th className="p-3 text-left font-medium">Score</th>
-                    <th className="p-3 text-left font-medium">Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboardData.map((student, index) => (
-                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{index + 1}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span>{student.display_name || 'No name'}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-full h-2 bg-muted rounded-full">
-                            <div
-                              className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress || 0}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              badges.map((badge) => (
+                <div key={badge.id} className="p-4 rounded-xl bg-muted/50 border border-border/50">
+                  <div className="relative">
+                    <div className={`w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center ${badge.earned ? 'bg-gradient-to-br from-primary to-accent' : 'bg-muted'}`}>
+                      <Award className={`w-8 h-8 ${badge.earned ? 'text-gold' : 'text-muted-foreground'}`} />
+                    </div>
+                    {!badge.earned && (
+                      <div className="absolute top-0 right-0">
+                        <Lock className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <h3 className="font-medium text-sm text-center">{badge.name}</h3>
+                  <p className="text-xs text-muted-foreground text-center mt-1">{badge.description}</p>
+                  <div className="flex items-center justify-center gap-2 mt-2">
+                    <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{badge.category}</span>
+                  </div>
+                </div>
+              ))
             )}
           </div>
         </CardContent>
@@ -516,28 +493,9 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Mock data for messages
-      const mockMessages = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          senderEmail: 'john@example.com',
-          subject: 'Question about competition',
-          content: 'Hello, I have a question about the upcoming math competition...',
-          date: '2025-06-01',
-          read: false
-        },
-        {
-          id: '2',
-          sender: 'Jane Smith',
-          senderEmail: 'jane@example.com',
-          subject: 'Technical issue',
-          content: 'I am having trouble accessing the practice questions...',
-          date: '2025-05-30',
-          read: true
-        }
-      ];
-      setMessages(mockMessages);
+      const { data, error } = await supabase.from('messages').select('*').eq('receiver_id', profile?.id);
+      if (error) throw error;
+      setMessages(data || []);
     } catch (error) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
@@ -550,8 +508,14 @@ function MessagesTab() {
     setSendingReply(true);
 
     try {
-      // Mock send reply
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase.from('messages').insert({
+        content: replyContent,
+        receiver_id: selectedMessage.senderEmail,
+        sender_id: profile?.email,
+        subject: `Re: ${selectedMessage.subject}`
+      });
+
+      if (error) throw error;
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
@@ -562,20 +526,6 @@ function MessagesTab() {
     setSendingReply(false);
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
-    setLoading(true);
-    try {
-      setMessages(messages.filter(msg => msg.id !== messageId));
-      if (selectedMessage?.id === messageId) {
-        setSelectedMessage(null);
-      }
-      toast({ title: 'Message deleted successfully!' });
-    } catch (error) {
-      toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchMessages();
   }, []);
@@ -584,7 +534,7 @@ function MessagesTab() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-display font-bold">Messages</h1>
-        <p className="text-muted-foreground">Your communications</p>
+        <p className="text-muted-foreground">Your communications with teachers and admins</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -635,30 +585,6 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
                         </div>
                       </button>
                     ))
@@ -708,7 +634,7 @@ function MessagesTab() {
             <Card>
               <CardContent className="flex items-center justify-center h-64">
                 <div className="text-center text-muted-foreground">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                  <Mail className="w-12 h-12 mx-auto mb-4" />
                   <p>Select a message to view details</p>
                 </div>
               </CardContent>
@@ -720,8 +646,8 @@ function MessagesTab() {
   );
 }
 
-// Profile View Component
-function ProfileView() {
+// Profile Tab Component
+function ProfileTab() {
   const { profile } = useAuth();
   const { toast } = useToast();
 
@@ -744,13 +670,13 @@ function ProfileView() {
             </div>
 
             <div className="space-y-2">
-              <Label>Role</Label>
-              <Input value={profile?.role || ''} disabled className="bg-muted" />
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
             </div>
 
             <div className="space-y-2">
-              <Label>Display Name</Label>
-              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+              <Label>School</Label>
+              <Input value={profile?.school_id || 'Not set'} disabled className="bg-muted" />
             </div>
           </CardContent>
         </Card>
@@ -761,13 +687,13 @@ function ProfileView() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Score</p>
-              <p className="text-2xl font-bold">{profile?.score?.toLocaleString() || '0'}</p>
+              <p className="text-sm text-muted-foreground">Total Score</p>
+              <p className="text-2xl font-bold">{profile?.score || 0}</p>
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Progress</p>
-              <p className="text-2xl font-bold">{profile?.progress?.toLocaleString() || '0'}%</p>
+              <p className="text-sm text-muted-foreground">Badges Earned</p>
+              <p className="text-2xl font-bold">0</p>
             </div>
 
             <div className="space-y-2">

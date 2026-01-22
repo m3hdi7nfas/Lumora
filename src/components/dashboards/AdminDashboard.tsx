@@ -1929,11 +1929,11 @@ function UsersTab() {
                         <td className="p-3">
                           <Select
                             value={user.role}
-                            onValueChange={(value) => handleRoleChange(user.id, value)}
-                            disabled={user.id === profile?.id || (value === 'admin' && profile?.role !== 'admin')}
+                            onValueChange={(selectedValue) => handleRoleChange(user.id, selectedValue)}
+                            disabled={user.id === profile?.id || (selectedValue === 'admin' && profile?.role !== 'admin')}
                           >
                             <SelectTrigger className="w-[120px] h-8">
-                              <SelectValue />
+                              <SelectValue placeholder={user.role} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="student">Student</SelectItem>

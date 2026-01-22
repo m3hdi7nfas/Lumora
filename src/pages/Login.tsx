@@ -13,7 +13,6 @@ import { AdBanner } from '@/components/ads/AdBanner';
 import { ContactDialog } from '@/components/landing/ContactDialog';
 import { Logo } from '@/components/ui/Logo';
 
-// Demo credentials
 const DEMO_ACCOUNTS = {
   admin: { email: 'demo.admin@lumora.com', password: 'Demo123!', role: 'admin', icon: Crown },
   moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'moderator', icon: Shield },
@@ -62,7 +61,6 @@ export default function Login() {
     try {
       console.log(`Attempting demo login for ${role}:`, account.email);
 
-      // Try to sign in with the demo account
       const { error: signInError } = await signIn(account.email, account.password);
 
       if (!signInError) {
@@ -119,7 +117,7 @@ export default function Login() {
         <Card className="w-full shadow-card-hover border-border/50">
           <CardHeader className="text-center space-y-2 pt-4 pb-3">
             <Link to="/" className="inline-flex items-center gap-6 justify-center mb-1">
-              <Logo size="lg" textSize="lg" />
+              <Logo size="lg" textSize="xl" />
             </Link>
             <CardTitle className="text-2xl font-display">Welcome!</CardTitle>
             <CardDescription className="text-sm">
@@ -191,7 +189,7 @@ export default function Login() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>

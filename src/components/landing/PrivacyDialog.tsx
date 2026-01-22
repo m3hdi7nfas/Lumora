@@ -1,6 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Shield, FileText, Calendar, Globe, User, Lock, Mail } from 'lucide-react';
-import { Logo } from '@/components/ui/Logo';
 
 interface PrivacyDialogProps {
   open: boolean;

@@ -10,7 +10,6 @@ import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
-import { Logo } from '@/components/ui/Logo';
 
 interface LandingPageEditorProps {
     isOpen: boolean;
@@ -110,10 +109,7 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Logo size="sm" textSize="md" />
-                        Edit Landing Page Content
-                    </DialogTitle>
+                    <DialogTitle>Edit Landing Page Content</DialogTitle>
                     <DialogDescription>
                         Make changes to the website content. Updates will be reflected immediately after saving.
                     </DialogDescription>

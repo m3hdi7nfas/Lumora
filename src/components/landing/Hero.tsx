@@ -5,7 +5,6 @@ import { ScrollAnimation } from '@/components/animations/ScrollAnimation';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
 import { CountingNumber } from '@/components/animations/CountingNumber';
 import { EditableText } from './EditableText';
-import { Logo } from '@/components/ui/Logo';
 
 interface HeroProps {
   content?: SiteContent['hero'];
@@ -87,8 +86,8 @@ export function Hero({
               <Button size="lg" variant="outline" className="text-lg px-8 py-6 hover:bg-secondary w-full sm:w-auto">
                 <EditableText
                   value={content.cta_secondary}
-                    isEditingGlobal={isEditingGlobal}
-                    onSave={(val) => updateContent?.('cta_secondary', val)}
+                  isEditingGlobal={isEditingGlobal}
+                  onSave={(val) => updateContent?.('cta_secondary', val)}
                 />
               </Button>
             </div>

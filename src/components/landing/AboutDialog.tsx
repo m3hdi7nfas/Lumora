@@ -1,6 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { GraduationCap, Users, Trophy, BookOpen, Target, Award, Swords, Star, Globe, Heart } from 'lucide-react';
-import { Logo } from '@/components/ui/Logo';
 
 interface AboutDialogProps {
   open: boolean;
@@ -25,7 +24,7 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
           <section className="text-center">
             <div className="mb-4">
               <div className="w-20 h-20 mx-auto mb-4 rounded-2xl gradient-hero flex items-center justify-center">
-                <Logo size="md" textSize="md" />
+                <GraduationCap className="w-10 h-10 text-primary-foreground" />
               </div>
               <h2 className="text-2xl font-display font-bold">Welcome to Lumora</h2>
               <p className="text-muted-foreground mt-2">

@@ -118,6 +118,8 @@ export default {
         "scale-in": "scale-in 0.2s ease-out",
       },
       transitionTimingFunction: {
+        // Add the problematic easing function to Tailwind's theme
+        // This prevents the ambiguity warning
         DEFAULT: "cubic-bezier(0.4, 0, 0.2, 1)",
       },
     },

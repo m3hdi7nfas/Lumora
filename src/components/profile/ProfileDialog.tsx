@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2, RefreshCw, User } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Logo } from '@/components/ui/Logo';
 
 const RANDOM_ADJECTIVES = ['Swift', 'Blue', 'Happy', 'Clever', 'Brave', 'Calm', 'Bright', 'Neon', 'Cyber', 'Pixel'];
 const RANDOM_NOUNS = ['Fox', 'Eagle', 'Panda', 'Tiger', 'Star', 'Moon', 'Comet', 'Ninja', 'Wizard', 'Robot'];
@@ -108,10 +107,7 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Logo size="sm" textSize="md" />
-                        Edit Profile
-                    </DialogTitle>
+                    <DialogTitle>Edit Profile</DialogTitle>
                     <DialogDescription>Update your personal information and settings.</DialogDescription>
                 </DialogHeader>
 

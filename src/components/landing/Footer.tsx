@@ -19,7 +19,7 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <Link to="/" className="flex items-center gap-2">
             <div className="p-2 rounded-xl gradient-hero">
-              <GraduationCap className="w-5 h-5 text-primary-foreground" />
+              <img src="/logo.png" alt="Lumora Logo" className="w-5 h-5" />
             </div>
             <span className="font-display font-bold">
               <EditableText

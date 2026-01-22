@@ -10,13 +10,13 @@ export const defaultSiteContent = {
             students: "1000+",
             competitions: "100+",
             questions: "10K+",
-            answers: "Expected"
+            schools: "500+"
         }
     },
     features: [
         {
             title: 'Competitions',
-            description: 'Participate in seasonal competitions with your school and compete against others.',
+            description: 'Participate in seasonal competitions with your school and compete against others. Expected prizes for top performers!',
             icon: 'Trophy'
         },
         {

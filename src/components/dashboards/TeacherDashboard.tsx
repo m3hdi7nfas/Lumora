@@ -154,31 +154,31 @@ function TeacherOverviewTab() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total Students"
-          value={stats.totalStudents.toLocaleString()}
+          value={(stats.totalStudents || 0).toLocaleString()}
           icon={Users}
           color="text-primary"
         />
         <StatCard
           title="Competitions"
-          value={stats.totalCompetitions.toLocaleString()}
+          value={(stats.totalCompetitions || 0).toLocaleString()}
           icon={Trophy}
           color="text-gold"
         />
         <StatCard
           title="Questions"
-          value={stats.totalQuestions.toLocaleString()}
+          value={(stats.totalQuestions || 0).toLocaleString()}
           icon={FileQuestion}
           color="text-success"
         />
         <StatCard
           title="Active Competitions"
-          value={stats.activeCompetitions.toLocaleString()}
+          value={(stats.activeCompetitions || 0).toLocaleString()}
           icon={Clock}
           color="text-warning"
         />
         <StatCard
           title="My Score"
-          value={stats.myScore.toLocaleString()}
+          value={(stats.myScore || 0).toLocaleString()}
           icon={Star}
           color="text-primary"
         />

@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -139,6 +140,7 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    font-family: 'Roboto', 'Poppins', sans-serif;
   }
 
   /* Custom Scrollbar - Flying Thumb, no track */
@@ -186,6 +188,7 @@
   h5,
   h6 {
     @apply font-display font-bold tracking-tight;
+    font-family: 'Poppins', 'Roboto', sans-serif;
   }
 }
 

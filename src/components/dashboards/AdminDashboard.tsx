@@ -46,6 +46,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AdToggle } from '@/components/ads/AdToggle';
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {
@@ -253,6 +254,17 @@ function AdminOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: strin
           className="bg-warning/10 border-warning/20"
         />
       </div>
+
+      {/* Ad Toggle for Admin */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Advertisement Settings</CardTitle>
+          <CardDescription>Control ad visibility for users</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AdToggle />
+        </CardContent>
+      </Card>
 
       {/* Quick Actions and Recent Activity in 2 columns */}
       <div className="grid md:grid-cols-2 gap-6">
@@ -624,8 +636,11 @@ function CompetitionsTab() {
     category: '',
     difficulty: 'medium',
     created_at: '',
-    updated_at: ''
+    updated_at: '',
+    participating_schools: []
   });
+  const [schools, setSchools] = useState([]);
+  const [selectAllSchools, setSelectAllSchools] = useState(false);
   const { toast } = useToast();
 
   const fetchCompetitions = async () => {
@@ -640,6 +655,15 @@ function CompetitionsTab() {
     setLoading(false);
   };
 
+  const fetchSchools = async () => {
+    try {
+      const schoolsData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS);
+      setSchools(schoolsData);
+    } catch (error) {
+      console.error('Error fetching schools:', error);
+    }
+  };
+
   const filteredCompetitions = competitions.filter(competition =>
     competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     competition.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -647,6 +671,7 @@ function CompetitionsTab() {
 
   useEffect(() => {
     fetchCompetitions();
+    fetchSchools();
   }, []);
 
   const handleAddCompetition = async () => {
@@ -686,8 +711,10 @@ function CompetitionsTab() {
         category: '',
         difficulty: 'medium',
         created_at: '',
-        updated_at: ''
+        updated_at: '',
+        participating_schools: []
       });
+      setSelectAllSchools(false);
     } catch (error) {
       toast({ title: 'Error adding competition', description: error.message, variant: 'destructive' });
     }
@@ -705,6 +732,24 @@ function CompetitionsTab() {
       toast({ title: 'Error deleting competition', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
+  };
+
+  const handleSchoolSelection = (schoolId: string) => {
+    setNewCompetition(prev => {
+      const newSchools = prev.participating_schools.includes(schoolId)
+        ? prev.participating_schools.filter(id => id !== schoolId)
+        : [...prev.participating_schools, schoolId];
+      return { ...prev, participating_schools: newSchools };
+    });
+  };
+
+  const handleSelectAllSchools = () => {
+    if (selectAllSchools) {
+      setNewCompetition(prev => ({ ...prev, participating_schools: [] }));
+    } else {
+      setNewCompetition(prev => ({ ...prev, participating_schools: schools.map(school => school.id) }));
+    }
+    setSelectAllSchools(!selectAllSchools);
   };
 
   return (
@@ -866,13 +911,31 @@ function CompetitionsTab() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Max Participants</Label>
-              <Input
-                type="number"
-                value={newCompetition.max_participants}
-                onChange={(e) => setNewCompetition({ ...newCompetition, max_participants: parseInt(e.target.value) || 0 })}
-                placeholder="100"
-              />
+              <Label>Participating Schools</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectAllSchools}
+                  className="h-8"
+                >
+                  {selectAllSchools ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+                {schools.map((school) => (
+                  <div key={school.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`school-${school.id}`}
+                      checked={newCompetition.participating_schools.includes(school.id)}
+                      onCheckedChange={() => handleSchoolSelection(school.id)}
+                    />
+                    <Label htmlFor={`school-${school.id}`} className="text-sm truncate">
+                      {school.name}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <Checkbox
@@ -2158,7 +2221,10 @@ function ApprovalsTab() {
       localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'approved' });
       setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
 
-      toast({ title: 'Request approved!', description: 'The request has been approved and will be processed.' });
+      toast({
+        title: 'Request approved!',
+        description: 'The request has been approved and will be processed.'
+      });
     } catch (error) {
       toast({ title: 'Error approving request', description: error.message, variant: 'destructive' });
     }
@@ -2172,7 +2238,10 @@ function ApprovalsTab() {
       localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'rejected' });
       setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
 
-      toast({ title: 'Request rejected!', description: 'The request has been rejected.' });
+      toast({
+        title: 'Request rejected!',
+        description: 'The request has been rejected.'
+      });
     } catch (error) {
       toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
     }

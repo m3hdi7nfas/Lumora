@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FileText, Calendar, User, Shield, Trophy, BookOpen, AlertTriangle, Mail } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 interface TermsDialogProps {
   open: boolean;

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { GripVertical } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 export function AdBanner() {
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -165,7 +166,8 @@ export function AdBanner() {
                         {/* Google AdMob Placeholder with Publisher ID */}
                         <div className="aspect-video bg-muted/30 rounded-lg flex items-center justify-center border border-dashed border-border">
                             <div className="text-center p-4">
-                                <p className="text-xs text-muted-foreground">
+                                <Logo size="sm" textSize="sm" />
+                                <p className="text-xs text-muted-foreground mt-2">
                                     Ad Space
                                 </p>
                                 <p className="text-[10px] text-muted-foreground/60 mt-1">

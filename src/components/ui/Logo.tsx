@@ -1,58 +1,66 @@
-import { GraduationCap, Star, Trophy, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  className?: string;
-  withText?: boolean;
+  size?: 'sm' | 'md' | 'lg';
   textSize?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
 }
 
-export function Logo({ size = 'md', className = '', withText = true, textSize }: LogoProps) {
+export function Logo({ size = 'md', textSize = 'md', className }: LogoProps) {
+  // Size classes
   const sizeClasses = {
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
-    lg: 'w-12 h-12',
-    xl: 'w-16 h-16'
+    lg: 'w-12 h-12'
   };
 
+  // Text size classes
   const textSizeClasses = {
-    sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-xl',
-    xl: 'text-2xl'
+    sm: 'text-lg',
+    md: 'text-xl',
+    lg: 'text-2xl',
+    xl: 'text-3xl'
   };
-
-  // Determine text size based on logo size if not specified
-  const effectiveTextSize = textSize || size;
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <div className={`relative ${sizeClasses[size]}`}>
-        {/* Background circle with enhanced gradient */}
-        <div className="absolute inset-0 rounded-full gradient-hero opacity-90" />
-
-        {/* Main graduation cap - larger and more prominent */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <GraduationCap className={`w-3/4 h-3/4 text-primary-foreground`} />
-        </div>
-
-        {/* Enhanced decorative elements */}
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full flex items-center justify-center shadow-lg">
-          <Star className="w-3 h-3 text-gold-foreground animate-pulse" />
-        </div>
-
-        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full shadow-lg" />
-
-        {/* Additional decorative elements for more sophistication */}
-        <div className="absolute top-1/2 -right-2 w-2 h-2 bg-success rounded-full" />
-        <div className="absolute top-1/3 -left-2 w-1.5 h-1.5 bg-warning rounded-full" />
+    <div className={cn("flex items-center gap-2 font-display font-bold", className)}>
+      <div className={cn("flex items-center justify-center rounded-lg gradient-hero", sizeClasses[size])}>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className={cn("w-6 h-6 text-primary-foreground", {
+            'w-4 h-4': size === 'sm',
+            'w-5 h-5': size === 'md',
+            'w-6 h-6': size === 'lg'
+          })}
+        >
+          <path
+            d="M12 2L2 7V17L12 22L22 17V7L12 2Z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M2 7L12 12L22 7"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M12 22V12"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </div>
-
-      {withText && (
-        <span className={`font-display font-bold ${textSizeClasses[effectiveTextSize]} tracking-wide`}>
-          Lumora
-        </span>
-      )}
+      <span className={cn("text-gradient font-display font-bold", textSizeClasses[textSize])}>
+        Lumora
+      </span>
     </div>
   );
 }

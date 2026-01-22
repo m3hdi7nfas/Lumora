@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Logo } from '@/components/ui/Logo';
 
 export function AdBox() {
     const [showAds, setShowAds] = useState(true);
@@ -38,7 +39,8 @@ export function AdBox() {
                     {/* Google AdMob Placeholder */}
                     <div className="aspect-square bg-muted/30 rounded-lg flex items-center justify-center border border-dashed border-border">
                         <div className="text-center p-4">
-                            <p className="text-xs text-muted-foreground">
+                            <Logo size="sm" textSize="sm" />
+                            <p className="text-xs text-muted-foreground mt-2">
                                 Ad Space
                             </p>
                             <p className="text-[10px] text-muted-foreground/60 mt-1">

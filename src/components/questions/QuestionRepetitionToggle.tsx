@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Logo } from '@/components/ui/Logo';
 
 interface QuestionRepetitionToggleProps {
   questionId: string;

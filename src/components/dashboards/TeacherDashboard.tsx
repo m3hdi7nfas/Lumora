@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, Eye, EyeOff, Loader2, RefreshCw, User, CheckCircle, XCircle, MessageSquare, AlertTriangle, Trash2, Mail, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Upload, ChevronDown, Shield, Unlock, Lock, Mail as MailIcon } from 'lucide-react';
+import { Search, Eye, EyeOff, Loader2, RefreshCw, User, CheckCircle, XCircle, MessageSquare, AlertTriangle, Trash2, Mail, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Upload, ChevronDown, Shield, Unlock, Lock, Mail as MailIcon, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -89,7 +89,8 @@ function TeacherOverviewTab() {
     totalCompetitions: 0,
     totalQuestions: 0,
     activeCompetitions: 0,
-    pendingApprovals: 0
+    myScore: 0,
+    myRank: 0
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -98,10 +99,6 @@ function TeacherOverviewTab() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      // Fetch all profiles
-      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
-      if (profilesError) throw profilesError;
-
       // Fetch competitions
       const { data: competitions, error: competitionsError } = await supabase.from('competitions').select('*');
       if (competitionsError) throw competitionsError;
@@ -110,19 +107,26 @@ function TeacherOverviewTab() {
       const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
       if (questionsError) throw questionsError;
 
+      // Fetch all students for ranking
+      const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
+      if (studentsError) throw studentsError;
+
       // Calculate stats
-      const totalStudents = profiles.filter(p => p.role === 'student').length;
       const totalCompetitions = competitions.length;
       const totalQuestions = questions.length;
       const activeCompetitions = competitions.filter(c => c.is_active).length;
-      const pendingApprovals = 0; // Placeholder for pending approvals
+      const myScore = profile?.score || 0;
+
+      // Calculate rank
+      const sortedStudents = students.sort((a, b) => (b.score || 0) - (a.score || 0));
+      const myRank = sortedStudents.findIndex(s => s.id === profile?.id) + 1;
 
       setStats({
-        totalStudents,
         totalCompetitions,
         totalQuestions,
         activeCompetitions,
-        pendingApprovals
+        myScore,
+        myRank
       });
     } catch (error) {
       toast({ title: 'Error fetching stats', description: error.message, variant: 'destructive' });
@@ -173,10 +177,10 @@ function TeacherOverviewTab() {
           color="text-warning"
         />
         <StatCard
-          title="Pending Approvals"
-          value={stats.pendingApprovals.toLocaleString()}
-          icon={AlertTriangle}
-          color="text-destructive"
+          title="My Score"
+          value={stats.myScore.toLocaleString()}
+          icon={Star}
+          color="text-primary"
         />
       </div>
 

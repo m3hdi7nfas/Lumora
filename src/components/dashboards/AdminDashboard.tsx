@@ -27,7 +27,9 @@ import {
   Edit,
   Trash2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Settings,
+  FileText
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +44,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { QuestionSetForm } from '@/components/questions/QuestionSetForm';
+import { Switch } from '@/components/ui/switch';
 
 function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -174,6 +177,87 @@ function AdminOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }
     { id: 'leaderboard', icon: Trophy, title: 'Global Leaderboard', description: 'See top performers' },
   ];
 
+  const handleResetDemoData = () => {
+    // Reset demo accounts data
+    const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
+    const updatedUsers = users.map(user => {
+      if (user.email.includes('demo.')) {
+        return {
+          ...user,
+          score: 0,
+          progress: 0,
+          display_name: user.email.split('@')[0].replace('demo.', '').replace(/\./g, ' '),
+          email: user.email // Keep email but reset other data
+        };
+      }
+      return user;
+    });
+
+    localStorage.setItem('lumora_users', JSON.stringify(updatedUsers));
+
+    // Reset competitions
+    const defaultCompetitions = [
+      {
+        id: 'comp-1',
+        name: 'Math Challenge',
+        description: 'Annual math competition for all students',
+        is_active: true,
+        max_participants: 100,
+        current_participants: 0, // Reset to 0
+        start_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'comp-2',
+        name: 'Science Olympiad',
+        description: 'Science competition covering physics, chemistry, and biology',
+        is_active: false,
+        max_participants: 50,
+        current_participants: 0, // Reset to 0
+        start_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        end_date: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('lumora_competitions', JSON.stringify(defaultCompetitions));
+
+    // Reset questions
+    const defaultQuestions = [
+      {
+        id: 'q-1',
+        text: 'What is 2 + 2?',
+        category: 'Math',
+        difficulty: 'easy',
+        points: 10,
+        options: ['2', '3', '4', '5'],
+        correct_answer: '4',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'q-2',
+        text: 'What is the capital of France?',
+        category: 'Geography',
+        difficulty: 'medium',
+        points: 15,
+        options: ['London', 'Berlin', 'Paris', 'Madrid'],
+        correct_answer: 'Paris',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem('lumora_questions', JSON.stringify(defaultQuestions));
+
+    toast({
+      title: 'Demo data reset',
+      description: 'All demo accounts have been reset to default values',
+      variant: 'success'
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -244,6 +328,18 @@ function AdminOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }
                 </div>
               </button>
             ))}
+          </div>
+
+          {/* Reset Demo Data Button */}
+          <div className="mt-6 pt-4 border-t border-border/50">
+            <Button
+              onClick={handleResetDemoData}
+              variant="outline"
+              className="w-full gradient-hero hover:scale-105 transition-transform"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Reset Demo Data
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -459,9 +555,62 @@ function QuestionSetsTab() {
     setLoading(false);
   };
 
+  const handleToggleRedo = async (setId: string, allowRedo: boolean) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('question_sets').update({
+        allow_redo: allowRedo,
+        updated_at: new Date().toISOString()
+      }).eq('id', setId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Redo setting updated',
+        description: `Students can ${allowRedo ? 'now' : 'no longer'} redo this question set`
+      });
+
+      fetchQuestionSets();
+    } catch (error) {
+      toast({ title: 'Error updating redo setting', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleToggleScoring = async (setId: string, scoringMethod: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('question_sets').update({
+        scoring_method: scoringMethod,
+        updated_at: new Date().toISOString()
+      }).eq('id', setId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Scoring method updated',
+        description: `Scoring method set to: ${scoringMethod}`
+      });
+
+      fetchQuestionSets();
+    } catch (error) {
+      toast({ title: 'Error updating scoring method', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   const getTimerInfo = (set) => {
     if (!set.is_timed) return 'No time limit';
     return `${set.time_limit_minutes} min${set.auto_submit ? ' (auto-submit)' : ''}`;
+  };
+
+  const getScoringMethodLabel = (method) => {
+    switch (method) {
+      case 'highest': return 'Highest Score';
+      case 'best_of_three': return 'Best of 3 Attempts';
+      case 'first_attempt': return 'First Attempt Only';
+      default: return 'Highest Score';
+    }
   };
 
   useEffect(() => {
@@ -570,6 +719,41 @@ function QuestionSetsTab() {
                             </AlertDialogFooter>
                           </AlertDialogContent>
                         </AlertDialog>
+                      </div>
+                    </div>
+
+                    {/* Admin Controls */}
+                    <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Allow Redo</Label>
+                        <Switch
+                          checked={set.allow_redo || false}
+                          onCheckedChange={(checked) => handleToggleRedo(set.id, checked)}
+                          disabled={loading}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Scoring Method</Label>
+                        <Select
+                          value={set.scoring_method || 'highest'}
+                          onValueChange={(value) => handleToggleScoring(set.id, value)}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Select scoring method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="highest">Highest Score</SelectItem>
+                            <SelectItem value="best_of_three">Best of 3 Attempts</SelectItem>
+                            <SelectItem value="first_attempt">First Attempt Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Settings className="w-3 h-3" />
+                        <span>Current: {getScoringMethodLabel(set.scoring_method || 'highest')}</span>
                       </div>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Clock, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
 
 interface QuestionSetFormProps {
   initialData?: any;
@@ -26,6 +27,8 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
     is_timed: false,
     time_limit_minutes: 15,
     auto_submit: true,
+    allow_redo: false,
+    scoring_method: 'highest',
     created_at: '',
     updated_at: ''
   });
@@ -42,6 +45,8 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
         is_timed: initialData.is_timed || false,
         time_limit_minutes: initialData.time_limit_minutes || 15,
         auto_submit: initialData.auto_submit !== false, // default to true
+        allow_redo: initialData.allow_redo || false,
+        scoring_method: initialData.scoring_method || 'highest',
         created_at: initialData.created_at || '',
         updated_at: initialData.updated_at || ''
       });
@@ -190,6 +195,51 @@ export function QuestionSetForm({ initialData, onSubmit, onCancel, isLoading }: 
                   </div>
                 </div>
               </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Redo Settings */}
+        <Card className="border-accent/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-accent" />
+              Redo Settings
+            </CardTitle>
+            <CardDescription>Configure whether students can redo this question set</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Switch
+                id="allow_redo"
+                checked={formData.allow_redo}
+                onCheckedChange={(checked) => setFormData({ ...formData, allow_redo: checked })}
+              />
+              <Label htmlFor="allow_redo" className="font-medium">
+                Allow Students to Redo This Question Set
+              </Label>
+            </div>
+
+            {formData.allow_redo && (
+              <div className="space-y-2 ml-6">
+                <Label htmlFor="scoring_method">Scoring Method</Label>
+                <Select
+                  value={formData.scoring_method}
+                  onValueChange={(value) => setFormData({ ...formData, scoring_method: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select scoring method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="highest">Highest Score Achieved</SelectItem>
+                    <SelectItem value="best_of_three">Best Score from 3 Attempts</SelectItem>
+                    <SelectItem value="first_attempt">First Attempt Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose how points are awarded when students redo this question set
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>

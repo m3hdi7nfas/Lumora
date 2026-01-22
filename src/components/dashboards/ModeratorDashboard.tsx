@@ -27,7 +27,8 @@ import {
   Edit,
   Trash2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogFooter } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 
 function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
   const { profile } = useAuth();
@@ -412,9 +414,62 @@ function QuestionSetsTab() {
     setLoading(false);
   };
 
+  const handleToggleRedo = async (setId: string, allowRedo: boolean) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('question_sets').update({
+        allow_redo: allowRedo,
+        updated_at: new Date().toISOString()
+      }).eq('id', setId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Redo setting updated',
+        description: `Students can ${allowRedo ? 'now' : 'no longer'} redo this question set`
+      });
+
+      fetchQuestionSets();
+    } catch (error) {
+      toast({ title: 'Error updating redo setting', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleToggleScoring = async (setId: string, scoringMethod: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('question_sets').update({
+        scoring_method: scoringMethod,
+        updated_at: new Date().toISOString()
+      }).eq('id', setId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Scoring method updated',
+        description: `Scoring method set to: ${scoringMethod}`
+      });
+
+      fetchQuestionSets();
+    } catch (error) {
+      toast({ title: 'Error updating scoring method', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
   const getTimerInfo = (set) => {
     if (!set.is_timed) return 'No time limit';
     return `${set.time_limit_minutes} min${set.auto_submit ? ' (auto-submit)' : ''}`;
+  };
+
+  const getScoringMethodLabel = (method) => {
+    switch (method) {
+      case 'highest': return 'Highest Score';
+      case 'best_of_three': return 'Best of 3 Attempts';
+      case 'first_attempt': return 'First Attempt Only';
+      default: return 'Highest Score';
+    }
   };
 
   useEffect(() => {
@@ -481,6 +536,41 @@ function QuestionSetsTab() {
                       <Button size="sm" variant="outline" className="gradient-hero">
                         View
                       </Button>
+                    </div>
+
+                    {/* Moderator Controls */}
+                    <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Allow Redo</Label>
+                        <Switch
+                          checked={set.allow_redo || false}
+                          onCheckedChange={(checked) => handleToggleRedo(set.id, checked)}
+                          disabled={loading}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Scoring Method</Label>
+                        <Select
+                          value={set.scoring_method || 'highest'}
+                          onValueChange={(value) => handleToggleScoring(set.id, value)}
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Select scoring method" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="highest">Highest Score</SelectItem>
+                            <SelectItem value="best_of_three">Best of 3 Attempts</SelectItem>
+                            <SelectItem value="first_attempt">First Attempt Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Settings className="w-3 h-3" />
+                        <span>Current: {getScoringMethodLabel(set.scoring_method || 'highest')}</span>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -1,41 +1,58 @@
-import { cn } from "@/lib/utils";
+import { GraduationCap, Star, Trophy, BookOpen } from 'lucide-react';
 
 interface LogoProps {
-  size?: "sm" | "md" | "lg" | "xl";
-  textSize?: "sm" | "md" | "lg" | "xl";
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  withText?: boolean;
+  textSize?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function Logo({ size = "md", textSize = "md", className }: LogoProps) {
+export function Logo({ size = 'md', className = '', withText = true, textSize }: LogoProps) {
   const sizeClasses = {
-    sm: "w-8 h-8",
-    md: "w-10 h-10",
-    lg: "w-12 h-12",
-    xl: "w-16 h-16",
+    sm: 'w-8 h-8',
+    md: 'w-10 h-10',
+    lg: 'w-12 h-12',
+    xl: 'w-16 h-16'
   };
 
   const textSizeClasses = {
-    sm: "text-sm",
-    md: "text-base",
-    lg: "text-lg",
-    xl: "text-xl",
+    sm: 'text-base',
+    md: 'text-lg',
+    lg: 'text-xl',
+    xl: 'text-2xl'
   };
 
+  // Determine text size based on logo size if not specified
+  const effectiveTextSize = textSize || size;
+
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <div className={cn("rounded-full gradient-hero flex items-center justify-center", sizeClasses[size])}>
-        <svg
-          className={cn("text-primary-foreground", size === "sm" ? "w-4 h-4" : size === "md" ? "w-5 h-5" : size === "lg" ? "w-6 h-6" : "w-8 h-8")}
-          fill="currentColor"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z"/>
-        </svg>
+    <div className={`flex items-center gap-3 ${className}`}>
+      <div className={`relative ${sizeClasses[size]}`}>
+        {/* Background circle with enhanced gradient */}
+        <div className="absolute inset-0 rounded-full gradient-hero opacity-90" />
+
+        {/* Main graduation cap - larger and more prominent */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <GraduationCap className={`w-3/4 h-3/4 text-primary-foreground`} />
+        </div>
+
+        {/* Enhanced decorative elements */}
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full flex items-center justify-center shadow-lg">
+          <Star className="w-3 h-3 text-gold-foreground animate-pulse" />
+        </div>
+
+        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full shadow-lg" />
+
+        {/* Additional decorative elements for more sophistication */}
+        <div className="absolute top-1/2 -right-2 w-2 h-2 bg-success rounded-full" />
+        <div className="absolute top-1/3 -left-2 w-1.5 h-1.5 bg-warning rounded-full" />
       </div>
-      <span className={cn("font-bold lumora-logo", textSizeClasses[textSize])}>
-        Lumora
-      </span>
+
+      {withText && (
+        <span className={`font-display font-bold ${textSizeClasses[effectiveTextSize]} tracking-wide`}>
+          Lumora
+        </span>
+      )}
     </div>
   );
 }

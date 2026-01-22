@@ -32,8 +32,7 @@ import {
   Trash2,
   Upload,
   ChevronDown,
-  ChevronUp,
-  Image as ImageIcon
+  ChevronUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -133,10 +132,11 @@ function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiv
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
-              ? 'bg-primary text-primary-foreground shadow-card'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-              }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+              activeTab === item.id
+                ? 'bg-primary text-primary-foreground shadow-card'
+                : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
           >
             <item.icon className="w-5 h-5" />
             <span className="font-medium">{item.label}</span>
@@ -377,6 +377,7 @@ function SchoolsTab() {
       setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
 
       toast({ title: 'School added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewSchool({
         id: '',
@@ -627,15 +628,26 @@ function CompetitionsTab() {
   });
   const { toast } = useToast();
 
-  // Load competitions from local storage
-  useEffect(() => {
-    setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
-  }, []);
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    try {
+      // Fetch competitions from local storage
+      const competitionsData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS);
+      setCompetitions(competitionsData);
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
 
   const filteredCompetitions = competitions.filter(competition =>
     competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     competition.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
 
   const handleAddCompetition = async () => {
     // Validate required fields
@@ -660,6 +672,7 @@ function CompetitionsTab() {
       setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
 
       toast({ title: 'Competition added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewCompetition({
         id: '',
@@ -909,15 +922,26 @@ function QuestionsTab() {
   });
   const { toast } = useToast();
 
-  // Load questions from local storage
-  useEffect(() => {
-    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-  }, []);
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      // Fetch questions from local storage
+      const questionsData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
+      setQuestions(questionsData);
+    } catch (error) {
+      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
 
   const filteredQuestions = questions.filter(question =>
     question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
     question.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
 
   const handleAddQuestion = async () => {
     // Validate required fields
@@ -942,6 +966,7 @@ function QuestionsTab() {
       setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
 
       toast({ title: 'Question added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewQuestion({
         id: '',
@@ -1182,15 +1207,26 @@ function QuestionSetsTab() {
   });
   const { toast } = useToast();
 
-  // Load question sets from local storage
-  useEffect(() => {
-    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
-  }, []);
+  const fetchQuestionSets = async () => {
+    setLoading(true);
+    try {
+      // Fetch question sets from local storage
+      const questionSetsData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS);
+      setQuestionSets(questionSetsData);
+    } catch (error) {
+      toast({ title: 'Error fetching question sets', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
 
   const filteredQuestionSets = questionSets.filter(qs =>
     qs.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     qs.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  useEffect(() => {
+    fetchQuestionSets();
+  }, []);
 
   const handleAddQuestionSet = async () => {
     // Validate required fields
@@ -1215,6 +1251,7 @@ function QuestionSetsTab() {
       setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
 
       toast({ title: 'Question set added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewQuestionSet({
         id: '',
@@ -1446,6 +1483,7 @@ function AvatarsTab() {
       setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
 
       toast({ title: 'Avatar added successfully!' });
+
       setIsAddDialogOpen(false);
       setNewAvatar({
         id: '',
@@ -1516,11 +1554,7 @@ function AvatarsTab() {
                 {filteredAvatars.map((avatar) => (
                   <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
                     <div className="flex flex-col items-center gap-3">
-                      <img
-                        src={avatar.image_url}
-                        alt={avatar.name}
-                        className="w-16 h-16 rounded-full object-cover"
-                      />
+                      <img src={avatar.image_url} alt={avatar.name} className="w-16 h-16 rounded-full object-cover" />
                       <div className="text-center">
                         <h3 className="font-medium text-sm">{avatar.name}</h3>
                         <p className="text-xs text-muted-foreground">{avatar.category}</p>
@@ -1697,6 +1731,7 @@ function UsersTab() {
         title: 'User added successfully!',
         description: `Password: ${userToAdd.password}`
       });
+
       setIsAddDialogOpen(false);
       setNewUser({
         id: '',
@@ -1764,6 +1799,7 @@ function UsersTab() {
         title: `Bulk users added successfully!`,
         description: `${usersToAdd.length} users added with auto-generated passwords.`
       });
+
       setIsBulkAddDialogOpen(false);
       setBulkUsers('');
     } catch (error) {
@@ -2107,7 +2143,11 @@ function ApprovalsTab() {
       if (!approval) return;
 
       // For admin dashboard, we can approve all types
-      const allowedTypes = ['question', 'question_delete', 'competition', 'competition_delete', 'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete', 'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'];
+      const allowedTypes = [
+        'question', 'question_delete', 'competition', 'competition_delete',
+        'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete',
+        'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'
+      ];
 
       if (!allowedTypes.includes(type)) {
         toast({ title: 'You cannot approve this type of request', variant: 'destructive' });
@@ -2165,7 +2205,13 @@ function ApprovalsTab() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${approval.status === 'pending' ? 'bg-warning/10 text-warning' : approval.status === 'approved' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          approval.status === 'pending'
+                            ? 'bg-warning/10 text-warning'
+                            : approval.status === 'approved'
+                            ? 'bg-success/10 text-success'
+                            : 'bg-destructive/10 text-destructive'
+                        }`}>
                           {approval.status}
                         </span>
                         <h3 className="font-medium">{getApprovalTitle(approval.type)}</h3>
@@ -2346,7 +2392,11 @@ function MessagesTab() {
                       <button
                         key={message.id}
                         onClick={() => setSelectedMessage(message)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
+                        className={`w-full text-left p-3 rounded-lg transition-colors ${
+                          selectedMessage?.id === message.id
+                            ? 'bg-primary/10 border border-primary'
+                            : 'hover:bg-muted/50'
+                        } ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -2366,8 +2416,8 @@ function MessagesTab() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>

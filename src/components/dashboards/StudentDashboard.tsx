@@ -1,106 +1,204 @@
-function StudentOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
+function StudentCompetitionsTab() {
+  const [competitions, setCompetitions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('available'); // 'available' or 'joined'
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Get stats from local storage
-  const competitions = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
-
-  const stats = {
-    totalCompetitions: competitions.length,
-    totalQuestions: questions.length,
-    score: profile?.score || 0,
-    progress: profile?.progress || 0
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    try {
+      // Fetch competitions from local storage
+      const storedCompetitions = localStorage.getItem('lumora_competitions');
+      if (storedCompetitions) {
+        setCompetitions(JSON.parse(storedCompetitions));
+      }
+    } catch (error) {
+      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
   };
 
-  const quickActions = [
-    { id: 'competitions', icon: Trophy, title: 'Join Competitions', description: 'Participate in learning challenges' },
-    { id: 'challenges', icon: FileQuestion, title: 'Complete Challenges', description: 'Earn extra points and badges' },
-    { id: 'leaderboard', icon: CheckSquare, title: 'View Leaderboard', description: 'See how you rank against others' },
-    { id: 'messages', icon: MessageSquare, title: 'Check Messages', description: 'Read your communications' },
-  ];
+  const handleJoinCompetition = async (competitionId) => {
+    try {
+      // Update competition in local storage
+      const updatedCompetitions = competitions.map(comp => {
+        if (comp.id === competitionId) {
+          return {
+            ...comp,
+            current_participants: (comp.current_participants || 0) + 1,
+            participants: [...(comp.participants || []), profile?.id]
+          };
+        }
+        return comp;
+      });
+
+      localStorage.setItem('lumora_competitions', JSON.stringify(updatedCompetitions));
+      setCompetitions(updatedCompetitions);
+
+      toast({ title: 'Competition joined successfully!', description: 'You can now participate in this competition.' });
+    } catch (error) {
+      toast({ title: 'Error joining competition', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleLeaveCompetition = async (competitionId) => {
+    try {
+      // Update competition in local storage
+      const updatedCompetitions = competitions.map(comp => {
+        if (comp.id === competitionId) {
+          return {
+            ...comp,
+            current_participants: Math.max((comp.current_participants || 0) - 1, 0),
+            participants: (comp.participants || []).filter(id => id !== profile?.id)
+          };
+        }
+        return comp;
+      });
+
+      localStorage.setItem('lumora_competitions', JSON.stringify(updatedCompetitions));
+      setCompetitions(updatedCompetitions);
+
+      toast({ title: 'Left competition successfully!' });
+    } catch (error) {
+      toast({ title: 'Error leaving competition', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
+
+  // Filter competitions
+  const availableCompetitions = competitions.filter(comp =>
+    comp.is_active &&
+    !comp.participants?.includes(profile?.id) &&
+    (comp.current_participants || 0) < (comp.max_participants || Infinity)
+  );
+
+  const joinedCompetitions = competitions.filter(comp =>
+    comp.participants?.includes(profile?.id)
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-display font-bold">Student Dashboard</h1>
-          <p className="text-muted-foreground">Track your learning progress and achievements</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-display font-bold">Competitions</h1>
+        <p className="text-muted-foreground">Participate in learning challenges</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Competitions"
-          value={stats.totalCompetitions.toString()}
-          icon={Trophy}
-          className="bg-primary/10 border-primary/20"
-        />
-        <StatCard
-          title="Total Questions"
-          value={stats.totalQuestions.toLocaleString()}
-          icon={FileQuestion}
-          className="bg-accent/10 border-accent/20"
-        />
-        <StatCard
-          title="Your Score"
-          value={stats.score.toLocaleString()}
-          icon={Star}
-          className="bg-success/10 border-success/20"
-        />
-        <StatCard
-          title="Progress"
-          value={`${stats.progress}%`}
-          icon={TrendingUp}
-          className="bg-warning/10 border-warning/20"
-        />
-      </div>
+      {/* Filter Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2 max-w-[400px]">
+          <TabsTrigger value="available">Find Competitions</TabsTrigger>
+          <TabsTrigger value="joined">My Competitions</TabsTrigger>
+        </TabsList>
 
-      {/* Quick Actions and Recent Activity in 2 columns */}
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Common student tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
-              {quickActions.map((action, index) => (
-                <button
-                  key={action.id}
-                  onClick={() => setActiveTab(action.id)}
-                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-lg bg-muted">
-                      <action.icon className="w-5 h-5 text-primary" />
+        <TabsContent value="available">
+          <Card>
+            <CardHeader>
+              <CardTitle>Available Competitions</CardTitle>
+              <CardDescription>Competitions you can join</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : availableCompetitions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No available competitions</p>
+              ) : (
+                <div className="space-y-4">
+                  {availableCompetitions.map(comp => (
+                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{comp.name}</h3>
+                          <p className="text-sm text-muted-foreground">{comp.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="gradient-hero"
+                          onClick={() => handleJoinCompetition(comp.id)}
+                        >
+                          Join Competition
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-medium">{action.title}</h3>
-                      <p className="text-xs text-muted-foreground">{action.description}</p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Your latest learning events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p className="text-center text-muted-foreground py-4">No recent activity</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="joined">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Competitions</CardTitle>
+              <CardDescription>Competitions you've joined</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </div>
+              ) : joinedCompetitions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">You haven't joined any competitions yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {joinedCompetitions.map(comp => (
+                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{comp.name}</h3>
+                          <p className="text-sm text-muted-foreground">{comp.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleLeaveCompetition(comp.id)}
+                          >
+                            Leave
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="gradient-hero"
+                            onClick={() => toast({ title: 'Participating in competition', description: 'You are now actively participating!' })}
+                          >
+                            Participate
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

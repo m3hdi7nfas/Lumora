@@ -28,7 +28,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [messagesDialogOpen, setMessagesDialogOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showAds, setShowAds] = useState(true);
   const { signOut, profile, setCurrentView, isAdmin, isAdminOrModerator } = useAuth();
   const navigate = useNavigate();
@@ -57,13 +56,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
     } catch (error) {
       toast({ title: 'Error signing out', description: error.message, variant: 'destructive' });
     }
-  };
-
-  // Handle search
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Implement search functionality
-    console.log('Searching for:', searchQuery);
   };
 
   // Handle profile click - only open dialog when "Profile" is clicked
@@ -138,20 +130,6 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
           <h1 className="hidden md:block text-lg font-display font-semibold">{title}</h1>
 
           <div className="flex items-center gap-3">
-            {/* Search */}
-            <form onSubmit={handleSearch} className="hidden md:flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search..."
-                  className="pl-10 w-[200px]"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </form>
-
             {/* Notifications */}
             <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
               <DropdownMenuTrigger asChild>

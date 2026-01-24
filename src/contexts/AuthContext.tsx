@@ -15,6 +15,8 @@ interface Profile {
   class?: string | null;
   is_active?: boolean;
   progress?: number | null;
+  login_streak?: number | null;
+  competitions_attended?: number | null;
 }
 
 interface AuthContextType {
@@ -33,74 +35,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Demo accounts for local development
+// Essential admin for the first login
 const DEMO_ACCOUNTS = {
-  'demo.admin@lumora.com': {
-    password: 'Demo123!',
+  'admin@lumora.com': {
+    password: 'AdminPassword123!',
     profile: {
-      id: 'demo-admin-id',
-      user_id: 'demo-admin-user-id',
-      email: 'demo.admin@lumora.com',
+      id: 'admin-id',
+      user_id: 'admin-user-id',
+      email: 'admin@lumora.com',
       role: 'admin' as UserRole,
-      display_name: 'Demo Admin',
+      display_name: 'Platform Admin',
       avatar_url: null,
       avatar_id: null,
       school_id: null,
-      score: 1000,
+      score: 0,
       class: null,
       is_active: true,
-      progress: 100
-    }
-  },
-  'demo.moderator@lumora.com': {
-    password: 'Demo123!',
-    profile: {
-      id: 'demo-moderator-id',
-      user_id: 'demo-moderator-user-id',
-      email: 'demo.moderator@lumora.com',
-      role: 'moderator' as UserRole,
-      display_name: 'Demo Moderator',
-      avatar_url: null,
-      avatar_id: null,
-      school_id: null,
-      score: 800,
-      class: null,
-      is_active: true,
-      progress: 80
-    }
-  },
-  'demo.teacher@lumora.com': {
-    password: 'Demo123!',
-    profile: {
-      id: 'demo-teacher-id',
-      user_id: 'demo-teacher-user-id',
-      email: 'demo.teacher@lumora.com',
-      role: 'teacher' as UserRole,
-      display_name: 'Demo Teacher',
-      avatar_url: null,
-      avatar_id: null,
-      school_id: null,
-      score: 600,
-      class: null,
-      is_active: true,
-      progress: 60
-    }
-  },
-  'demo.student@lumora.com': {
-    password: 'Demo123!',
-    profile: {
-      id: 'demo-student-id',
-      user_id: 'demo-student-user-id',
-      email: 'demo.student@lumora.com',
-      role: 'student' as UserRole,
-      display_name: 'Demo Student',
-      avatar_url: null,
-      avatar_id: null,
-      school_id: null,
-      score: 400,
-      class: null,
-      is_active: true,
-      progress: 40
+      progress: 0,
+      login_streak: 0,
+      competitions_attended: 0
     }
   }
 };
@@ -157,7 +110,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<any | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<UserRole | null>(null);
+  const [currentView, setCurrentView] = useState<UserRole | null>(() => {
+    const savedView = localStorage.getItem('lumora_current_view');
+    return (savedView as UserRole) || null;
+  });
+
+  // Persist currentView when it changes
+  useEffect(() => {
+    if (currentView) {
+      localStorage.setItem('lumora_current_view', currentView);
+    } else {
+      localStorage.removeItem('lumora_current_view');
+    }
+  }, [currentView]);
 
   const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
   const isAdmin = profile?.role === 'admin';
@@ -318,6 +283,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         class: null,
         is_active: true,
         progress: 0,
+        login_streak: 1,
+        competitions_attended: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };

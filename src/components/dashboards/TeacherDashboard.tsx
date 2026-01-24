@@ -291,7 +291,7 @@ function StudentsTab() {
 
   const filteredStudents = students.filter(student =>
     (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+      student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
     (selectedClass === 'all' || student.class === selectedClass)
   );
 
@@ -566,59 +566,56 @@ function StudentsTab() {
 
 // Teacher Leaderboard Tab Component
 function TeacherLeaderboardTab() {
-  const [selectedCompetition, setSelectedCompetition] = useState('all');
-  const [selectedClass, setSelectedClass] = useState('all');
-  const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [competitions, setCompetitions] = useState([]);
-  const [classes, setClasses] = useState([]);
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [selectedCompId, setSelectedCompId] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
-  const badgeColors = {
-    gold: 'bg-gold text-gold-foreground',
-    silver: 'bg-silver text-silver-foreground',
-    bronze: 'bg-bronze text-bronze-foreground',
-    none: 'bg-muted text-muted-foreground'
-  };
-
-  const fetchCompetitions = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('competitions').select('*');
-      if (error) throw error;
-      setCompetitions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
+      // Fetch competitions from local storage (to match StudentDashboard logic)
+      const comps = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
+      setCompetitions(comps);
 
-  const fetchClasses = async () => {
-    try {
-      const { data, error } = await supabase.from('schools').select('*');
-      if (error) throw error;
-      setClasses(data || []);
-    } catch (error) {
-      console.error('Error fetching classes:', error);
-    }
-  };
+      // Fetch leaderboard data
+      const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
 
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    try {
-      // Fetch students with scores
-      let query = supabase.from('profiles').select('*').eq('role', 'student').order('score', { ascending: false });
+      let filteredData = usersData.filter(u => {
+        // Only show students
+        if (u.role !== 'student') return false;
 
-      if (!isAdminOrModerator || !currentView) {
-        // Regular teacher can only see students from their school
-        // query = query.eq('school_id', profile?.school_id);
+        // Exclude demo accounts
+        const demoEmails = [
+          'demo.admin@lumora.com',
+          'demo.moderator@lumora.com',
+          'demo.teacher@lumora.com',
+          'demo.student@lumora.com'
+        ];
+        if (demoEmails.includes(u.email)) return false;
+
+        return true;
+      });
+
+      if (selectedCompId !== 'all') {
+        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+        const compResults = results.filter(r => r.question_set_id === selectedCompId || r.competition_id === selectedCompId);
+
+        const userScores = {};
+        compResults.forEach(r => {
+          if (!userScores[r.student_id] || r.score > userScores[r.student_id]) {
+            userScores[r.student_id] = r.score;
+          }
+        });
+
+        filteredData = filteredData
+          .filter(u => userScores[u.id] !== undefined)
+          .map(u => ({ ...u, score: userScores[u.id] }));
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-
-      setLeaderboardData(data || []);
+      const sortedUsers = filteredData.sort((a, b) => (b.score || 0) - (a.score || 0));
+      setLeaderboardData(sortedUsers);
     } catch (error) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
     }
@@ -626,46 +623,26 @@ function TeacherLeaderboardTab() {
   };
 
   useEffect(() => {
-    fetchCompetitions();
-    fetchClasses();
-    fetchLeaderboard();
-  }, []);
+    fetchInitialData();
+  }, [selectedCompId]);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold">Class Leaderboard</h1>
-          <p className="text-muted-foreground">Track your students' performance</p>
-          {isAdminOrModerator && currentView && (
-            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-              <Unlock className="w-4 h-4" />
-              <span>Admin/Moderator View - Can see all competitions</span>
-            </div>
-          )}
+          <p className="text-muted-foreground">Track student performance across competitions</p>
         </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
-            <SelectTrigger className="w-full sm:w-[200px]">
-              <SelectValue placeholder="Select competition" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">Filter by Competition:</span>
+          <Select value={selectedCompId} onValueChange={setSelectedCompId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Competitions" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Competitions</SelectItem>
-              {competitions.map(comp => (
+              {competitions.map((comp) => (
                 <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Select class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {classes.map(cls => (
-                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -674,59 +651,32 @@ function TeacherLeaderboardTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Student Performance</CardTitle>
-          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'} scores and progress</CardDescription>
+          <CardTitle>Student Rankings</CardTitle>
+          <CardDescription>Performance details for individual students</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
+              <div className="text-center py-4"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
             ) : leaderboardData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+              <p className="text-center text-muted-foreground py-4">No data available for this selection.</p>
             ) : (
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
                     <th className="p-3 text-left font-medium">Rank</th>
-                    <th className="p-3 text-left font-medium">Student</th>
-                    <th className="p-3 text-left font-medium">School</th>
-                    <th className="p-3 text-left font-medium">Score</th>
-                    <th className="p-3 text-left font-medium">Progress</th>
-                    <th className="p-3 text-left font-medium">Achievement</th>
+                    <th className="p-3 text-left font-medium">Email</th>
+                    <th className="p-3 text-left font-medium">Username</th>
+                    <th className="p-3 text-right font-medium">Points</th>
                   </tr>
                 </thead>
                 <tbody>
                   {leaderboardData.map((student, index) => (
-                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{index + 1}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span>{student.display_name || 'No name'}</span>
-                        </div>
-                      </td>
-                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
-                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-full h-2 bg-muted rounded-full">
-                            <div
-                              className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress || 0}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
-                          {index + 1}
-                        </div>
-                      </td>
+                    <tr key={student.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-semibold text-lg">{index + 1}</td>
+                      <td className="p-3 text-sm">{student.email}</td>
+                      <td className="p-3 text-sm italic">{student.display_name || 'No username'}</td>
+                      <td className="p-3 text-right font-mono font-bold text-primary">{student.score?.toLocaleString() || '0'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -736,25 +686,83 @@ function TeacherLeaderboardTab() {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Class Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">No class statistics available</p>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>School Leaderboard</CardTitle>
+          <CardDescription>Aggregate performance by institution</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TeacherSchoolLeaderboard selectedCompId={selectedCompId} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">No top performers data available</p>
-          </CardContent>
-        </Card>
-      </div>
+function TeacherSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }) {
+  const [schoolData, setSchoolData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+      setLoading(true);
+      try {
+        const schools = localStorage.getItem('lumora_schools') ? JSON.parse(localStorage.getItem('lumora_schools')) : [];
+        const users = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
+        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+
+        const aggregatedSchools = schools.map(school => {
+          const schoolStudents = users.filter(u => u.school_id === school.id);
+          let totalPoints = 0;
+
+          if (selectedCompId === 'all') {
+            totalPoints = schoolStudents.reduce((sum, u) => sum + (u.score || 0), 0);
+          } else {
+            schoolStudents.forEach(student => {
+              const studentResults = results.filter(r => (r.question_set_id === selectedCompId || r.competition_id === selectedCompId) && r.student_id === student.id);
+              if (studentResults.length > 0) {
+                totalPoints += Math.max(...studentResults.map(r => r.score || 0));
+              }
+            });
+          }
+
+          return { ...school, totalPoints };
+        });
+
+        const sortedSchools = aggregatedSchools.sort((a, b) => b.totalPoints - a.totalPoints);
+        setSchoolData(sortedSchools);
+      } catch (e) { console.error(e); }
+      setLoading(false);
+    };
+    fetchSchools();
+  }, [selectedCompId]);
+
+  return (
+    <div className="overflow-x-auto">
+      {loading ? (
+        <div className="text-center py-8"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
+      ) : schoolData.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No data found.</p>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="p-3 text-left font-medium">School Name</th>
+              <th className="p-3 text-left font-medium">Country</th>
+              <th className="p-3 text-right font-medium">Combined Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {schoolData.map((school) => (
+              <tr key={school.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                <td className="p-3 font-semibold">{school.name}</td>
+                <td className="p-3 text-sm">{school.country || 'Global'}</td>
+                <td className="p-3 text-right font-mono text-primary font-bold">{school.totalPoints.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -949,26 +957,35 @@ function MessagesTab() {
               <CardContent>
                 <div className="space-y-6">
                   <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm">{selectedMessage.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedMessage.content}</p>
                   </div>
 
-                  <div className="space-y-4">
-                    <Label>Your Reply</Label>
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Type your reply here..."
-                      rows={8}
-                    />
-                    <Button
-                      onClick={handleSendReply}
-                      disabled={sendingReply || !replyContent}
-                      className="gradient-hero"
-                    >
-                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Send Reply
-                    </Button>
-                  </div>
+                  {/* Teachers can only see Announcements, no reply section */}
+                  {profile?.role !== 'student' && profile?.role !== 'teacher' ? (
+                    <div className="space-y-4 pt-4 border-t">
+                      <Label>Your Reply</Label>
+                      <Textarea
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder="Type your reply here..."
+                        rows={8}
+                      />
+                      <Button
+                        onClick={handleSendReply}
+                        disabled={sendingReply || !replyContent}
+                        className="gradient-hero"
+                      >
+                        {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Send Reply
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="pt-4 border-t">
+                      <p className="text-xs text-muted-foreground italic text-center">
+                        This is a read-only announcement. Replies are disabled.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

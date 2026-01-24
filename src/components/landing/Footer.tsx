@@ -22,7 +22,7 @@ export function Footer({ isEditingGlobal = false, updateContent }: { isEditingGl
           </Link>
 
           <p className="text-muted-foreground text-sm flex items-center gap-1">
-            Made with ❤️ for education
+            Lumora is a Non-Profit Organization (NPO)
           </p>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">

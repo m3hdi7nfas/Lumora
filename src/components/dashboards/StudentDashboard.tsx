@@ -53,6 +53,7 @@ function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setAct
   const navItems = [
     { id: 'overview', icon: Users, label: 'Overview' },
     { id: 'competitions', icon: Trophy, label: 'Competitions' },
+    { id: 'practice', icon: LayoutTemplate, label: 'Practice' },
     { id: 'challenges', icon: FileQuestion, label: 'Challenges' },
     { id: 'leaderboard', icon: CheckSquare, label: 'Leaderboard' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
@@ -109,6 +110,7 @@ export default function StudentDashboard() {
     >
       {activeTab === 'overview' && <StudentOverviewTab setActiveTab={setActiveTab} loading={loading} />}
       {activeTab === 'competitions' && <CompetitionsTab />}
+      {activeTab === 'practice' && <PracticeTab />}
       {activeTab === 'challenges' && <ChallengesTab />}
       {activeTab === 'leaderboard' && <LeaderboardTab />}
       {activeTab === 'messages' && <MessagesTab />}
@@ -242,92 +244,524 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
   );
 }
 
+// Practice Tab Component
+function PracticeTab() {
+  const [practiceSets, setPracticeSets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [activeSet, setActiveSet] = useState(null);
+
+  useEffect(() => {
+    const sets = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
+    setPracticeSets(sets);
+  }, []);
+
+  if (activeSet) {
+    return <QuizInterface questionSet={activeSet} onExit={() => setActiveSet(null)} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Practice Mode</h1>
+          <p className="text-muted-foreground">Improve your skills with self-paced learning</p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {practiceSets.map((set: any) => (
+          <Card key={set.id} className="hover:border-primary/50 transition-colors">
+            <CardHeader>
+              <CardTitle className="text-lg">{set.name}</CardTitle>
+              <CardDescription className="text-xs line-clamp-2">{set.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="px-2 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase">{set.category}</span>
+              </div>
+              <Button className="w-full gradient-hero h-9 text-sm" onClick={() => setActiveSet(set)}>Attempt Practice</Button>
+            </CardContent>
+          </Card>
+        ))}
+        {practiceSets.length === 0 && (
+          <Card className="col-span-full p-12 text-center text-muted-foreground border-dashed">
+            <p className="text-lg font-medium text-foreground mb-2">No Practice Sets Yet</p>
+            <p>Check back later for new self-paced content from your teachers or admins.</p>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuizInterface({ questionSet, onExit }) {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [finished, setFinished] = useState(false);
+  const [score, setScore] = useState(0);
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  const questions = questionSet.questions || [];
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const handleAnswer = (val) => {
+    setAnswers({ ...answers, [currentQuestion.id]: val });
+  };
+
+  const handleSubmit = () => {
+    if (!finished) {
+      // Calculate Score
+      let calculatedScore = 0;
+      let totalPoints = 0;
+
+      questions.forEach(q => {
+        totalPoints += (q.points || 10);
+        const studentAns = answers[q.id];
+
+        if (q.type === 'text') {
+          const studentAns = (answers[q.id] || '').trim();
+          const modelAns = (q.correct_answer || '').trim();
+
+          if (studentAns.length > 0) {
+            let isCorrect = false;
+
+            if (q.exact_match_required) {
+              isCorrect = studentAns === modelAns;
+            } else {
+              isCorrect = studentAns.toLowerCase() === modelAns.toLowerCase();
+            }
+
+            if (isCorrect) {
+              calculatedScore += (q.points || 10);
+            } else {
+              // Create Grading Request for manual review if it didn't match
+              const gradingRequest = {
+                id: `grad-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                student_id: profile.id,
+                student_name: profile.display_name,
+                question_set_id: questionSet.id,
+                question_set_name: questionSet.name,
+                question_id: q.id,
+                question_text: q.text,
+                answer: studentAns,
+                max_points: q.points || 10,
+                model_answer: q.correct_answer,
+                status: 'pending',
+                submitted_at: new Date().toISOString()
+              };
+
+              const queue = localStorage.getItem('lumora_grading_queue') ? JSON.parse(localStorage.getItem('lumora_grading_queue')) : [];
+              queue.push(gradingRequest);
+              localStorage.setItem('lumora_grading_queue', JSON.stringify(queue));
+            }
+          }
+        } else {
+          if (answers[q.id] === q.correct_answer) {
+            calculatedScore += (q.points || 10);
+          }
+        }
+      });
+
+      setScore(calculatedScore);
+      setFinished(true);
+
+      // Save Results
+      const result = {
+        id: `res-${Date.now()}`,
+        student_id: profile.id,
+        question_set_id: questionSet.id,
+        score: calculatedScore,
+        total_points: totalPoints,
+        answers: answers,
+        date: new Date().toISOString()
+      };
+
+      const allResults = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+      allResults.push(result);
+      localStorage.setItem('lumora_results', JSON.stringify(allResults));
+
+      // Update User Profile Score based on strategy
+      // We calculate the 'effective points' this set contributes to the total score
+      const previousSetResults = allResults.filter(r => r.student_id === profile.id && r.question_set_id === questionSet.id && r.id !== result.id);
+
+      let previousEffectiveScore = 0;
+      if (previousSetResults.length > 0) {
+        const scores = previousSetResults.map(r => r.score);
+        if (questionSet.scoring_type === 'best_of_3') {
+          // Be careful: if we are at attempt 4 (which shouldn't happen if UI blocks it), we take max of first 3? 
+          // UI logic blocks starting attempt 4. So we just look at max of existing.
+          previousEffectiveScore = Math.max(...scores);
+        } else if (questionSet.scoring_type === 'first_attempt') {
+          // Should be just the first one.
+          previousEffectiveScore = scores[0];
+        } else {
+          // Default Highest
+          previousEffectiveScore = Math.max(...scores);
+        }
+      }
+
+      let newEffectiveScore = 0;
+      // Include current result
+      const allSetResultsIncludingCurrent = [...previousSetResults, result];
+      const allScores = allSetResultsIncludingCurrent.map(r => r.score);
+
+      if (questionSet.scoring_type === 'best_of_3') {
+        // If somehow we have more than 3, we strictly only count first 3. But UI blocks start. 
+        // Let's assume valid attempts.
+        newEffectiveScore = Math.max(...allScores);
+      } else if (questionSet.scoring_type === 'first_attempt') {
+        newEffectiveScore = allScores[0];
+      } else {
+        // Highest
+        newEffectiveScore = Math.max(...allScores);
+      }
+
+      const scoreDelta = Math.max(0, newEffectiveScore - previousEffectiveScore);
+
+      if (scoreDelta > 0) {
+        const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
+        const updatedUsers = users.map(u => {
+          if (u.id === profile.id) {
+            return { ...u, score: (u.score || 0) + scoreDelta, progress: Math.min((u.progress || 0) + 10, 100) };
+          }
+          return u;
+        });
+        localStorage.setItem('lumora_users', JSON.stringify(updatedUsers));
+        toast({ title: `Quiz Completed! You earned ${scoreDelta} new points!` });
+      } else {
+        toast({ title: `Quiz Completed! Score: ${calculatedScore}. (Writing answers pending grading)` });
+      }
+    } else {
+      onExit();
+    }
+  };
+
+  if (questions.length === 0) return <div className="p-8 text-center">No questions in this set <Button onClick={onExit} variant="link">Go Back</Button></div>;
+
+  if (finished) {
+    return (
+      <Card className="max-w-2xl mx-auto mt-8 text-center">
+        <CardHeader>
+          <CardTitle className="text-3xl">Set Completed!</CardTitle>
+          <CardDescription>You scored</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="text-6xl font-bold text-primary">{score}</div>
+          <p className="text-muted-foreground">Total Points Available: {questions.reduce((a, b) => a + (b.points || 10), 0)}</p>
+
+          <div className="p-4 bg-muted rounded-lg text-left text-sm max-h-60 overflow-y-auto">
+            <p className="font-semibold mb-2">Review:</p>
+            {questions.map((q, i) => (
+              <div key={q.id} className="mb-2 border-b pb-2 last:border-0">
+                <p className="font-medium">{i + 1}. {q.text}</p>
+                <p className={`text-xs ${answers[q.id] === q.correct_answer ? 'text-success' : 'text-destructive'}`}>
+                  Your Answer: {answers[q.id] || '(Skipped)'}
+                  {q.type === 'mcq' && answers[q.id] !== q.correct_answer && ` (Correct: ${q.correct_answer})`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+        <div className="p-6">
+          <Button onClick={onExit} className="w-full gradient-hero">Back to Dashboard</Button>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="max-w-3xl mx-auto mt-4">
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <CardTitle>{questionSet.name}</CardTitle>
+          <span className="text-muted-foreground text-sm">Question {currentQuestionIndex + 1} of {questions.length}</span>
+        </div>
+        <div className="w-full bg-muted h-2 rounded-full overflow-hidden mt-2">
+          <div className="bg-primary h-full transition-all" style={{ width: `${((currentQuestionIndex) / questions.length) * 100}%` }}></div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="text-lg font-medium">{currentQuestion.text}</div>
+
+        <div className="space-y-4">
+          {currentQuestion.type === 'mcq' ? (
+            <div className="grid gap-3">
+              {currentQuestion.options.map((opt, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleAnswer(opt)}
+                  className={`p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-all ${answers[currentQuestion.id] === opt ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}`}
+                >
+                  {opt}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Textarea
+              placeholder="Type your answer here..."
+              className="min-h-[150px]"
+              value={answers[currentQuestion.id] || ''}
+              onChange={(e) => handleAnswer(e.target.value)}
+            />
+          )}
+        </div>
+      </CardContent>
+      <div className="p-6 flex justify-between">
+        <Button
+          variant="outline"
+          disabled={currentQuestionIndex === 0}
+          onClick={() => setCurrentQuestionIndex(curr => curr - 1)}
+        >
+          Previous
+        </Button>
+        {currentQuestionIndex < questions.length - 1 ? (
+          <Button onClick={() => setCurrentQuestionIndex(curr => curr + 1)}>Next</Button>
+        ) : (
+          <Button onClick={handleSubmit} className="gradient-hero">Submit Set</Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // Competitions Tab Component
 function CompetitionsTab() {
   const [competitions, setCompetitions] = useState([]);
+  const [joinedCompIds, setJoinedCompIds] = useState([]);
+  const [selectedComp, setSelectedComp] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'find' | 'participating'>('participating');
+  const [practiceSets, setPracticeSets] = useState([]); // Added practiceSets state
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const fetchCompetitions = async () => {
     setLoading(true);
     try {
-      // Fetch competitions from local storage
       const competitionsData = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
       setCompetitions(competitionsData);
+
+      const allJoined = localStorage.getItem('lumora_joined_competitions') ? JSON.parse(localStorage.getItem('lumora_joined_competitions')) : [];
+      const userJoined = allJoined.filter(jc => jc.user_id === profile.id).map(jc => jc.competition_id);
+      setJoinedCompIds(userJoined);
+
+      const pSets = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
+      setPracticeSets(pSets);
     } catch (error) {
       toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
-  const filteredCompetitions = competitions.filter(competition =>
-    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   useEffect(() => {
     fetchCompetitions();
   }, []);
 
+  const handleJoin = (compId) => {
+    try {
+      const allJoined = localStorage.getItem('lumora_joined_competitions') ? JSON.parse(localStorage.getItem('lumora_joined_competitions')) : [];
+      if (!allJoined.some(jc => jc.user_id === profile.id && jc.competition_id === compId)) {
+        allJoined.push({ user_id: profile.id, competition_id: compId });
+        localStorage.setItem('lumora_joined_competitions', JSON.stringify(allJoined));
+
+        // Refresh local state
+        setJoinedCompIds(prev => [...prev, compId]);
+
+        toast({ title: 'Joined competition successfully!' });
+      }
+    } catch (e) { toast({ title: 'Error joining' }); }
+  };
+
+  const handleLeave = (compId) => {
+    try {
+      const allJoined = localStorage.getItem('lumora_joined_competitions') ? JSON.parse(localStorage.getItem('lumora_joined_competitions')) : [];
+      const updatedJoined = allJoined.filter(jc => !(jc.user_id === profile.id && jc.competition_id === compId));
+      localStorage.setItem('lumora_joined_competitions', JSON.stringify(updatedJoined));
+
+      // Refresh local state
+      setJoinedCompIds(prev => prev.filter(id => id !== compId));
+
+      toast({ title: 'Left competition successfully!' });
+    } catch (e) { toast({ title: 'Error leaving' }); }
+  };
+
+  if (selectedComp) {
+    return <CompetitionDetailView competition={selectedComp} onBack={() => setSelectedComp(null)} />;
+  }
+
+  const myCompetitions = competitions.filter(c => {
+    const isJoinedManually = joinedCompIds.includes(c.id);
+    const isAssignedBySchool = c.participating_schools?.includes(profile?.school_id);
+    return (isJoinedManually || isAssignedBySchool) && (c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
+
+  const discoverCompetitions = competitions.filter(c => {
+    const isJoinedManually = joinedCompIds.includes(c.id);
+    const isAssignedBySchool = c.participating_schools?.includes(profile?.school_id);
+    return !isJoinedManually && !isAssignedBySchool && c.is_active && (c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  });
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold">Competitions</h1>
-          <p className="text-muted-foreground">Join learning competitions</p>
+          <p className="text-muted-foreground">Manage your competitions and discover new ones</p>
+        </div>
+        <div className="flex bg-muted p-1 rounded-lg">
+          <Button
+            variant={viewMode === 'participating' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('participating')}
+            className="rounded-md h-8 text-xs px-4"
+          >
+            Participating
+          </Button>
+          <Button
+            variant={viewMode === 'find' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('find')}
+            className="rounded-md h-8 text-xs px-4"
+          >
+            Find Competitions
+          </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Competitions List</CardTitle>
-          <CardDescription>Available competitions to join</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search competitions..."
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search competitions..."
+          className="pl-10 h-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
 
-            {loading ? (
-              <div className="text-center py-4">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-              </div>
-            ) : filteredCompetitions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No competitions found</p>
-            ) : (
-              <div className="space-y-4">
-                {filteredCompetitions.map((competition) => (
-                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-medium">{competition.name}</h3>
-                        <p className="text-xs text-muted-foreground">{competition.description}</p>
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                            {competition.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
-                        </div>
+      {viewMode === 'participating' ? (
+        <div className="space-y-6">
+          {myCompetitions.length === 0 ? (
+            <Card className="p-12 text-center text-muted-foreground border-dashed">
+              <p>You haven't joined any competitions yet.</p>
+              <Button variant="link" className="mt-2" onClick={() => setViewMode('find')}>
+                Explore open competitions
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {myCompetitions.map(comp => {
+                const isMandatory = comp.participating_schools?.includes(profile?.school_id) || comp.can_leave === false;
+
+                return (
+                  <Card key={comp.id} className="hover:border-primary/50 transition-colors flex flex-col">
+                    <CardHeader className="flex-1 pb-2">
+                      <div className="flex justify-between items-start mb-2">
+                        <CardTitle className="text-lg">{comp.name}</CardTitle>
+                        {isMandatory && <span className="px-2 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] font-bold">MANDATORY</span>}
                       </div>
-                      <Button size="sm" className="gradient-hero">
-                        Join
-                      </Button>
-                    </div>
+                      <CardDescription className="line-clamp-2 text-xs">{comp.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="flex flex-col gap-2 mt-4">
+                        <Button className="w-full h-9 gradient-hero text-sm" onClick={() => setSelectedComp(comp)}>
+                          Participate
+                        </Button>
+                        {!isMandatory && (
+                          <Button variant="outline" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/5" onClick={(e) => { e.stopPropagation(); handleLeave(comp.id); }}>
+                            Leave Competition
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {discoverCompetitions.map(comp => (
+              <Card key={comp.id} className="flex flex-col">
+                <CardHeader className="flex-1 pb-2">
+                  <CardTitle className="text-lg">{comp.name}</CardTitle>
+                  <CardDescription className="line-clamp-2 text-xs">{comp.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] uppercase font-bold">{comp.category || 'General'}</span>
                   </div>
-                ))}
+                  <Button className="w-full h-9 gradient-hero text-sm" onClick={() => handleJoin(comp.id)}>Join Competition</Button>
+                </CardContent>
+              </Card>
+            ))}
+            {discoverCompetitions.length === 0 && (
+              <div className="col-span-full text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+                No new competitions found to join.
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompetitionDetailView({ competition, onBack }) {
+  const [questionSets, setQuestionSets] = useState([]);
+  const [activeSet, setActiveSet] = useState(null);
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    const allSets = localStorage.getItem('lumora_question_sets') ? JSON.parse(localStorage.getItem('lumora_question_sets')) : [];
+    // Only show sets that are linked to this competition id OR its participating schools if applicable
+    // In our current local storage setup, question sets have question_set_id which might match competition id in some logic
+    // Let's filter by matching competition_id from the set object if it exists
+    const filtered = allSets.filter(set => set.competition_id === competition.id);
+    setQuestionSets(filtered);
+  }, [competition.id]);
+
+  if (activeSet) {
+    return <QuizInterface questionSet={activeSet} onExit={() => setActiveSet(null)} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <Button variant="ghost" onClick={onBack} className="mb-2">
+        <ChevronRight className="w-4 h-4 mr-2 rotate-180" />
+        Back to Competitions
+      </Button>
+
+      <div>
+        <h1 className="text-2xl font-display font-bold">{competition.name}</h1>
+        <p className="text-muted-foreground">{competition.description}</p>
+      </div>
+
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {questionSets.map(set => (
+          <Card key={set.id}>
+            <CardHeader>
+              <CardTitle>{set.name}</CardTitle>
+              <CardDescription>{set.description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm text-muted-foreground mb-4">
+                <div className="flex items-center gap-2"><FileQuestion className="w-4 h-4" /> {set.questions?.length || 0} Questions</div>
+                <div className="flex items-center gap-2"><Clock className="w-4 h-4" /> {set.time_limit} mins</div>
+              </div>
+              <Button className="w-full gradient-hero" onClick={() => setActiveSet(set)}>Enter Question Set</Button>
+            </CardContent>
+          </Card>
+        ))}
+        {questionSets.length === 0 && (
+          <div className="col-span-full p-12 text-center text-muted-foreground border rounded-lg">
+            No question sets available for this competition yet.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -361,7 +795,10 @@ function ChallengesTab() {
           <h1 className="text-2xl font-display font-bold">Challenges</h1>
           <p className="text-muted-foreground">Complete challenges to earn extra points</p>
         </div>
-        <Button className="gradient-hero">
+        <Button
+          className="gradient-hero"
+          onClick={() => toast({ title: "Coming Soon!", description: "1v1 Friends feature is currently under development.", variant: "default" })}
+        >
           <Users className="w-4 h-4 mr-2" />
           1v1 Friend
         </Button>
@@ -409,16 +846,43 @@ function ChallengesTab() {
 // Leaderboard Tab Component
 function LeaderboardTab() {
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
+  const [selectedCompId, setSelectedCompId] = useState('all');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const fetchLeaderboard = async () => {
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
+      // Fetch competitions
+      const comps = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
+      setCompetitions(comps);
+
       // Fetch leaderboard data from local storage
       const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
+
+      // Filter by competition if selected, exclude non-students
+      let filteredData = usersData.filter(u => u.role === 'student');
+
+      if (selectedCompId !== 'all') {
+        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+        const compResults = results.filter(r => r.question_set_id === selectedCompId || r.competition_id === selectedCompId);
+
+        // Map user IDs to their best score in this specific competition
+        const userScores = {};
+        compResults.forEach(r => {
+          if (!userScores[r.student_id] || r.score > userScores[r.student_id]) {
+            userScores[r.student_id] = r.score;
+          }
+        });
+
+        filteredData = filteredData
+          .filter(u => userScores[u.id] !== undefined)
+          .map(u => ({ ...u, score: userScores[u.id] }));
+      }
+
       // Sort by score descending
-      const sortedUsers = usersData.sort((a, b) => (b.score || 0) - (a.score || 0));
+      const sortedUsers = filteredData.sort((a, b) => (b.score || 0) - (a.score || 0));
       setLeaderboardData(sortedUsers);
     } catch (error) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
@@ -427,14 +891,30 @@ function LeaderboardTab() {
   };
 
   useEffect(() => {
-    fetchLeaderboard();
-  }, []);
+    fetchInitialData();
+  }, [selectedCompId]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
-        <p className="text-muted-foreground">See how you rank against others</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Leaderboard</h1>
+          <p className="text-muted-foreground">See how you rank against others</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">Filter by Competition:</span>
+          <Select value={selectedCompId} onValueChange={setSelectedCompId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All Competitions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Competitions</SelectItem>
+              {competitions.map((comp) => (
+                <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Card>
@@ -455,35 +935,30 @@ function LeaderboardTab() {
                 <thead>
                   <tr className="border-b border-border">
                     <th className="p-3 text-left font-medium">Rank</th>
-                    <th className="p-3 text-left font-medium">Student</th>
-                    <th className="p-3 text-left font-medium">Score</th>
-                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Email</th>
+                    <th className="p-3 text-left font-medium">Username</th>
+                    <th className="p-3 text-right font-medium">Points</th>
                   </tr>
                 </thead>
                 <tbody>
                   {leaderboardData.map((student, index) => (
                     <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                      <td className="p-3 font-medium">{index + 1}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
-                          </div>
-                          <span>{student.display_name || 'No name'}</span>
+                          <span className="font-bold text-lg">{index + 1}</span>
+                          {index === 0 && <Crown className="w-4 h-4 text-warning" />}
                         </div>
                       </td>
-                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-full h-2 bg-muted rounded-full">
-                            <div
-                              className="h-2 bg-primary rounded-full"
-                              style={{ width: `${student.progress || 0}%` }}
-                            />
+                          <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-[10px] font-bold text-primary-foreground">
+                            {student.email?.substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
+                          <span className="text-sm">{student.email}</span>
                         </div>
                       </td>
+                      <td className="p-3 text-sm italic">{student.display_name || 'No username set'}</td>
+                      <td className="p-3 text-right font-mono font-bold text-primary">{student.score?.toLocaleString() || '0'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -492,6 +967,96 @@ function LeaderboardTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* School Leaderboard Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>School Leaderboard</CardTitle>
+          <CardDescription>Schools with total combined points from active students</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SchoolLeaderboard selectedCompId={selectedCompId} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SchoolLeaderboard({ selectedCompId }: { selectedCompId: string }) {
+  const [schoolData, setSchoolData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+      setLoading(true);
+      try {
+        const schools = localStorage.getItem('lumora_schools') ? JSON.parse(localStorage.getItem('lumora_schools')) : [];
+        const users = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
+        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+
+        const aggregatedSchools = schools.map(school => {
+          const schoolStudents = users.filter(u => u.school_id === school.id);
+          let totalPoints = 0;
+
+          if (selectedCompId === 'all') {
+            totalPoints = schoolStudents.reduce((sum, u) => sum + (u.score || 0), 0);
+          } else {
+            // Calculate based on specific competition
+            schoolStudents.forEach(student => {
+              const studentResults = results.filter(r => (r.question_set_id === selectedCompId || r.competition_id === selectedCompId) && r.student_id === student.id);
+              if (studentResults.length > 0) {
+                totalPoints += Math.max(...studentResults.map(r => r.score || 0));
+              }
+            });
+          }
+
+          return {
+            ...school,
+            totalPoints
+          };
+        });
+
+        const sortedSchools = aggregatedSchools.sort((a, b) => b.totalPoints - a.totalPoints);
+        setSchoolData(sortedSchools);
+      } catch (e) {
+        console.error(e);
+      }
+      setLoading(false);
+    };
+
+    fetchSchools();
+  }, [selectedCompId]);
+
+  return (
+    <div className="overflow-x-auto">
+      {loading ? (
+        <div className="text-center py-8"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
+      ) : schoolData.length === 0 ? (
+        <p className="text-center py-8 text-muted-foreground">No school data found for this competition.</p>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="p-3 text-left font-medium">School Name</th>
+              <th className="p-3 text-left font-medium">Country</th>
+              <th className="p-3 text-right font-medium">Total Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {schoolData.map((school) => (
+              <tr key={school.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                <td className="p-3 font-semibold">{school.name}</td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{school.country || 'Global'}</span>
+                  </div>
+                </td>
+                <td className="p-3 text-right font-mono text-primary font-bold">{school.totalPoints.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -635,30 +1200,32 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this message? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  className="bg-destructive hover:bg-destructive/90"
-                                  onClick={() => handleDeleteMessage(message.id)}
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          {(profile?.role !== 'student' && profile?.role !== 'teacher') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this message? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteMessage(message.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
                       </button>
                     ))
@@ -684,23 +1251,32 @@ function MessagesTab() {
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
 
-                  <div className="space-y-4">
-                    <Label>Your Reply</Label>
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Type your reply here..."
-                      rows={8}
-                    />
-                    <Button
-                      onClick={handleSendReply}
-                      disabled={sendingReply || !replyContent}
-                      className="gradient-hero"
-                    >
-                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Send Reply
-                    </Button>
-                  </div>
+                  {/* Students and Teachers can only see Announcements, no reply section */}
+                  {profile?.role !== 'student' && profile?.role !== 'teacher' ? (
+                    <div className="space-y-4 pt-4 border-t">
+                      <Label>Your Reply</Label>
+                      <Textarea
+                        value={replyContent}
+                        onChange={(e) => setReplyContent(e.target.value)}
+                        placeholder="Type your reply here..."
+                        rows={8}
+                      />
+                      <Button
+                        onClick={handleSendReply}
+                        disabled={sendingReply || !replyContent}
+                        className="gradient-hero"
+                      >
+                        {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Send Reply
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="pt-4 border-t">
+                      <p className="text-xs text-muted-foreground italic text-center">
+                        This is a read-only announcement. Replies are disabled.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -1,204 +1,222 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Search, Eye, EyeOff, Loader2, RefreshCw, User, CheckCircle, XCircle, MessageSquare, AlertTriangle, Trash2, Mail, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Upload, ChevronDown, Shield, Unlock, Lock, Mail as MailIcon } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { DashboardLayout } from './DashboardLayout';
-import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Users,
+  Trophy,
+  FileQuestion,
+  CheckSquare,
+  Clock,
+  LayoutTemplate,
+  School,
+  Search,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  RefreshCw,
+  Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  Unlock,
+  Calendar,
+  ChevronRight,
+  Crown,
+  Medal,
+  Star,
+  Plus,
+  Edit,
+  Trash2,
+  Upload,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/AuthContext';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { supabase } from '@/integrations/supabase/client';
 
-export default function StudentDashboard() {
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-
-  // Sidebar navigation items
-  const sidebarItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutTemplate },
-    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
-    { id: 'competitions', label: 'Competitions', icon: Trophy },
-    { id: 'questions', label: 'Questions', icon: FileQuestion },
-    { id: 'messages', label: 'Messages', icon: MailIcon },
-    { id: 'settings', label: 'Settings', icon: Settings },
+function StudentSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
+  const { profile } = useAuth();
+  const navItems = [
+    { id: 'overview', icon: Users, label: 'Overview' },
+    { id: 'competitions', icon: Trophy, label: 'Competitions' },
+    { id: 'challenges', icon: FileQuestion, label: 'Challenges' },
+    { id: 'leaderboard', icon: CheckSquare, label: 'Leaderboard' },
+    { id: 'messages', icon: MessageSquare, label: 'Messages' },
   ];
 
-  // Handle navigation item click
-  const handleNavItemClick = (itemId) => {
-    setActiveTab(itemId);
-  };
+  return (
+    <div className="flex flex-col h-full">
+      <nav className="flex-1 space-y-2">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
+              ? 'bg-primary text-primary-foreground shadow-card'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+          >
+            <item.icon className="w-5 h-5" />
+            <span className="font-medium">{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
-  // Render content based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return <StudentOverviewTab />;
-      case 'leaderboard':
-        return <StudentLeaderboardTab />;
-      case 'competitions':
-        return <StudentCompetitionsTab />;
-      case 'questions':
-        return <StudentQuestionsTab />;
-      case 'messages':
-        return <MessagesTab />;
-      case 'settings':
-        return <StudentSettingsTab />;
-      default:
-        return <StudentOverviewTab />;
-    }
-  };
+      <div className="mt-auto pt-6 border-t border-border/50">
+        <div className="p-4 rounded-2xl bg-muted/30">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
+              {profile?.display_name?.substring(0, 2).toUpperCase() || 'ST'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{profile?.display_name || 'Student'}</p>
+              <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setActiveTab('profile')}>
+            <User className="w-3 h-3 mr-2" />
+            Profile Settings
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function StudentDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   return (
     <DashboardLayout
-      title="Student Dashboard"
-      sidebar={
-        <div className="space-y-2">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavItemClick(item.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'}`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      }
-      onNavItemClick={handleNavItemClick}
+      title="Lumora Student Dashboard"
+      sidebar={<StudentSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
     >
-      {renderContent()}
+      {activeTab === 'overview' && <StudentOverviewTab setActiveTab={setActiveTab} loading={loading} />}
+      {activeTab === 'competitions' && <CompetitionsTab />}
+      {activeTab === 'challenges' && <ChallengesTab />}
+      {activeTab === 'leaderboard' && <LeaderboardTab />}
+      {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'profile' && <ProfileView />}
     </DashboardLayout>
   );
 }
 
-// Overview Tab Component
-function StudentOverviewTab() {
-  const [stats, setStats] = useState({
-    totalCompetitions: 0,
-    totalQuestions: 0,
-    activeCompetitions: 0,
-    myScore: 0,
-    myRank: 0
-  });
-  const [loading, setLoading] = useState(false);
+// Student Overview Component
+function StudentOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
   const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
+  const { profile } = useAuth();
 
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      // Fetch competitions
-      const { data: competitions, error: competitionsError } = await supabase.from('competitions').select('*');
-      if (competitionsError) throw competitionsError;
+  // Get stats from local storage
+  const competitions = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
+  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
 
-      // Fetch questions
-      const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
-      if (questionsError) throw questionsError;
-
-      // Fetch all students for ranking
-      const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
-      if (studentsError) throw studentsError;
-
-      // Calculate stats
-      const totalCompetitions = competitions.length;
-      const totalQuestions = questions.length;
-      const activeCompetitions = competitions.filter(c => c.is_active).length;
-      const myScore = profile?.score || 0;
-
-      // Calculate rank
-      const sortedStudents = students.sort((a, b) => (b.score || 0) - (a.score || 0));
-      const myRank = sortedStudents.findIndex(s => s.id === profile?.id) + 1;
-
-      setStats({
-        totalCompetitions,
-        totalQuestions,
-        activeCompetitions,
-        myScore,
-        myRank
-      });
-    } catch (error) {
-      toast({ title: 'Error fetching stats', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
+  const stats = {
+    totalCompetitions: competitions.length,
+    totalQuestions: questions.length,
+    score: profile?.score || 0,
+    progress: profile?.progress || 0
   };
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  const quickActions = [
+    { id: 'competitions', icon: Trophy, title: 'Join Competitions', description: 'Participate in learning challenges' },
+    { id: 'challenges', icon: FileQuestion, title: 'Complete Challenges', description: 'Earn extra points and badges' },
+    { id: 'leaderboard', icon: CheckSquare, title: 'View Leaderboard', description: 'See how you rank against others' },
+  ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Student Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, {profile?.display_name || 'Student'}!</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Unlock className="w-4 h-4" />
-            <span>Admin/Moderator View - Can see all competitions</span>
-          </div>
-        )}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Student Dashboard</h1>
+          <p className="text-muted-foreground">Track your learning progress and achievements</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           title="Total Competitions"
-          value={stats.totalCompetitions.toLocaleString()}
+          value={stats.totalCompetitions.toString()}
           icon={Trophy}
-          color="text-gold"
+          className="bg-primary/10 border-primary/20"
         />
         <StatCard
           title="Total Questions"
           value={stats.totalQuestions.toLocaleString()}
           icon={FileQuestion}
-          color="text-success"
+          className="bg-accent/10 border-accent/20"
         />
         <StatCard
-          title="Active Competitions"
-          value={stats.activeCompetitions.toLocaleString()}
-          icon={Clock}
-          color="text-warning"
-        />
-        <StatCard
-          title="My Score"
-          value={stats.myScore.toLocaleString()}
+          title="Your Score"
+          value={stats.score.toLocaleString()}
           icon={Star}
-          color="text-primary"
+          className="bg-success/10 border-success/20"
         />
         <StatCard
-          title="My Rank"
-          value={`#${stats.myRank.toLocaleString()}`}
+          title="Progress"
+          value={`${stats.progress}%`}
           icon={TrendingUp}
-          color="text-accent"
+          className="bg-warning/10 border-warning/20"
         />
       </div>
 
+      {/* Quick Actions and Recent Activity in 2 columns */}
       <div className="grid md:grid-cols-2 gap-6">
+        {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common student tasks</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            <div className="grid grid-cols-2 gap-4">
+              {quickActions.map((action, index) => (
+                <button
+                  key={action.id}
+                  onClick={() => setActiveTab(action.id)}
+                  className={`p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left ${index === quickActions.length - 1 && quickActions.length % 2 === 1 ? 'md:col-span-2' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-lg bg-muted">
+                      <action.icon className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{action.title}</h3>
+                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
+        {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle>Achievements</CardTitle>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Your latest learning events</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-center text-muted-foreground py-4">No achievements yet</p>
+            <div className="space-y-4">
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -206,17 +224,17 @@ function StudentOverviewTab() {
   );
 }
 
-function StatCard({ title, value, icon: Icon, color }) {
+function StatCard({ title, value, icon: Icon, className }: { title: string; value: string; icon: any; className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
             <p className="text-2xl font-bold mt-1">{value}</p>
           </div>
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
-            <Icon className="w-5 h-5" />
+          <div className="p-2 rounded-lg bg-card">
+            <Icon className="w-6 h-6 text-primary" />
           </div>
         </div>
       </CardContent>
@@ -224,85 +242,192 @@ function StatCard({ title, value, icon: Icon, color }) {
   );
 }
 
-// Leaderboard Tab Component
-function StudentLeaderboardTab() {
-  const [selectedCompetition, setSelectedCompetition] = useState('all');
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
+// Competitions Tab Component
+function CompetitionsTab() {
   const [competitions, setCompetitions] = useState([]);
-  const [leaderboardData, setLeaderboardData] = useState([]);
-  const [schoolLeaderboardData, setSchoolLeaderboardData] = useState([]);
-  const [activeTab, setActiveTab] = useState('student'); // 'student' or 'school'
-
-  const badgeColors = {
-    gold: 'bg-gold text-gold-foreground',
-    silver: 'bg-silver text-silver-foreground',
-    bronze: 'bg-bronze text-bronze-foreground',
-    none: 'bg-muted text-muted-foreground'
-  };
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
 
   const fetchCompetitions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('competitions').select('*');
-      if (error) throw error;
-      setCompetitions(data || []);
+      // Fetch competitions from local storage
+      const competitionsData = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
+      setCompetitions(competitionsData);
     } catch (error) {
       toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
+  const filteredCompetitions = competitions.filter(competition =>
+    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => {
+    fetchCompetitions();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Competitions</h1>
+          <p className="text-muted-foreground">Join learning competitions</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Competitions List</CardTitle>
+          <CardDescription>Available competitions to join</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search competitions..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredCompetitions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No competitions found</p>
+            ) : (
+              <div className="space-y-4">
+                {filteredCompetitions.map((competition) => (
+                  <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{competition.name}</h3>
+                        <p className="text-xs text-muted-foreground">{competition.description}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                            {competition.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">Participants: {competition.current_participants || 0}/{competition.max_participants}</span>
+                        </div>
+                      </div>
+                      <Button size="sm" className="gradient-hero">
+                        Join
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Challenges Tab Component
+function ChallengesTab() {
+  const [challenges, setChallenges] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
+  const fetchChallenges = async () => {
+    setLoading(true);
+    try {
+      // Fetch challenges from local storage - now empty by default
+      const challengesData = localStorage.getItem('lumora_challenges') ? JSON.parse(localStorage.getItem('lumora_challenges')) : [];
+      setChallenges(challengesData);
+    } catch (error) {
+      toast({ title: 'Error fetching challenges', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchChallenges();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Challenges</h1>
+          <p className="text-muted-foreground">Complete challenges to earn extra points</p>
+        </div>
+        <Button className="gradient-hero">
+          <Users className="w-4 h-4 mr-2" />
+          1v1 Friend
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Available Challenges</CardTitle>
+          <CardDescription>Complete these to earn points and badges</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : challenges.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No challenges available</p>
+            ) : (
+              challenges.map((challenge) => (
+                <div key={challenge.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">{challenge.name}</h3>
+                      <p className="text-xs text-muted-foreground">{challenge.description}</p>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{challenge.category}</span>
+                        <span className="px-2 py-1 rounded-full text-xs bg-success/10 text-success">{challenge.points} pts</span>
+                      </div>
+                    </div>
+                    <Button size="sm" className="gradient-hero">
+                      Start
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Leaderboard Tab Component
+function LeaderboardTab() {
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
+
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
-      // Fetch students with scores
-      const { data, error } = await supabase.from('profiles').select('*').eq('role', 'student').order('score', { ascending: false });
-      if (error) throw error;
-
-      setLeaderboardData(data || []);
+      // Fetch leaderboard data from local storage
+      const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
+      // Sort by score descending
+      const sortedUsers = usersData.sort((a, b) => (b.score || 0) - (a.score || 0));
+      setLeaderboardData(sortedUsers);
     } catch (error) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
-  const fetchSchoolLeaderboard = async () => {
-    setLoading(true);
-    try {
-      // Fetch schools and calculate total points
-      const { data: schools, error: schoolsError } = await supabase.from('schools').select('*');
-      if (schoolsError) throw schoolsError;
-
-      // Fetch all students
-      const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
-      if (studentsError) throw studentsError;
-
-      // Calculate total points per school
-      const schoolScores = schools.map(school => {
-        const schoolStudents = students.filter(student => student.school_id === school.id);
-        const totalPoints = schoolStudents.reduce((sum, student) => sum + (student.score || 0), 0);
-        return {
-          ...school,
-          totalPoints,
-          studentCount: schoolStudents.length
-        };
-      });
-
-      // Sort by total points
-      schoolScores.sort((a, b) => b.totalPoints - a.totalPoints);
-
-      setSchoolLeaderboardData(schoolScores);
-    } catch (error) {
-      toast({ title: 'Error fetching school leaderboard', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchCompetitions();
     fetchLeaderboard();
-    fetchSchoolLeaderboard();
   }, []);
 
   return (
@@ -312,506 +437,61 @@ function StudentLeaderboardTab() {
         <p className="text-muted-foreground">See how you rank against others</p>
       </div>
 
-      <div className="flex items-center justify-end gap-3 mb-4">
-        <Select value={selectedCompetition} onValueChange={setSelectedCompetition}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select competition" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Competitions</SelectItem>
-            {competitions.map(comp => (
-              <SelectItem key={comp.id} value={comp.id}>{comp.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Tabs for Student/School Leaderboard */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 max-w-[400px]">
-          <TabsTrigger value="student">Student Leaderboard</TabsTrigger>
-          <TabsTrigger value="school">School Leaderboard</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="student">
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Rankings</CardTitle>
-              <CardDescription>Top performers across all competitions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                  </div>
-                ) : leaderboardData.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="p-3 text-left font-medium">Rank</th>
-                        <th className="p-3 text-left font-medium">Email</th>
-                        <th className="p-3 text-left font-medium">Username</th>
-                        <th className="p-3 text-left font-medium">Points</th>
-                        <th className="p-3 text-left font-medium">Achievement</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaderboardData.map((student, index) => (
-                        <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                          <td className="p-3 font-medium">{index + 1}</td>
-                          <td className="p-3 text-muted-foreground">{student.email}</td>
-                          <td className="p-3">{student.display_name || 'No username'}</td>
-                          <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
-                          <td className="p-3">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
-                              {index + 1}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Student Rankings</CardTitle>
+          <CardDescription>Top performers across all competitions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="school">
-          <Card>
-            <CardHeader>
-              <CardTitle>School Rankings</CardTitle>
-              <CardDescription>Combined scores of all students per school</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                  </div>
-                ) : schoolLeaderboardData.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No school leaderboard data available</p>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="p-3 text-left font-medium">Rank</th>
-                        <th className="p-3 text-left font-medium">School Name</th>
-                        <th className="p-3 text-left font-medium">Country</th>
-                        <th className="p-3 text-left font-medium">Total Points</th>
-                        <th className="p-3 text-left font-medium">Students</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {schoolLeaderboardData.map((school, index) => (
-                        <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                          <td className="p-3 font-medium">{index + 1}</td>
-                          <td className="p-3 font-medium">{school.name}</td>
-                          <td className="p-3 text-muted-foreground">{school.country || 'N/A'}</td>
-                          <td className="p-3 font-bold">{school.totalPoints?.toLocaleString() || '0'}</td>
-                          <td className="p-3 text-muted-foreground">{school.studentCount || '0'} students</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// Competitions Tab Component
-function StudentCompetitionsTab() {
-  const [competitions, setCompetitions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('available'); // 'available' or 'joined'
-  const { toast } = useToast();
-  const { profile } = useAuth();
-
-  const fetchCompetitions = async () => {
-    setLoading(true);
-    try {
-      // Fetch competitions from local storage
-      const storedCompetitions = localStorage.getItem('lumora_competitions');
-      if (storedCompetitions) {
-        setCompetitions(JSON.parse(storedCompetitions));
-      }
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleJoinCompetition = async (competitionId) => {
-    try {
-      // Update competition in local storage
-      const updatedCompetitions = competitions.map(comp => {
-        if (comp.id === competitionId) {
-          return {
-            ...comp,
-            current_participants: (comp.current_participants || 0) + 1,
-            participants: [...(comp.participants || []), profile?.id]
-          };
-        }
-        return comp;
-      });
-
-      localStorage.setItem('lumora_competitions', JSON.stringify(updatedCompetitions));
-      setCompetitions(updatedCompetitions);
-
-      toast({ title: 'Competition joined successfully!', description: 'You can now participate in this competition.' });
-    } catch (error) {
-      toast({ title: 'Error joining competition', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  const handleLeaveCompetition = async (competitionId) => {
-    try {
-      // Update competition in local storage
-      const updatedCompetitions = competitions.map(comp => {
-        if (comp.id === competitionId) {
-          return {
-            ...comp,
-            current_participants: Math.max((comp.current_participants || 0) - 1, 0),
-            participants: (comp.participants || []).filter(id => id !== profile?.id)
-          };
-        }
-        return comp;
-      });
-
-      localStorage.setItem('lumora_competitions', JSON.stringify(updatedCompetitions));
-      setCompetitions(updatedCompetitions);
-
-      toast({ title: 'Left competition successfully!' });
-    } catch (error) {
-      toast({ title: 'Error leaving competition', description: error.message, variant: 'destructive' });
-    }
-  };
-
-  useEffect(() => {
-    fetchCompetitions();
-  }, []);
-
-  // Filter competitions
-  const availableCompetitions = competitions.filter(comp =>
-    comp.is_active &&
-    !comp.participants?.includes(profile?.id) &&
-    (comp.current_participants || 0) < (comp.max_participants || Infinity)
-  );
-
-  const joinedCompetitions = competitions.filter(comp =>
-    comp.participants?.includes(profile?.id)
-  );
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Competitions</h1>
-        <p className="text-muted-foreground">Participate in learning challenges</p>
-      </div>
-
-      {/* Filter Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 max-w-[400px]">
-          <TabsTrigger value="available">Find Competitions</TabsTrigger>
-          <TabsTrigger value="joined">My Competitions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="available">
-          <Card>
-            <CardHeader>
-              <CardTitle>Available Competitions</CardTitle>
-              <CardDescription>Competitions you can join</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : availableCompetitions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No available competitions</p>
-              ) : (
-                <div className="space-y-4">
-                  {availableCompetitions.map(comp => (
-                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{comp.name}</h3>
-                          <p className="text-sm text-muted-foreground">{comp.description}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
-                            </span>
+            ) : leaderboardData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">Student</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardData.map((student, index) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{index + 1}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
                           </div>
+                          <span>{student.display_name || 'No name'}</span>
                         </div>
-                        <Button
-                          size="sm"
-                          className="gradient-hero"
-                          onClick={() => handleJoinCompetition(comp.id)}
-                        >
-                          Join Competition
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="joined">
-          <Card>
-            <CardHeader>
-              <CardTitle>My Competitions</CardTitle>
-              <CardDescription>Competitions you've joined</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : joinedCompetitions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">You haven't joined any competitions yet</p>
-              ) : (
-                <div className="space-y-4">
-                  {joinedCompetitions.map(comp => (
-                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{comp.name}</h3>
-                          <p className="text-sm text-muted-foreground">{comp.description}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
-                            </span>
+                      </td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress || 0}%` }}
+                            />
                           </div>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleLeaveCompetition(comp.id)}
-                          >
-                            Leave
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="gradient-hero"
-                            onClick={() => toast({ title: 'Participating in competition', description: 'You are now actively participating!' })}
-                          >
-                            Participate
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// Questions Tab Component
-function StudentQuestionsTab() {
-  const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
-  const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('questions').select('*');
-      if (error) throw error;
-      setQuestions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchQuestions();
-  }, []);
-
-  const approvedQuestions = questions.filter(q => q.status === 'approved');
-  const pendingQuestions = questions.filter(q => q.status === 'pending');
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Questions</h1>
-        <p className="text-muted-foreground">Practice questions</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Unlock className="w-4 h-4" />
-            <span>Admin/Moderator View - Can see all questions</span>
+                </tbody>
+              </table>
+            )}
           </div>
-        )}
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 max-w-[400px]">
-          <TabsTrigger value="all">All Questions</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Questions</CardTitle>
-              <CardDescription>All questions in the database</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : questions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No questions found</p>
-              ) : (
-                <div className="space-y-4">
-                  {questions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" className="gradient-hero">Practice</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="approved">
-          <Card>
-            <CardHeader>
-              <CardTitle>Approved Questions</CardTitle>
-              <CardDescription>Questions ready for practice</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : approvedQuestions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No approved questions</p>
-              ) : (
-                <div className="space-y-4">
-                  {approvedQuestions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" className="gradient-hero">Practice</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Questions</CardTitle>
-              <CardDescription>Questions awaiting approval</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : pendingQuestions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No pending questions</p>
-              ) : (
-                <div className="space-y-4">
-                  {pendingQuestions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" className="gradient-hero">Practice</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -825,8 +505,7 @@ function MessagesTab() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-  const queryClient = useQueryClient();
+  const { profile } = useAuth();
 
   const filteredMessages = messages.filter(message =>
     message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -837,17 +516,28 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Fetch messages - if admin/moderator viewing as teacher, show all messages
-      let query = supabase.from('messages').select('*').eq('receiver_id', profile?.id);
-
-      if (isAdminOrModerator && currentView) {
-        // Admin/moderator can see all messages
-        query = supabase.from('messages').select('*');
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setMessages(data || []);
+      // Mock data for messages
+      const mockMessages = [
+        {
+          id: '1',
+          sender: 'John Doe',
+          senderEmail: 'john@example.com',
+          subject: 'Question about competition',
+          content: 'Hello, I have a question about the upcoming math competition...',
+          date: '2025-06-01',
+          read: false
+        },
+        {
+          id: '2',
+          sender: 'Jane Smith',
+          senderEmail: 'jane@example.com',
+          subject: 'Technical issue',
+          content: 'I am having trouble accessing the practice questions...',
+          date: '2025-05-30',
+          read: true
+        }
+      ];
+      setMessages(mockMessages);
     } catch (error) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
@@ -860,14 +550,8 @@ function MessagesTab() {
     setSendingReply(true);
 
     try {
-      const { error } = await supabase.from('messages').insert({
-        content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
-        sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
-      });
-
-      if (error) throw error;
+      // Mock send reply
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
@@ -881,38 +565,13 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-      if (error) throw error;
-
-      toast({ title: 'Message deleted successfully!' });
       setMessages(messages.filter(msg => msg.id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
       }
+      toast({ title: 'Message deleted successfully!' });
     } catch (error) {
       toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleMarkAsRead = async (messageId: string) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('messages').update({
-        read: true,
-        read_at: new Date().toISOString()
-      }).eq('id', messageId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMessages(messages.map(msg =>
-        msg.id === messageId ? { ...msg, read: true } : msg
-      ));
-
-      toast({ title: 'Message marked as read' });
-    } catch (error) {
-      toast({ title: 'Error marking message as read', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -926,12 +585,6 @@ function MessagesTab() {
       <div>
         <h1 className="text-2xl font-display font-bold">Messages</h1>
         <p className="text-muted-foreground">Your communications</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Eye className="w-4 h-4" />
-            <span>Viewing as Student - Can see all messages</span>
-          </div>
-        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -964,12 +617,7 @@ function MessagesTab() {
                     filteredMessages.map((message) => (
                       <button
                         key={message.id}
-                        onClick={() => {
-                          setSelectedMessage(message);
-                          if (!message.read) {
-                            handleMarkAsRead(message.id);
-                          }
-                        }}
+                        onClick={() => setSelectedMessage(message)}
                         className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
@@ -987,33 +635,30 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          {/* Only show delete button for admins/moderators */}
-                          {(isAdminOrModerator || profile?.role === 'teacher') && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this message? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteMessage(message.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </button>
                     ))
@@ -1039,26 +684,23 @@ function MessagesTab() {
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
 
-                  {/* Only show reply for admins/moderators/teachers, not students */}
-                  {(isAdminOrModerator || profile?.role === 'teacher') && (
-                    <div className="space-y-4">
-                      <Label>Your Reply</Label>
-                      <Textarea
-                        value={replyContent}
-                        onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder="Type your reply here..."
-                        rows={8}
-                      />
-                      <Button
-                        onClick={handleSendReply}
-                        disabled={sendingReply || !replyContent}
-                        className="gradient-hero"
-                      >
-                        {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Send Reply
-                      </Button>
-                    </div>
-                  )}
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent}
+                      className="gradient-hero"
+                    >
+                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reply
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1078,114 +720,62 @@ function MessagesTab() {
   );
 }
 
-// Settings Tab Component
-function StudentSettingsTab() {
-  const [settings, setSettings] = useState({
-    platformName: 'Lumora',
-    maintenanceMode: false,
-    registrationOpen: true,
-    maxStudentsPerCompetition: 100,
-    questionApprovalRequired: true
-  });
-  const [loading, setLoading] = useState(false);
+// Profile View Component
+function ProfileView() {
+  const { profile } = useAuth();
   const { toast } = useToast();
-
-  const handleSaveSettings = async () => {
-    setLoading(true);
-    try {
-      // Save settings to database
-      const { error } = await supabase.from('settings').upsert(settings);
-      if (error) throw error;
-
-      toast({ title: 'Settings saved successfully!' });
-    } catch (error) {
-      toast({ title: 'Error saving settings', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-display font-bold">Platform Settings</h1>
-        <p className="text-muted-foreground">Configure global platform settings</p>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your student account</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>General Settings</CardTitle>
-          <CardDescription>Basic platform configuration</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Platform Name</Label>
-            <Input
-              value={settings.platformName}
-              onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
-            />
-          </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <Switch
-              id="maintenance-mode"
-              checked={settings.maintenanceMode}
-              onCheckedChange={(checked) => setSettings({ ...settings, maintenanceMode: checked })}
-            />
-            <Label htmlFor="maintenance-mode">Maintenance Mode</Label>
-          </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <Switch
-              id="registration-open"
-              checked={settings.registrationOpen}
-              onCheckedChange={(checked) => setSettings({ ...settings, registrationOpen: checked })}
-            />
-            <Label htmlFor="registration-open">Allow New Registrations</Label>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Competition Settings</CardTitle>
-          <CardDescription>Competition rules and limits</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Max Students per Competition</Label>
-            <Input
-              type="number"
-              value={settings.maxStudentsPerCompetition}
-              onChange={(e) => setSettings({ ...settings, maxStudentsPerCompetition: parseInt(e.target.value) || 0 })}
-              min="10"
-              max="1000"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Score</p>
+              <p className="text-2xl font-bold">{profile?.score?.toLocaleString() || '0'}</p>
+            </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Settings</CardTitle>
-          <CardDescription>Question and content moderation</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="question-approval"
-              checked={settings.questionApprovalRequired}
-              onCheckedChange={(checked) => setSettings({ ...settings, questionApprovalRequired: checked })}
-            />
-            <Label htmlFor="question-approval">Require Question Approval</Label>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Progress</p>
+              <p className="text-2xl font-bold">{profile?.progress?.toLocaleString() || '0'}%</p>
+            </div>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSaveSettings} disabled={loading} className="gradient-hero">
-          {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Save Settings
-        </Button>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Joined</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

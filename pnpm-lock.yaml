@@ -184,7 +184,7 @@ importers:
         specifier: ^18.3.23
         version: 18.3.27
       '@types/react-dom':
-        specifier: ^18.3.1
+        specifier: ^18.3.7
         version: 18.3.7(@types/react@18.3.27)
       '@vitejs/plugin-react-swc':
         specifier: ^3.11.0

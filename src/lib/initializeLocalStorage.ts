@@ -54,7 +54,7 @@ export function initializeLocalStorage() {
   // Initialize users if not present
   const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
   if (users.length === 0) {
-    // Add demo accounts to local storage with reset data
+    // Add demo accounts to local storage
     const demoAccounts = [
       {
         id: 'demo-admin-id',
@@ -65,10 +65,10 @@ export function initializeLocalStorage() {
         avatar_url: null,
         avatar_id: null,
         school_id: null,
-        score: 0, // Reset to 0
+        score: 1000,
         class: null,
         is_active: true,
-        progress: 0, // Reset to 0
+        progress: 100,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       },
@@ -81,10 +81,10 @@ export function initializeLocalStorage() {
         avatar_url: null,
         avatar_id: null,
         school_id: null,
-        score: 0, // Reset to 0
+        score: 800,
         class: null,
         is_active: true,
-        progress: 0, // Reset to 0
+        progress: 80,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       },
@@ -97,10 +97,10 @@ export function initializeLocalStorage() {
         avatar_url: null,
         avatar_id: null,
         school_id: null,
-        score: 0, // Reset to 0
+        score: 600,
         class: null,
         is_active: true,
-        progress: 0, // Reset to 0
+        progress: 60,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       },
@@ -113,10 +113,10 @@ export function initializeLocalStorage() {
         avatar_url: null,
         avatar_id: null,
         school_id: null,
-        score: 0, // Reset to 0
+        score: 400,
         class: null,
         is_active: true,
-        progress: 0, // Reset to 0
+        progress: 40,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -192,7 +192,7 @@ export function initializeLocalStorage() {
         description: 'Annual math competition for all students',
         is_active: true,
         max_participants: 100,
-        current_participants: 0, // Reset to 0
+        current_participants: 15,
         start_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
@@ -204,7 +204,7 @@ export function initializeLocalStorage() {
         description: 'Science competition covering physics, chemistry, and biology',
         is_active: false,
         max_participants: 50,
-        current_participants: 0, // Reset to 0
+        current_participants: 0,
         start_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         end_date: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000).toISOString(),
         created_at: new Date().toISOString(),
@@ -242,42 +242,6 @@ export function initializeLocalStorage() {
       }
     ];
     localStorage.setItem(LOCAL_STORAGE_KEYS.QUESTIONS, JSON.stringify(defaultQuestions));
-  }
-
-  // Initialize question sets if not present
-  const questionSets = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS);
-  if (questionSets.length === 0) {
-    const defaultQuestionSets = [
-      {
-        id: 'set-1',
-        name: 'Basic Math Skills',
-        description: 'Fundamental math questions for beginners',
-        category: 'math',
-        questions_count: 10,
-        is_timed: true,
-        time_limit_minutes: 15,
-        auto_submit: true,
-        allow_redo: false,
-        scoring_method: 'highest',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        id: 'set-2',
-        name: 'General Knowledge',
-        description: 'Basic general knowledge questions',
-        category: 'general',
-        questions_count: 15,
-        is_timed: false,
-        time_limit_minutes: 0,
-        auto_submit: false,
-        allow_redo: true,
-        scoring_method: 'best_of_three',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-    ];
-    localStorage.setItem(LOCAL_STORAGE_KEYS.QUESTION_SETS, JSON.stringify(defaultQuestionSets));
   }
 
   // Initialize schools if not present

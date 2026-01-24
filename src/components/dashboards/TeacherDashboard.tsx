@@ -1,219 +1,275 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Search, Eye, EyeOff, Loader2, RefreshCw, User, CheckCircle, XCircle, MessageSquare, AlertTriangle, Trash2, Mail, Users, Trophy, FileQuestion, CheckSquare, Clock, LayoutTemplate, School, TrendingUp, Calendar, ChevronRight, Crown, Medal, Star, Plus, Edit, Upload, ChevronDown, Shield, Unlock, Lock, Mail as MailIcon } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { DashboardLayout } from './DashboardLayout';
-import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Users,
+  BarChart3,
+  Trophy,
+  Search,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  MessageSquare,
+  RefreshCw,
+  Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Lock,
+  Unlock,
+  Calendar,
+  ChevronRight,
+  Crown,
+  Medal,
+  Star,
+  Plus,
+  Edit,
+  Trash2
+} from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 
-export default function TeacherDashboard() {
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
-
-  // Sidebar navigation items
-  const sidebarItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutTemplate },
-    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
-    { id: 'competitions', label: 'Competitions', icon: Trophy },
-    { id: 'questions', label: 'Questions', icon: FileQuestion },
-    { id: 'messages', label: 'Messages', icon: MailIcon },
-    { id: 'settings', label: 'Settings', icon: Settings },
+function TeacherSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
+  const { profile } = useAuth();
+  const navItems = [
+    { id: 'overview', icon: BarChart3, label: 'Overview' },
+    { id: 'students', icon: Users, label: 'Students' },
+    { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
+    { id: 'messages', icon: MessageSquare, label: 'Inbox' },
   ];
 
-  // Handle navigation item click
-  const handleNavItemClick = (itemId) => {
-    setActiveTab(itemId);
-  };
-
-  // Render content based on active tab
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return <TeacherOverviewTab />;
-      case 'leaderboard':
-        return <TeacherLeaderboardTab />;
-      case 'competitions':
-        return <TeacherCompetitionsTab />;
-      case 'questions':
-        return <TeacherQuestionsTab />;
-      case 'messages':
-        return <MessagesTab />;
-      case 'settings':
-        return <TeacherSettingsTab />;
-      default:
-        return <TeacherOverviewTab />;
-    }
-  };
-
   return (
-    <DashboardLayout
-      title="Teacher Dashboard"
-      sidebar={
-        <div className="space-y-2">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavItemClick(item.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${activeTab === item.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'}`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      }
-      onNavItemClick={handleNavItemClick}
-    >
-      {renderContent()}
-    </DashboardLayout>
-  );
-}
+    <div className="flex flex-col h-full">
+      <nav className="flex-1 space-y-2">
+        {navItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === item.id
+              ? 'bg-primary text-primary-foreground shadow-card'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+          >
+            <item.icon className="w-5 h-5" />
+            <span className="font-medium">{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
-// Overview Tab Component
-function TeacherOverviewTab() {
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalCompetitions: 0,
-    totalQuestions: 0,
-    activeCompetitions: 0,
-    pendingApprovals: 0
-  });
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  const fetchStats = async () => {
-    setLoading(true);
-    try {
-      // Fetch all profiles
-      const { data: profiles, error: profilesError } = await supabase.from('profiles').select('*');
-      if (profilesError) throw profilesError;
-
-      // Fetch competitions
-      const { data: competitions, error: competitionsError } = await supabase.from('competitions').select('*');
-      if (competitionsError) throw competitionsError;
-
-      // Fetch questions
-      const { data: questions, error: questionsError } = await supabase.from('questions').select('*');
-      if (questionsError) throw questionsError;
-
-      // Calculate stats
-      const totalStudents = profiles.filter(p => p.role === 'student').length;
-      const totalCompetitions = competitions.length;
-      const totalQuestions = questions.length;
-      const activeCompetitions = competitions.filter(c => c.is_active).length;
-      const pendingApprovals = 0; // Placeholder for pending approvals
-
-      setStats({
-        totalStudents,
-        totalCompetitions,
-        totalQuestions,
-        activeCompetitions,
-        pendingApprovals
-      });
-    } catch (error) {
-      toast({ title: 'Error fetching stats', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your class activity</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Unlock className="w-4 h-4" />
-            <span>Admin/Moderator View - Can see all competitions</span>
+      <div className="mt-auto pt-6 border-t border-border/50">
+        <div className="p-4 rounded-2xl bg-muted/30">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
+              {profile?.display_name?.substring(0, 2).toUpperCase() || 'TD'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{profile?.display_name || 'Teacher'}</p>
+              <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
+            </div>
           </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatCard
-          title="Total Students"
-          value={stats.totalStudents.toLocaleString()}
-          icon={Users}
-          color="text-primary"
-        />
-        <StatCard
-          title="Competitions"
-          value={stats.totalCompetitions.toLocaleString()}
-          icon={Trophy}
-          color="text-gold"
-        />
-        <StatCard
-          title="Questions"
-          value={stats.totalQuestions.toLocaleString()}
-          icon={FileQuestion}
-          color="text-success"
-        />
-        <StatCard
-          title="Active Competitions"
-          value={stats.activeCompetitions.toLocaleString()}
-          icon={Clock}
-          color="text-warning"
-        />
-        <StatCard
-          title="Pending Approvals"
-          value={stats.pendingApprovals.toLocaleString()}
-          icon={AlertTriangle}
-          color="text-destructive"
-        />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">No recent activity</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-muted-foreground py-4">All systems operational</p>
-          </CardContent>
-        </Card>
+          <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setActiveTab('profile')}>
+            <User className="w-3 h-3 mr-2" />
+            Profile Settings
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
-function StatCard({ title, value, icon: Icon, color }) {
+export default function TeacherDashboard() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+
   return (
-    <Card>
+    <DashboardLayout
+      title="Lumora Teacher Dashboard"
+      sidebar={<TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+    >
+      {activeTab === 'overview' && <TeacherOverview setActiveTab={setActiveTab} />}
+      {activeTab === 'students' && <StudentsTab />}
+      {activeTab === 'leaderboard' && <TeacherLeaderboardTab />}
+      {activeTab === 'messages' && <MessagesTab />}
+      {activeTab === 'profile' && <ProfileView />}
+    </DashboardLayout>
+  );
+}
+
+// Teacher Overview Component
+function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+
+  // Fetch stats from database
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['teacher-stats'],
+    queryFn: async () => {
+      try {
+        // Get students for this teacher
+        const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
+        if (studentsError) throw studentsError;
+
+        // Get competitions
+        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
+        if (compError) throw compError;
+
+        return {
+          totalStudents: students.length,
+          activeStudents: students.length,
+          competitions: competitions.length,
+          questionsAnswered: 0, // This would come from a more complex query
+          avgScore: 0, // This would come from a more complex query
+          recentActivity: []
+        };
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+        return {
+          totalStudents: 0,
+          activeStudents: 0,
+          competitions: 0,
+          questionsAnswered: 0,
+          avgScore: 0,
+          recentActivity: []
+        };
+      }
+    }
+  });
+
+  const quickActions = [
+    { id: 'students', icon: Users, title: 'View Students', description: 'Check student progress' },
+    { id: 'leaderboard', icon: Trophy, title: 'Class Leaderboard', description: 'See top performers' },
+    { id: 'messages', icon: MessageSquare, title: 'Student Messages', description: 'Read student communications' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
+        <p className="text-muted-foreground">Overview of your class performance and activities</p>
+        {isAdminOrModerator && currentView && (
+          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+            <Eye className="w-4 h-4" />
+            <span>Viewing as Teacher - Can access all schools and competitions</span>
+          </div>
+        )}
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Students"
+          value={stats?.totalStudents?.toString() || '0'}
+          icon={Users}
+          className="bg-primary/10 border-primary/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Active Students"
+          value={stats?.activeStudents?.toString() || '0'}
+          icon={CheckCircle}
+          className="bg-success/10 border-success/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Competitions"
+          value={stats?.competitions?.toString() || '0'}
+          icon={Trophy}
+          className="bg-accent/10 border-accent/20"
+          loading={statsLoading}
+        />
+        <StatCard
+          title="Avg. Score"
+          value={`${stats?.avgScore || 0}%`}
+          icon={BarChart3}
+          className="bg-warning/10 border-warning/20"
+          loading={statsLoading}
+        />
+      </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common teacher tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {quickActions.map((action) => (
+              <button
+                key={action.id}
+                onClick={() => setActiveTab(action.id)}
+                className="p-4 rounded-xl border border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-lg bg-muted">
+                    <action.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium">{action.title}</h3>
+                    <p className="text-xs text-muted-foreground">{action.description}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Latest class events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {!stats || stats.recentActivity?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No recent activity</p>
+            ) : (
+              stats.recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="p-2 rounded-lg bg-muted">
+                    {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                    {activity.type === 'student' && <Users className="w-4 h-4 text-primary" />}
+                    {activity.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
+                    {activity.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{activity.title}</p>
+                    <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon: Icon, className, loading = false }: { title: string; value: string; icon: any; className?: string; loading?: boolean }) {
+  return (
+    <Card className={className}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
+            <p className="text-2xl font-bold mt-1">{loading ? <Loader2 className="w-6 h-6 animate-spin" /> : value}</p>
           </div>
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}>
-            <Icon className="w-5 h-5" />
+          <div className="p-2 rounded-lg bg-card">
+            <Icon className="w-6 h-6 text-primary" />
           </div>
         </div>
       </CardContent>
@@ -221,7 +277,294 @@ function StatCard({ title, value, icon: Icon, color }) {
   );
 }
 
-// Leaderboard Tab Component
+// Students Tab Component
+function StudentsTab() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedClass, setSelectedClass] = useState('all');
+  const { toast } = useToast();
+  const { profile, currentView, isAdminOrModerator } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [students, setStudents] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const queryClient = useQueryClient();
+
+  const filteredStudents = students.filter(student =>
+    (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (selectedClass === 'all' || student.class === selectedClass)
+  );
+
+  const fetchStudents = async () => {
+    setLoading(true);
+    try {
+      // Fetch students - if admin/moderator viewing as teacher, show all students
+      let query = supabase.from('profiles').select('*').eq('role', 'student');
+
+      if (!isAdminOrModerator || !currentView) {
+        // Regular teacher can only see students from their school
+        // query = query.eq('school_id', profile?.school_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const { data, error } = await supabase.from('schools').select('*');
+      if (error) throw error;
+      setClasses(data || []);
+    } catch (error) {
+      console.error('Error fetching classes:', error);
+    }
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editingStudent.name) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { error } = await supabase.from('profiles').update({
+        display_name: editingStudent.name,
+        is_active: editingStudent.is_active
+      }).eq('id', editingStudent.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Student updated successfully!' });
+      setEditingStudent(null);
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error updating student', description: error.message, variant: 'destructive' });
+    }
+
+    setLoading(false);
+  };
+
+  const handleDeleteStudent = async (studentId: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('profiles').delete().eq('id', studentId);
+      if (error) throw error;
+
+      toast({ title: 'Student deleted successfully!' });
+      fetchStudents();
+    } catch (error) {
+      toast({ title: 'Error deleting student', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchStudents();
+    fetchClasses();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Student Management</h1>
+          <p className="text-muted-foreground">View and manage your students</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Unlock className="w-4 h-4" />
+              <span>Admin/Moderator View - Can see all schools</span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search students..."
+              className="pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Filter by class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Classes</SelectItem>
+              {classes.map(cls => (
+                <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Students List</CardTitle>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No students found</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Name</th>
+                    <th className="p-3 text-left font-medium">Class</th>
+                    <th className="p-3 text-left font-medium">School</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Status</th>
+                    <th className="p-3 text-left font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium">{student.display_name || 'No name'}</p>
+                            <p className="text-xs text-muted-foreground">{student.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.class || 'N/A'}</td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress || 0}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-1 rounded-full text-xs capitalize ${student.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {student.is_active ? 'active' : 'inactive'}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setEditingStudent(student)}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Student</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this student? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Student Dialog */}
+      {editingStudent && (
+        <Dialog open={!!editingStudent} onOpenChange={() => setEditingStudent(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Student</DialogTitle>
+              <DialogDescription>Update student information</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={editingStudent.display_name || ''}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, display_name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={editingStudent.email || ''}
+                  disabled
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="is-active"
+                  checked={editingStudent.is_active}
+                  onCheckedChange={(checked) => setEditingStudent({ ...editingStudent, is_active: checked })}
+                />
+                <Label htmlFor="is-active">Active Student</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingStudent(null)}>Cancel</Button>
+              <Button onClick={handleUpdateStudent} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  'Update Student'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+// Teacher Leaderboard Tab Component
 function TeacherLeaderboardTab() {
   const [selectedCompetition, setSelectedCompetition] = useState('all');
   const [selectedClass, setSelectedClass] = useState('all');
@@ -231,8 +574,6 @@ function TeacherLeaderboardTab() {
   const [competitions, setCompetitions] = useState([]);
   const [classes, setClasses] = useState([]);
   const [leaderboardData, setLeaderboardData] = useState([]);
-  const [schoolLeaderboardData, setSchoolLeaderboardData] = useState([]);
-  const [activeTab, setActiveTab] = useState('student'); // 'student' or 'school'
 
   const badgeColors = {
     gold: 'bg-gold text-gold-foreground',
@@ -284,43 +625,10 @@ function TeacherLeaderboardTab() {
     setLoading(false);
   };
 
-  const fetchSchoolLeaderboard = async () => {
-    setLoading(true);
-    try {
-      // Fetch schools and calculate total points
-      const { data: schools, error: schoolsError } = await supabase.from('schools').select('*');
-      if (schoolsError) throw schoolsError;
-
-      // Fetch all students
-      const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
-      if (studentsError) throw studentsError;
-
-      // Calculate total points per school
-      const schoolScores = schools.map(school => {
-        const schoolStudents = students.filter(student => student.school_id === school.id);
-        const totalPoints = schoolStudents.reduce((sum, student) => sum + (student.score || 0), 0);
-        return {
-          ...school,
-          totalPoints,
-          studentCount: schoolStudents.length
-        };
-      });
-
-      // Sort by total points
-      schoolScores.sort((a, b) => b.totalPoints - a.totalPoints);
-
-      setSchoolLeaderboardData(schoolScores);
-    } catch (error) {
-      toast({ title: 'Error fetching school leaderboard', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchCompetitions();
     fetchClasses();
     fetchLeaderboard();
-    fetchSchoolLeaderboard();
   }, []);
 
   return (
@@ -364,103 +672,69 @@ function TeacherLeaderboardTab() {
         </div>
       </div>
 
-      {/* Tabs for Student/School Leaderboard */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 max-w-[400px]">
-          <TabsTrigger value="student">Student Leaderboard</TabsTrigger>
-          <TabsTrigger value="school">School Leaderboard</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="student">
-          <Card>
-            <CardHeader>
-              <CardTitle>Student Performance</CardTitle>
-              <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'} scores and progress</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                  </div>
-                ) : leaderboardData.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="p-3 text-left font-medium">Rank</th>
-                        <th className="p-3 text-left font-medium">Email</th>
-                        <th className="p-3 text-left font-medium">Username</th>
-                        <th className="p-3 text-left font-medium">Points</th>
-                        <th className="p-3 text-left font-medium">Achievement</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leaderboardData.map((student, index) => (
-                        <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                          <td className="p-3 font-medium">{index + 1}</td>
-                          <td className="p-3 text-muted-foreground">{student.email}</td>
-                          <td className="p-3">{student.display_name || 'No username'}</td>
-                          <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
-                          <td className="p-3">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
-                              {index + 1}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Student Performance</CardTitle>
+          <CardDescription>{isAdminOrModerator && currentView ? 'All students across all schools' : 'Your students'} scores and progress</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="text-center py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="school">
-          <Card>
-            <CardHeader>
-              <CardTitle>School Performance</CardTitle>
-              <CardDescription>Combined scores of all students per school</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                {loading ? (
-                  <div className="text-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                  </div>
-                ) : schoolLeaderboardData.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No school leaderboard data available</p>
-                ) : (
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="p-3 text-left font-medium">Rank</th>
-                        <th className="p-3 text-left font-medium">School Name</th>
-                        <th className="p-3 text-left font-medium">Country</th>
-                        <th className="p-3 text-left font-medium">Total Points</th>
-                        <th className="p-3 text-left font-medium">Students</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {schoolLeaderboardData.map((school, index) => (
-                        <tr key={school.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
-                          <td className="p-3 font-medium">{index + 1}</td>
-                          <td className="p-3 font-medium">{school.name}</td>
-                          <td className="p-3 text-muted-foreground">{school.country || 'N/A'}</td>
-                          <td className="p-3 font-bold">{school.totalPoints?.toLocaleString() || '0'}</td>
-                          <td className="p-3 text-muted-foreground">{school.studentCount || '0'} students</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ) : leaderboardData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No leaderboard data available</p>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="p-3 text-left font-medium">Rank</th>
+                    <th className="p-3 text-left font-medium">Student</th>
+                    <th className="p-3 text-left font-medium">School</th>
+                    <th className="p-3 text-left font-medium">Score</th>
+                    <th className="p-3 text-left font-medium">Progress</th>
+                    <th className="p-3 text-left font-medium">Achievement</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardData.map((student, index) => (
+                    <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                      <td className="p-3 font-medium">{index + 1}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span>{student.display_name || 'No name'}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 text-muted-foreground">{student.school || 'N/A'}</td>
+                      <td className="p-3 font-bold">{student.score?.toLocaleString() || '0'}</td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-full h-2 bg-muted rounded-full">
+                            <div
+                              className="h-2 bg-primary rounded-full"
+                              style={{ width: `${student.progress || 0}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">{student.progress || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${badgeColors[index < 3 ? (index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze') : 'none']}`}>
+                          {index + 1}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         <Card>
@@ -481,332 +755,6 @@ function TeacherLeaderboardTab() {
           </CardContent>
         </Card>
       </div>
-    </div>
-  );
-}
-
-// Competitions Tab Component
-function TeacherCompetitionsTab() {
-  const [competitions, setCompetitions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('active');
-  const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  const fetchCompetitions = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('competitions').select('*');
-      if (error) throw error;
-      setCompetitions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchCompetitions();
-  }, []);
-
-  const activeCompetitions = competitions.filter(comp => comp.is_active);
-  const pastCompetitions = competitions.filter(comp => !comp.is_active);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Competitions</h1>
-        <p className="text-muted-foreground">Manage class competitions</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Unlock className="w-4 h-4" />
-            <span>Admin/Moderator View - Can see all competitions</span>
-          </div>
-        )}
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-2 max-w-[400px]">
-          <TabsTrigger value="active">Active Competitions</TabsTrigger>
-          <TabsTrigger value="past">Past Competitions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Competitions</CardTitle>
-              <CardDescription>Currently running competitions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : activeCompetitions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No active competitions</p>
-              ) : (
-                <div className="space-y-4">
-                  {activeCompetitions.map(comp => (
-                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium">{comp.name}</h3>
-                          <p className="text-sm text-muted-foreground">{comp.description}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Edit</Button>
-                          <Button variant="destructive" size="sm">Delete</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="past">
-          <Card>
-            <CardHeader>
-              <CardTitle>Past Competitions</CardTitle>
-              <CardDescription>Completed competitions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : pastCompetitions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No past competitions</p>
-              ) : (
-                <div className="space-y-4">
-                  {pastCompetitions.map(comp => (
-                    <div key={comp.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium">{comp.name}</h3>
-                          <p className="text-sm text-muted-foreground">{comp.description}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              {comp.current_participants || 0}/{comp.max_participants || '∞'} participants
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {new Date(comp.start_date).toLocaleDateString()} - {new Date(comp.end_date).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">View Results</Button>
-                          <Button variant="destructive" size="sm">Delete</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-// Questions Tab Component
-function TeacherQuestionsTab() {
-  const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
-  const { toast } = useToast();
-  const { profile, currentView, isAdminOrModerator } = useAuth();
-
-  const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('questions').select('*');
-      if (error) throw error;
-      setQuestions(data || []);
-    } catch (error) {
-      toast({ title: 'Error fetching questions', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchQuestions();
-  }, []);
-
-  const approvedQuestions = questions.filter(q => q.status === 'approved');
-  const pendingQuestions = questions.filter(q => q.status === 'pending');
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Questions</h1>
-        <p className="text-muted-foreground">Manage question database</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Unlock className="w-4 h-4" />
-            <span>Admin/Moderator View - Can see all questions</span>
-          </div>
-        )}
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-3 max-w-[400px]">
-          <TabsTrigger value="all">All Questions</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Questions</CardTitle>
-              <CardDescription>All questions in the database</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : questions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No questions found</p>
-              ) : (
-                <div className="space-y-4">
-                  {questions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Edit</Button>
-                          <Button variant="destructive" size="sm">Delete</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="approved">
-          <Card>
-            <CardHeader>
-              <CardTitle>Approved Questions</CardTitle>
-              <CardDescription>Questions ready for use</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : approvedQuestions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No approved questions</p>
-              ) : (
-                <div className="space-y-4">
-                  {approvedQuestions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">Edit</Button>
-                          <Button variant="destructive" size="sm">Delete</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Questions</CardTitle>
-              <CardDescription>Questions awaiting approval</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                </div>
-              ) : pendingQuestions.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">No pending questions</p>
-              ) : (
-                <div className="space-y-4">
-                  {pendingQuestions.map(question => (
-                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{question.text}</h3>
-                          <p className="text-sm text-muted-foreground mt-1">{question.category}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs">
-                            <span className="flex items-center gap-1">
-                              <CheckSquare className="w-3 h-3" />
-                              {question.difficulty}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3 h-3" />
-                              {question.points || 1} points
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" className="gradient-success">Approve</Button>
-                          <Button variant="destructive" size="sm">Reject</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
@@ -890,28 +838,6 @@ function MessagesTab() {
     setLoading(false);
   };
 
-  const handleMarkAsRead = async (messageId: string) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('messages').update({
-        read: true,
-        read_at: new Date().toISOString()
-      }).eq('id', messageId);
-
-      if (error) throw error;
-
-      // Update local state
-      setMessages(messages.map(msg =>
-        msg.id === messageId ? { ...msg, read: true } : msg
-      ));
-
-      toast({ title: 'Message marked as read' });
-    } catch (error) {
-      toast({ title: 'Error marking message as read', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
     fetchMessages();
   }, []);
@@ -959,12 +885,7 @@ function MessagesTab() {
                     filteredMessages.map((message) => (
                       <button
                         key={message.id}
-                        onClick={() => {
-                          setSelectedMessage(message);
-                          if (!message.read) {
-                            handleMarkAsRead(message.id);
-                          }
-                        }}
+                        onClick={() => setSelectedMessage(message)}
                         className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id ? 'bg-primary/10 border border-primary' : 'hover:bg-muted/50'} ${!message.read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
@@ -982,33 +903,30 @@ function MessagesTab() {
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
-                          {/* Only show delete button for admins/moderators */}
-                          {(isAdminOrModerator || profile?.role === 'teacher') && (
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Are you sure you want to delete this message? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteMessage(message.id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          )}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="sm" className="h-6 w-6 p-0">
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this message? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-destructive hover:bg-destructive/90"
+                                  onClick={() => handleDeleteMessage(message.id)}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </button>
                     ))
@@ -1034,26 +952,23 @@ function MessagesTab() {
                     <p className="text-sm">{selectedMessage.content}</p>
                   </div>
 
-                  {/* Only show reply for admins/moderators/teachers, not students */}
-                  {(isAdminOrModerator || profile?.role === 'teacher') && (
-                    <div className="space-y-4">
-                      <Label>Your Reply</Label>
-                      <Textarea
-                        value={replyContent}
-                        onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder="Type your reply here..."
-                        rows={8}
-                      />
-                      <Button
-                        onClick={handleSendReply}
-                        disabled={sendingReply || !replyContent}
-                        className="gradient-hero"
-                      >
-                        {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Send Reply
-                      </Button>
-                    </div>
-                  )}
+                  <div className="space-y-4">
+                    <Label>Your Reply</Label>
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Type your reply here..."
+                      rows={8}
+                    />
+                    <Button
+                      onClick={handleSendReply}
+                      disabled={sendingReply || !replyContent}
+                      className="gradient-hero"
+                    >
+                      {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reply
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1073,114 +988,62 @@ function MessagesTab() {
   );
 }
 
-// Settings Tab Component
-function TeacherSettingsTab() {
-  const [settings, setSettings] = useState({
-    platformName: 'Lumora',
-    maintenanceMode: false,
-    registrationOpen: true,
-    maxStudentsPerCompetition: 100,
-    questionApprovalRequired: true
-  });
-  const [loading, setLoading] = useState(false);
+// Profile View Component
+function ProfileView() {
+  const { profile } = useAuth();
   const { toast } = useToast();
-
-  const handleSaveSettings = async () => {
-    setLoading(true);
-    try {
-      // Save settings to database
-      const { error } = await supabase.from('settings').upsert(settings);
-      if (error) throw error;
-
-      toast({ title: 'Settings saved successfully!' });
-    } catch (error) {
-      toast({ title: 'Error saving settings', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-display font-bold">Platform Settings</h1>
-        <p className="text-muted-foreground">Configure global platform settings</p>
+        <h1 className="text-2xl font-display font-bold">My Profile</h1>
+        <p className="text-muted-foreground">Manage your teacher account</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>General Settings</CardTitle>
-          <CardDescription>Basic platform configuration</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Platform Name</Label>
-            <Input
-              value={settings.platformName}
-              onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
-            />
-          </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input value={profile?.email || ''} disabled className="bg-muted" />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <Switch
-              id="maintenance-mode"
-              checked={settings.maintenanceMode}
-              onCheckedChange={(checked) => setSettings({ ...settings, maintenanceMode: checked })}
-            />
-            <Label htmlFor="maintenance-mode">Maintenance Mode</Label>
-          </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Input value={profile?.role || ''} disabled className="bg-muted" />
+            </div>
 
-          <div className="flex items-center gap-3">
-            <Switch
-              id="registration-open"
-              checked={settings.registrationOpen}
-              onCheckedChange={(checked) => setSettings({ ...settings, registrationOpen: checked })}
-            />
-            <Label htmlFor="registration-open">Allow New Registrations</Label>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={profile?.display_name || 'Not set'} disabled className="bg-muted" />
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Competition Settings</CardTitle>
-          <CardDescription>Competition rules and limits</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Max Students per Competition</Label>
-            <Input
-              type="number"
-              value={settings.maxStudentsPerCompetition}
-              onChange={(e) => setSettings({ ...settings, maxStudentsPerCompetition: parseInt(e.target.value) || 0 })}
-              min="10"
-              max="1000"
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Students Taught</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Settings</CardTitle>
-          <CardDescription>Question and content moderation</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Switch
-              id="question-approval"
-              checked={settings.questionApprovalRequired}
-              onCheckedChange={(checked) => setSettings({ ...settings, questionApprovalRequired: checked })}
-            />
-            <Label htmlFor="question-approval">Require Question Approval</Label>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Competitions Organized</p>
+              <p className="text-2xl font-bold">0</p>
+            </div>
 
-      <div className="flex justify-end">
-        <Button onClick={handleSaveSettings} disabled={loading} className="gradient-hero">
-          {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Save Settings
-        </Button>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Avg. Class Score</p>
+              <p className="text-2xl font-bold">0%</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

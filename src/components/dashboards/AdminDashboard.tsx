@@ -435,10 +435,10 @@ function SchoolsTab() {
     setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
   }, []);
 
-  const filteredSchools = schools.filter(school =>
-    school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.country.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSchools = (schools || []).filter(school =>
+    (school?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (school?.city || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (school?.country || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleAddSchool = async () => {
@@ -743,9 +743,9 @@ function CompetitionsTab() {
     }
   };
 
-  const filteredCompetitions = competitions.filter(competition =>
-    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCompetitions = (competitions || []).filter(competition =>
+    (competition?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (competition?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   useEffect(() => {
@@ -1096,10 +1096,10 @@ function QuestionsTab() {
     setLoading(false);
   };
 
-  const filteredQuestions = questions.filter(question => {
-    const questionSetName = questionSets.find(qs => qs.id === question.question_set_id)?.name || '';
-    return question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      questionSetName.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredQuestions = (questions || []).filter(question => {
+    const questionSetName = (questionSets || []).find(qs => qs.id === question?.question_set_id)?.name || '';
+    return (question?.text || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (questionSetName || "").toLowerCase().includes((searchTerm || "").toLowerCase());
   });
 
   useEffect(() => {
@@ -1472,9 +1472,9 @@ function QuestionSetsTab() {
     setLoading(false);
   };
 
-  const filteredQuestionSets = questionSets.filter(qs =>
-    qs.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    qs.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredQuestionSets = (questionSets || []).filter(qs =>
+    (qs?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (qs?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   useEffect(() => {
@@ -1749,9 +1749,9 @@ function AvatarsTab() {
     setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
   }, []);
 
-  const filteredAvatars = avatars.filter(avatar =>
-    avatar.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    avatar.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAvatars = (avatars || []).filter(avatar =>
+    (avatar?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (avatar?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2276,7 +2276,7 @@ function UsersTab() {
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                              {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
+                              {(user?.display_name || user?.email || '??').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                             </div>
                             <span>{user.display_name || 'No name'}</span>
                           </div>
@@ -3168,6 +3168,69 @@ function MessagesTab() {
           )}
         </div>
       </div>
+
+      {/* Compose Message Dialog */}
+      <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Compose Message</DialogTitle>
+            <DialogDescription>Send a message to a student, teacher, or moderator.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Recipient Type</Label>
+                <Select
+                  value={newMessage.recipientRole}
+                  onValueChange={(val: any) => setNewMessage({ ...newMessage, recipientRole: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Students</SelectItem>
+                    <SelectItem value="teacher">Teachers</SelectItem>
+                    <SelectItem value="moderator">Moderators</SelectItem>
+                    <SelectItem value="all">All Users</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Specific Email (Optional)</Label>
+                <Input
+                  placeholder="user@example.com"
+                  value={newMessage.recipientId}
+                  onChange={(e) => setNewMessage({ ...newMessage, recipientId: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                placeholder="Message subject"
+                value={newMessage.subject}
+                onChange={(e) => setNewMessage({ ...newMessage, subject: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <Textarea
+                placeholder="Type your message here..."
+                rows={10}
+                value={newMessage.content}
+                onChange={(e) => setNewMessage({ ...newMessage, content: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsComposeOpen(false)}>Cancel</Button>
+            <Button onClick={handleSendMessage} disabled={loading || !newMessage.subject || !newMessage.content} className="gradient-hero">
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MessageSquare className="w-4 h-4 mr-2" />}
+              Send Message
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -3679,15 +3742,14 @@ function PracticeManagerTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Manage Questions Dialog */}
       <Dialog open={isManageDialogOpen} onOpenChange={setIsManageDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>Assign Questions: {selectedSet?.name}</DialogTitle>
             <DialogDescription>Select questions from the global question bank to add to this practice set.</DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 mt-4 border rounded-md p-4 bg-muted/20">
+          <ScrollArea className="flex-1 px-6 mt-4">
             <div className="space-y-4">
               {globalQuestions.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No questions found in the question bank.</p>
@@ -3715,7 +3777,7 @@ function PracticeManagerTab() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="p-6 pt-2">
             <Button variant="outline" onClick={() => setIsManageDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveQuestions} className="gradient-hero">Save Assignments</Button>
           </DialogFooter>
@@ -3723,15 +3785,15 @@ function PracticeManagerTab() {
       </Dialog>
 
       <Dialog open={isCreateQuestionDialogOpen} onOpenChange={(open) => { setIsCreateQuestionDialogOpen(open); if (!open) setIsEditingQuestion(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>{isEditingQuestion ? 'Edit Question' : `New Question for ${selectedSet?.name}`}</DialogTitle>
             <DialogDescription>
               {isEditingQuestion ? 'Update question details globally.' : 'Create a question that will be saved globally and added to this set.'}
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4 mt-4">
+          <ScrollArea className="flex-1 px-6 mt-4">
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Question Type</Label>
@@ -3802,7 +3864,7 @@ function PracticeManagerTab() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-4 pt-4 border-t gap-2">
+          <DialogFooter className="p-6 pt-4 border-t gap-2">
             <Button variant="ghost" onClick={() => setIsCreateQuestionDialogOpen(false)}>Cancel</Button>
             {!isEditingQuestion && (
               <Button variant="outline" onClick={() => handleCreateAndAddQuestion(true)} disabled={loading}>

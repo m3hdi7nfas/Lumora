@@ -13,19 +13,12 @@ import { AdBanner } from '@/components/ads/AdBanner';
 import { ContactDialog } from '@/components/landing/ContactDialog';
 import { Logo } from '@/components/ui/Logo';
 
-const DEMO_ACCOUNTS = {
-  admin: { email: 'demo.admin@lumora.com', password: 'Demo123!', role: 'admin', icon: Crown },
-  moderator: { email: 'demo.moderator@lumora.com', password: 'Demo123!', role: 'moderator', icon: Shield },
-  teacher: { email: 'demo.teacher@lumora.com', password: 'Demo123!', role: 'teacher', icon: BookOpen },
-  student: { email: 'demo.student@lumora.com', password: 'Demo123!', role: 'student', icon: User },
-};
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -54,45 +47,6 @@ export default function Login() {
     setLoading(false);
   };
 
-  const handleDemoLogin = async (role: keyof typeof DEMO_ACCOUNTS) => {
-    const account = DEMO_ACCOUNTS[role];
-    setDemoLoading(role);
-
-    try {
-      console.log(`Attempting demo login for ${role}:`, account.email);
-
-      const { error: signInError } = await signIn(account.email, account.password);
-
-      if (!signInError) {
-        console.log('Demo login successful');
-        toast({
-          title: `Welcome, Demo ${account.role}!`,
-          description: 'Successfully logged in.',
-        });
-        await new Promise(resolve => setTimeout(resolve, 300));
-        navigate('/dashboard');
-        setDemoLoading(null);
-        return;
-      }
-
-      console.error('Demo login failed:', signInError.message);
-      toast({
-        title: 'Demo login failed',
-        description: signInError.message,
-        variant: 'destructive',
-      });
-
-    } catch (err) {
-      console.error('Demo login exception:', err);
-      toast({
-        title: 'Demo login failed',
-        description: err.message || 'An unexpected error occurred',
-        variant: 'destructive',
-      });
-    }
-
-    setDemoLoading(null);
-  };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -126,39 +80,6 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="space-y-4 pb-4 px-6">
-            {/* Demo Login Section */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground text-center font-medium">Try a demo account</p>
-              <div className="grid grid-cols-4 gap-2">
-                {(Object.keys(DEMO_ACCOUNTS) as Array<keyof typeof DEMO_ACCOUNTS>).map((role) => {
-                  const account = DEMO_ACCOUNTS[role];
-                  const Icon = account.icon;
-                  return (
-                    <Button
-                      key={role}
-                      variant="outline"
-                      onClick={() => handleDemoLogin(role)}
-                      disabled={demoLoading !== null || loading}
-                      className="flex flex-col items-center gap-1.5 h-auto py-3 hover:bg-primary/5 hover:border-primary/30 transition-all"
-                    >
-                      {demoLoading === role ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Icon className="w-4 h-4 text-primary" />
-                      )}
-                      <span className="text-[10px] font-medium">{account.role}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="relative py-1">
-              <Separator />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-[10px] text-muted-foreground">
-                or sign in with email
-              </span>
-            </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
@@ -199,7 +120,7 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full h-9 text-sm gradient-hero shadow-glow hover:scale-[1.02] transition-transform mt-1"
-                disabled={loading || demoLoading !== null}
+                disabled={loading}
               >
                 {loading ? (
                   <>

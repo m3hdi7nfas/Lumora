@@ -124,9 +124,9 @@ function StudentOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: str
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Get stats from local storage
-  const competitions = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-  const questions = localStorage.getItem('lumora_questions') ? JSON.parse(localStorage.getItem('lumora_questions')) : [];
+  // Get stats from local storage safely
+  const competitions = JSON.parse(localStorage.getItem('lumora_competitions') || '[]');
+  const questions = JSON.parse(localStorage.getItem('lumora_questions') || '[]');
 
   const stats = {
     totalCompetitions: competitions.length,
@@ -251,8 +251,12 @@ function PracticeTab() {
   const [activeSet, setActiveSet] = useState(null);
 
   useEffect(() => {
-    const sets = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
-    setPracticeSets(sets);
+    try {
+      const sets = JSON.parse(localStorage.getItem('lumora_practice_sets') || '[]');
+      setPracticeSets(Array.isArray(sets) ? sets : []);
+    } catch (e) {
+      setPracticeSets([]);
+    }
   }, []);
 
   if (activeSet) {
@@ -302,10 +306,11 @@ function QuizInterface({ questionSet, onExit }) {
   const { profile } = useAuth();
   const { toast } = useToast();
 
-  const questions = questionSet.questions || [];
-  const currentQuestion = questions[currentQuestionIndex];
+  const questions = questionSet?.questions || [];
+  const currentQuestion = questions[currentQuestionIndex] || {};
 
   const handleAnswer = (val) => {
+    if (!currentQuestion?.id) return;
     setAnswers({ ...answers, [currentQuestion.id]: val });
   };
 
@@ -315,7 +320,8 @@ function QuizInterface({ questionSet, onExit }) {
       let calculatedScore = 0;
       let totalPoints = 0;
 
-      questions.forEach(q => {
+      (questions || []).forEach(q => {
+        if (!q) return;
         totalPoints += (q.points || 10);
         const studentAns = answers[q.id];
 
@@ -351,7 +357,7 @@ function QuizInterface({ questionSet, onExit }) {
                 submitted_at: new Date().toISOString()
               };
 
-              const queue = localStorage.getItem('lumora_grading_queue') ? JSON.parse(localStorage.getItem('lumora_grading_queue')) : [];
+              const queue = JSON.parse(localStorage.getItem('lumora_grading_queue') || '[]');
               queue.push(gradingRequest);
               localStorage.setItem('lumora_grading_queue', JSON.stringify(queue));
             }
@@ -377,7 +383,7 @@ function QuizInterface({ questionSet, onExit }) {
         date: new Date().toISOString()
       };
 
-      const allResults = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+      const allResults = JSON.parse(localStorage.getItem('lumora_results') || '[]');
       allResults.push(result);
       localStorage.setItem('lumora_results', JSON.stringify(allResults));
 
@@ -540,17 +546,17 @@ function CompetitionsTab() {
   const fetchCompetitions = async () => {
     setLoading(true);
     try {
-      const competitionsData = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-      setCompetitions(competitionsData);
+      const competitionsData = JSON.parse(localStorage.getItem('lumora_competitions') || '[]');
+      setCompetitions(Array.isArray(competitionsData) ? competitionsData : []);
 
-      const allJoined = localStorage.getItem('lumora_joined_competitions') ? JSON.parse(localStorage.getItem('lumora_joined_competitions')) : [];
-      const userJoined = allJoined.filter(jc => jc.user_id === profile.id).map(jc => jc.competition_id);
+      const allJoined = JSON.parse(localStorage.getItem('lumora_joined_competitions') || '[]');
+      const userJoined = (Array.isArray(allJoined) ? allJoined : []).filter(jc => jc?.user_id === profile?.id).map(jc => jc?.competition_id);
       setJoinedCompIds(userJoined);
 
-      const pSets = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
-      setPracticeSets(pSets);
+      const pSets = JSON.parse(localStorage.getItem('lumora_practice_sets') || '[]');
+      setPracticeSets(Array.isArray(pSets) ? pSets : []);
     } catch (error) {
-      toast({ title: 'Error fetching competitions', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error fetching competitions', description: (error as Error).message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -591,16 +597,16 @@ function CompetitionsTab() {
     return <CompetitionDetailView competition={selectedComp} onBack={() => setSelectedComp(null)} />;
   }
 
-  const myCompetitions = competitions.filter(c => {
+  const myCompetitions = (competitions || []).filter(c => {
     const isJoinedManually = joinedCompIds.includes(c.id);
     const isAssignedBySchool = c.participating_schools?.includes(profile?.school_id);
-    return (isJoinedManually || isAssignedBySchool) && (c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    return (isJoinedManually || isAssignedBySchool) && ((c?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()));
   });
 
-  const discoverCompetitions = competitions.filter(c => {
+  const discoverCompetitions = (competitions || []).filter(c => {
     const isJoinedManually = joinedCompIds.includes(c.id);
     const isAssignedBySchool = c.participating_schools?.includes(profile?.school_id);
-    return !isJoinedManually && !isAssignedBySchool && c.is_active && (c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    return !isJoinedManually && !isAssignedBySchool && c.is_active && ((c?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()));
   });
 
   return (

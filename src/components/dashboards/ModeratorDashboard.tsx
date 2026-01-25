@@ -294,10 +294,10 @@ function SchoolsTab() {
     setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
   }, []);
 
-  const filteredSchools = schools.filter(school =>
-    school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    school.country.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredSchools = (schools || []).filter(school =>
+    (school?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (school?.city || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (school?.country || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleAddSchool = async () => {
@@ -579,6 +579,7 @@ function CompetitionsTab() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [newCompetition, setNewCompetition] = useState({
     id: '',
     name: '',
@@ -601,9 +602,9 @@ function CompetitionsTab() {
     setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
   }, []);
 
-  const filteredCompetitions = competitions.filter(competition =>
-    competition.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    competition.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCompetitions = (competitions || []).filter(competition =>
+    (competition?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (competition?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleAddCompetition = async () => {
@@ -907,14 +908,17 @@ function QuestionsTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load questions from local storage
+  // Load questions from local storage safely
   useEffect(() => {
-    setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
+    try {
+      const q = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
+      setQuestions(Array.isArray(q) ? q : []);
+    } catch (e) { setQuestions([]); }
   }, []);
 
-  const filteredQuestions = questions.filter(question =>
-    question.text.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    question.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredQuestions = (questions || []).filter(question =>
+    (question?.text || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (question?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const handleAddQuestion = async () => {
@@ -1030,13 +1034,13 @@ function QuestionsTab() {
                   <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <h3 className="font-medium">{question.text}</h3>
+                        <h3 className="font-medium">{question?.text || 'Untitled Question'}</h3>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Category: {question.category} • Difficulty: {question.difficulty}
+                          Category: {question?.category || 'N/A'} • Difficulty: {question?.difficulty || 'N/A'}
                         </p>
                         <div className="flex items-center gap-4 mt-2">
                           <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
-                            {question.points} pts
+                            {question?.points || 0} pts
                           </span>
                         </div>
                       </div>
@@ -1046,7 +1050,7 @@ function QuestionsTab() {
                           variant="outline"
                           className="h-8 w-8 p-0"
                           onClick={() => {
-                            setNewQuestion(q);
+                            setNewQuestion(question);
                             setIsEditing(true);
                             setIsAddDialogOpen(true);
                           }}
@@ -1223,6 +1227,17 @@ function QuestionSetsTab() {
     updated_at: ''
   });
   const { toast } = useToast();
+
+  // Load question sets from local storage
+  useEffect(() => {
+    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+  }, []);
+
+  const filteredQuestionSets = (questionSets || []).filter(qs =>
+    (qs?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (qs?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (qs?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+  );
 
   const handleAddQuestionSet = async () => {
     if (!newQuestionSet.name) {
@@ -1444,6 +1459,15 @@ function AvatarsTab() {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Load avatars from local storage
+  useEffect(() => {
+    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+  }, []);
+
+  const filteredAvatars = (avatars || []).filter(avatar =>
+    (avatar?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (avatar?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+  );
   const handleAddAvatar = async () => {
     if (!newAvatar.name || !newAvatar.image_url) {
       toast({ title: 'Name and image are required', variant: 'destructive' });
@@ -1478,7 +1502,7 @@ function AvatarsTab() {
         created_at: '', updated_at: ''
       });
       setFilePreview(null);
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error saving avatar', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -1864,9 +1888,9 @@ function UsersTab() {
                     <td className="p-3">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                          {user.display_name?.split(' ').map(n => n[0]).join('') || user.email?.substring(0, 2).toUpperCase()}
+                          {(user?.display_name || user?.email || '??').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </div>
-                        <span>{user.display_name || 'No name'}</span>
+                        <span>{user?.display_name || 'No name'}</span>
                       </div>
                     </td>
                     <td className="p-3 text-muted-foreground text-sm">{user.email}</td>
@@ -1880,7 +1904,7 @@ function UsersTab() {
                         </SelectContent>
                       </Select>
                     </td>
-                    <td className="p-3 text-muted-foreground text-sm">{schools.find(s => s.id === user.school_id)?.name || 'N/A'}</td>
+                    <td className="p-3 text-muted-foreground text-sm">{(schools || []).find(s => s?.id === user?.school_id)?.name || 'N/A'}</td>
                     <td className="p-3">
                       <div className="flex gap-2">
                         <Button
@@ -2265,15 +2289,10 @@ function ApprovalsTab() {
   const handleReject = async (id: string) => {
     setLoading(true);
     try {
-      // Update the approval status
       localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'rejected' });
       setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
-
-      toast({
-        title: 'Request rejected!',
-        description: 'The request has been rejected.'
-      });
-    } catch (error) {
+      toast({ title: 'Request rejected!' });
+    } catch (error: any) {
       toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -2379,11 +2398,53 @@ function MessagesTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [newMessage, setNewMessage] = useState({
+    recipientRole: 'student',
+    recipientId: '',
+    subject: '',
+    content: ''
+  });
+
   const filteredMessages = messages.filter(message =>
-    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.content.toLowerCase().includes(searchTerm.toLowerCase())
+    (message.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (message.sender || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (message.content || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleSendMessage = async () => {
+    if (!newMessage.subject || !newMessage.content) {
+      toast({ title: 'Subject and Content are required', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const msg = {
+        id: `msg-${Date.now()}`,
+        sender: profile.display_name || 'Moderator',
+        senderId: profile.id,
+        senderRole: 'moderator',
+        recipientRole: newMessage.recipientRole,
+        recipientId: newMessage.recipientId || null,
+        subject: newMessage.subject,
+        content: newMessage.content,
+        date: new Date().toISOString(),
+        read: false,
+        status: 'pending_approval',
+        replies: []
+      };
+
+      localStorageCRUD.add(LOCAL_STORAGE_KEYS.MESSAGES, msg);
+      fetchMessages();
+      setIsComposeOpen(false);
+      setNewMessage({ recipientRole: 'student', recipientId: '', subject: '', content: '' });
+      toast({ title: 'Message submitted for approval!' });
+    } catch (error) {
+      toast({ title: 'Error sending message', variant: 'destructive' });
+    }
+    setLoading(false);
+  };
 
   const fetchMessages = async () => {
     setLoading(true);
@@ -2450,9 +2511,15 @@ function MessagesTab() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Messages</h1>
-        <p className="text-muted-foreground">User communications</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Messages</h1>
+          <p className="text-muted-foreground">User communications</p>
+        </div>
+        <Button onClick={() => setIsComposeOpen(true)} className="gradient-hero">
+          <Plus className="w-4 h-4 mr-2" />
+          Compose
+        </Button>
       </div>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
@@ -2887,15 +2954,14 @@ function PracticeManagerTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Manage Questions Dialog */}
       <Dialog open={isManageDialogOpen} onOpenChange={setIsManageDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>Assign Questions: {selectedSet?.name}</DialogTitle>
             <DialogDescription>Select questions from the global question bank to add to this practice set.</DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 mt-4 border rounded-md p-4 bg-muted/20">
+          <ScrollArea className="flex-1 px-6 mt-4">
             <div className="space-y-4">
               {globalQuestions.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">No questions found in the question bank.</p>
@@ -2923,7 +2989,7 @@ function PracticeManagerTab() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="p-6 pt-2">
             <Button variant="outline" onClick={() => setIsManageDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveQuestions} className="gradient-hero">Save Assignments</Button>
           </DialogFooter>
@@ -2931,15 +2997,15 @@ function PracticeManagerTab() {
       </Dialog>
 
       <Dialog open={isCreateQuestionDialogOpen} onOpenChange={(open) => { setIsCreateQuestionDialogOpen(open); if (!open) setIsEditingQuestion(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>{isEditingQuestion ? 'Edit Question' : `New Question for ${selectedSet?.name}`}</DialogTitle>
             <DialogDescription>
               {isEditingQuestion ? 'Update question details globally.' : 'Create a question that will be saved globally and added to this set.'}
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 pr-4 mt-4">
+          <ScrollArea className="flex-1 px-6 mt-4">
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Question Type</Label>
@@ -3010,7 +3076,7 @@ function PracticeManagerTab() {
             </div>
           </ScrollArea>
 
-          <DialogFooter className="mt-4 pt-4 border-t gap-2">
+          <DialogFooter className="p-6 pt-4 border-t gap-2">
             <Button variant="ghost" onClick={() => setIsCreateQuestionDialogOpen(false)}>Cancel</Button>
             {!isEditingQuestion && (
               <Button variant="outline" onClick={() => handleCreateAndAddQuestion(true)} disabled={loading}>

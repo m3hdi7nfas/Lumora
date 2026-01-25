@@ -108,6 +108,7 @@ export default function TeacherDashboard() {
 
 // Teacher Overview Component
 function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const { toast } = useToast();
   const { profile, currentView, isAdminOrModerator } = useAuth();
 
@@ -154,16 +155,24 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your class performance and activities</p>
-        {isAdminOrModerator && currentView && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-primary">
-            <Eye className="w-4 h-4" />
-            <span>Viewing as Teacher - Can access all schools and competitions</span>
-          </div>
-        )}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your class performance and activities</p>
+          {isAdminOrModerator && currentView && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-primary">
+              <Eye className="w-4 h-4" />
+              <span>Viewing as Teacher - Can access all schools and competitions</span>
+            </div>
+          )}
+        </div>
+        <Button onClick={() => setIsReportDialogOpen(true)} variant="outline" className="border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive">
+          <MessageSquare className="w-4 h-4 mr-2" />
+          Report Issue
+        </Button>
       </div>
+
+      <ReportIssueDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -234,20 +243,20 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {!stats || stats.recentActivity?.length === 0 ? (
+            {!stats || !stats.recentActivity || stats.recentActivity.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">No recent activity</p>
             ) : (
-              stats.recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+              stats.recentActivity.map((activity: any) => (
+                <div key={activity?.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="p-2 rounded-lg bg-muted">
-                    {activity.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
-                    {activity.type === 'student' && <Users className="w-4 h-4 text-primary" />}
-                    {activity.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
-                    {activity.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
+                    {activity?.type === 'competition' && <Trophy className="w-4 h-4 text-primary" />}
+                    {activity?.type === 'student' && <Users className="w-4 h-4 text-primary" />}
+                    {activity?.type === 'question' && <Eye className="w-4 h-4 text-primary" />}
+                    {activity?.type === 'badge' && <CheckCircle className="w-4 h-4 text-primary" />}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.title}</p>
-                    <p className="text-xs text-muted-foreground">{activity.action} • {activity.time}</p>
+                    <p className="text-sm font-medium">{activity?.title || 'Unknown Activity'}</p>
+                    <p className="text-xs text-muted-foreground">{activity?.action} • {activity?.time}</p>
                   </div>
                 </div>
               ))
@@ -289,10 +298,10 @@ function StudentsTab() {
   const [editingStudent, setEditingStudent] = useState(null);
   const queryClient = useQueryClient();
 
-  const filteredStudents = students.filter(student =>
-    (student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    (selectedClass === 'all' || student.class === selectedClass)
+  const filteredStudents = (students || []).filter(student =>
+    ((student?.display_name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+      (student?.email || "").toLowerCase().includes((searchTerm || "").toLowerCase())) &&
+    (selectedClass === 'all' || student?.class === selectedClass || student?.school_id === selectedClass)
   );
 
   const fetchStudents = async () => {
@@ -439,8 +448,8 @@ function StudentsTab() {
                     <tr key={student.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
-                            {student.display_name?.split(' ').map(n => n[0]).join('') || student.email?.substring(0, 2).toUpperCase()}
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold font-mono">
+                            {(student?.display_name || student?.email || '??').split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                           </div>
                           <div>
                             <p className="font-medium">{student.display_name || 'No name'}</p>
@@ -582,7 +591,7 @@ function TeacherLeaderboardTab() {
       // Fetch leaderboard data
       const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
 
-      let filteredData = usersData.filter(u => {
+      let filteredData = (usersData || []).filter(u => {
         // Only show students
         if (u.role !== 'student') return false;
 
@@ -600,7 +609,7 @@ function TeacherLeaderboardTab() {
 
       if (selectedCompId !== 'all') {
         const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
-        const compResults = results.filter(r => r.question_set_id === selectedCompId || r.competition_id === selectedCompId);
+        const compResults = (results || []).filter(r => r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId);
 
         const userScores = {};
         compResults.forEach(r => {
@@ -610,7 +619,7 @@ function TeacherLeaderboardTab() {
         });
 
         filteredData = filteredData
-          .filter(u => userScores[u.id] !== undefined)
+          .filter(u => u?.id && userScores[u.id] !== undefined)
           .map(u => ({ ...u, score: userScores[u.id] }));
       }
 
@@ -711,17 +720,17 @@ function TeacherSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }
         const users = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
         const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
 
-        const aggregatedSchools = schools.map(school => {
-          const schoolStudents = users.filter(u => u.school_id === school.id);
+        const aggregatedSchools = (schools || []).map(school => {
+          const schoolStudents = (users || []).filter(u => u?.school_id === school?.id);
           let totalPoints = 0;
 
           if (selectedCompId === 'all') {
             totalPoints = schoolStudents.reduce((sum, u) => sum + (u.score || 0), 0);
           } else {
             schoolStudents.forEach(student => {
-              const studentResults = results.filter(r => (r.question_set_id === selectedCompId || r.competition_id === selectedCompId) && r.student_id === student.id);
+              const studentResults = (results || []).filter(r => (r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId) && r?.student_id === student?.id);
               if (studentResults.length > 0) {
-                totalPoints += Math.max(...studentResults.map(r => r.score || 0));
+                totalPoints += studentResults.length > 0 ? Math.max(...studentResults.map(r => r?.score || 0)) : 0;
               }
             });
           }
@@ -767,6 +776,78 @@ function TeacherSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }
   );
 }
 
+function ReportIssueDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
+  const [subject, setSubject] = useState('');
+  const [content, setContent] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { profile } = useAuth();
+  const { toast } = useToast();
+
+  const handleSend = async () => {
+    if (!subject || !content) {
+      toast({ title: 'Please fill all fields', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const msg = {
+        id: `msg-${Date.now()}`,
+        sender: profile?.display_name || profile?.email || 'Teacher',
+        senderId: profile?.id,
+        senderRole: 'teacher',
+        recipientRole: 'admin', // Directed to admins/mods
+        subject: `[ISSUE] ${subject}`,
+        content,
+        date: new Date().toISOString(),
+        read: false,
+        status: 'pending',
+        replies: []
+      };
+
+      const messages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+      messages.push(msg);
+      localStorage.setItem('lumora_messages', JSON.stringify(messages));
+
+      toast({ title: 'Issue reported!', description: 'Admins will review your report shortly.' });
+      onOpenChange(false);
+      setSubject('');
+      setContent('');
+    } catch (e) {
+      toast({ title: 'Error sending report', variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>Report an Issue</DialogTitle>
+          <DialogDescription>Send a message directly to platform administrators.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Subject</Label>
+            <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="What is the issue about?" />
+          </div>
+          <div className="space-y-2">
+            <Label>Details</Label>
+            <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Describe the issue in detail..." rows={5} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSend} disabled={loading} className="gradient-hero">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <MessageSquare className="w-4 h-4 mr-2" />}
+            Send Report
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Messages Tab Component
 function MessagesTab() {
   const [messages, setMessages] = useState([]);
@@ -779,10 +860,10 @@ function MessagesTab() {
   const { profile, currentView, isAdminOrModerator } = useAuth();
   const queryClient = useQueryClient();
 
-  const filteredMessages = messages.filter(message =>
-    message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    message.content.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMessages = (messages || []).filter(message =>
+    (message?.subject || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (message?.sender || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (message?.content || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   const fetchMessages = async () => {
@@ -898,7 +979,7 @@ function MessagesTab() {
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
+                            {(message?.sender || "??").split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, MessageSquare, Trash2, Loader2 } from 'lucide-react';
+import { Search, MessageSquare, Trash2, Loader2, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -22,44 +22,96 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
     const [sendingReply, setSendingReply] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+
+    const [isComposeMode, setIsComposeMode] = useState(false);
+    const [recipient, setRecipient] = useState('');
+    const [subject, setSubject] = useState('');
+    const [composeContent, setComposeContent] = useState('');
+    const [sendingMessage, setSendingMessage] = useState(false);
+
     const { toast } = useToast();
     const { profile } = useAuth();
 
-    const filteredMessages = messages.filter(message =>
-        message.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        message.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        message.content.toLowerCase().includes(searchTerm.toLowerCase())
+    const isAdminOrMod = profile?.role === 'admin' || profile?.role === 'moderator';
+
+    const filteredMessages = (messages || []).filter(message =>
+        (message?.subject || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+        (message?.sender || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+        (message?.content || "").toLowerCase().includes((searchTerm || "").toLowerCase())
     );
 
     const fetchMessages = async () => {
         setLoading(true);
         try {
-            // Mock data for messages
-            const mockMessages = [
-                {
-                    id: '1',
-                    sender: 'John Doe',
-                    senderEmail: 'john@example.com',
-                    subject: 'Question about competition',
-                    content: 'Hello, I have a question about the upcoming math competition...',
-                    date: '2025-06-01',
-                    read: false
-                },
-                {
-                    id: '2',
-                    sender: 'Jane Smith',
-                    senderEmail: 'jane@example.com',
-                    subject: 'Technical issue',
-                    content: 'I am having trouble accessing the practice questions...',
-                    date: '2025-05-30',
-                    read: true
+            const storedMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+
+            // Filter logic:
+            // 1. Admins see everything.
+            // 2. Others see messages sent to them (if approved or from Admin).
+            // 3. Sender sees their own messages regardless of status.
+
+            const filtered = storedMessages.filter((m: any) => {
+                const isAdmin = profile?.role === 'admin';
+                const isModerator = profile?.role === 'moderator';
+                const isSender = m.senderId === profile?.id;
+                const isRecipient = m.recipient === profile?.email || m.recipient === profile?.role;
+
+                if (isAdmin) return true;
+                if (isSender) return true;
+                if (isRecipient) {
+                    // Only show approved messages or messages from Admin
+                    return m.status === 'approved' || m.senderRole === 'admin';
                 }
-            ];
-            setMessages(mockMessages);
+                return false;
+            });
+
+            setMessages(filtered.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         } catch (error: any) {
             toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
         }
         setLoading(false);
+    };
+
+    const handleSendMessage = async () => {
+        if (!recipient || !subject || !composeContent) {
+            toast({ title: 'Please fill all fields', variant: 'destructive' });
+            return;
+        }
+
+        setSendingMessage(true);
+        try {
+            const newMessage = {
+                id: `msg-${Date.now()}`,
+                sender: profile?.display_name || profile?.email || 'User',
+                senderEmail: profile?.email,
+                senderId: profile?.id,
+                senderRole: profile?.role,
+                recipient, // Email or role
+                subject,
+                content: composeContent,
+                date: new Date().toISOString(),
+                read: false,
+                status: profile?.role === 'moderator' ? 'pending_approval' : 'approved'
+            };
+
+            // Save to localStorage
+            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+            allMessages.push(newMessage);
+            localStorage.setItem('lumora_messages', JSON.stringify(allMessages));
+
+            toast({
+                title: profile?.role === 'moderator' ? 'Message submitted for approval!' : 'Message sent successfully!',
+                description: profile?.role === 'moderator' ? 'An Admin will review your message shortly.' : undefined
+            });
+            setIsComposeMode(false);
+            setRecipient('');
+            setSubject('');
+            setComposeContent('');
+            fetchMessages();
+        } catch (error: any) {
+            toast({ title: 'Error sending message', description: error.message, variant: 'destructive' });
+        }
+        setSendingMessage(false);
     };
 
     const handleSendReply = async () => {
@@ -77,9 +129,27 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
         setSendingReply(false);
     };
 
+    const handleUpdateStatus = (messageId: string, newStatus: string) => {
+        try {
+            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+            const updated = allMessages.map((m: any) =>
+                m.id === messageId ? { ...m, status: newStatus } : m
+            );
+            localStorage.setItem('lumora_messages', JSON.stringify(updated));
+            toast({ title: `Message ${newStatus}!` });
+            fetchMessages();
+            if (selectedMessage?.id === messageId) {
+                setSelectedMessage({ ...selectedMessage, status: newStatus });
+            }
+        } catch (e) { toast({ title: 'Error updating status' }); }
+    };
+
     const handleDeleteMessage = async (messageId: string) => {
         setLoading(true);
         try {
+            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+            const updated = allMessages.filter((msg: any) => msg.id !== messageId);
+            localStorage.setItem('lumora_messages', JSON.stringify(updated));
             setMessages(messages.filter(msg => msg.id !== messageId));
             if (selectedMessage?.id === messageId) {
                 setSelectedMessage(null);
@@ -101,8 +171,17 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-0 shrink-0">
-                    <DialogTitle className="text-2xl font-display font-bold">Inbox</DialogTitle>
-                    <DialogDescription>Your communications and notifications</DialogDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <DialogTitle className="text-2xl font-display font-bold">Inbox</DialogTitle>
+                            <DialogDescription>Your communications and notifications</DialogDescription>
+                        </div>
+                        {isAdminOrMod && (
+                            <Button onClick={() => setIsComposeMode(!isComposeMode)} variant={isComposeMode ? "outline" : "default"} className={!isComposeMode ? "gradient-hero" : ""}>
+                                {isComposeMode ? "View Inbox" : "Compose Message"}
+                            </Button>
+                        )}
+                    </div>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-hidden grid md:grid-cols-3 p-6 gap-6 min-h-0">
@@ -141,9 +220,14 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                                                     <p className="text-[10px] text-muted-foreground whitespace-nowrap">{message.date}</p>
                                                 </div>
                                                 <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                                                {!message.read && (
-                                                    <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
-                                                )}
+                                                <div className="flex gap-2 mt-1">
+                                                    {!message.read && (
+                                                        <span className="w-2 h-2 bg-primary rounded-full" />
+                                                    )}
+                                                    {message.status === 'pending_approval' && (
+                                                        <span className="text-[10px] px-1 bg-warning/20 text-warning rounded-sm">PENDING</span>
+                                                    )}
+                                                </div>
                                             </div>
                                             {profile?.role !== 'student' && profile?.role !== 'teacher' && (
                                                 <AlertDialog>
@@ -179,7 +263,31 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                     </div>
 
                     <div className="md:col-span-2 overflow-y-auto h-full border rounded-xl bg-muted/30 p-6">
-                        {selectedMessage ? (
+                        {isComposeMode ? (
+                            <div className="space-y-6">
+                                <h2 className="text-xl font-bold">New Message</h2>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Recipient (Email)</Label>
+                                        <Input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="student@example.com" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Subject</Label>
+                                        <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Message subject" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Message Content</Label>
+                                        <Textarea value={composeContent} onChange={e => setComposeContent(e.target.value)} placeholder="Type your message here..." className="min-h-[200px] resize-none bg-card" />
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button onClick={handleSendMessage} disabled={sendingMessage || !recipient || !subject || !composeContent} className="gradient-hero">
+                                            {sendingMessage && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                            Send Message
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : selectedMessage ? (
                             <div className="space-y-6">
                                 <div>
                                     <h2 className="text-xl font-bold">{selectedMessage.subject}</h2>
@@ -188,12 +296,26 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                                     </p>
                                 </div>
 
-                                <div className="p-6 bg-card rounded-xl border shadow-sm">
+                                <div className="p-6 bg-card rounded-xl border shadow-sm space-y-3">
                                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedMessage.content}</p>
+
+                                    {selectedMessage.status === 'pending_approval' && (
+                                        <div className="mt-2 px-3 py-1 rounded-full bg-warning/20 text-warning text-[10px] font-bold uppercase w-fit inline-flex items-center gap-1">
+                                            <Clock className="w-3 h-3" /> Pending Approval
+                                        </div>
+                                    )}
                                 </div>
 
+
+                                {profile?.role === 'admin' && selectedMessage.status === 'pending_approval' && (
+                                    <div className="flex gap-3 pt-4 justify-end border-t border-dashed">
+                                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleUpdateStatus(selectedMessage.id, 'rejected')}>Reject</Button>
+                                        <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground" onClick={() => handleUpdateStatus(selectedMessage.id, 'approved')}>Approve Message</Button>
+                                    </div>
+                                )}
+
                                 <div className="space-y-6 pt-4 border-t">
-                                    {profile?.role !== 'student' && profile?.role !== 'teacher' ? (
+                                    {isAdminOrMod ? (
                                         <>
                                             <Label className="text-sm font-semibold">Your Reply</Label>
                                             <Textarea
@@ -234,6 +356,6 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                     </div>
                 </div>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

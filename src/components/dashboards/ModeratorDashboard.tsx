@@ -1468,6 +1468,19 @@ function AvatarsTab() {
     (avatar?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
     (avatar?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setFilePreview(event.target?.result as string);
+        setNewAvatar({ ...newAvatar, image_url: event.target?.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleAddAvatar = async () => {
     if (!newAvatar.name || !newAvatar.image_url) {
       toast({ title: 'Name and image are required', variant: 'destructive' });

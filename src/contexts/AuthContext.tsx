@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import type { User, Session } from '@supabase/supabase-js';
 
 type UserRole = 'moderator' | 'teacher' | 'student' | 'admin';
 
@@ -20,8 +22,8 @@ interface Profile {
 }
 
 interface AuthContextType {
-  user: any | null;
-  session: any | null;
+  user: User | null;
+  session: Session | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -35,79 +37,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Essential admin for the first login
-const DEMO_ACCOUNTS = {
-  'admin@lumora.com': {
-    password: 'AdminPassword123!',
-    profile: {
-      id: 'admin-id',
-      user_id: 'admin-user-id',
-      email: 'admin@lumora.com',
-      role: 'admin' as UserRole,
-      display_name: 'Platform Admin',
-      avatar_url: null,
-      avatar_id: null,
-      school_id: null,
-      score: 0,
-      class: null,
-      is_active: true,
-      progress: 0,
-      login_streak: 0,
-      competitions_attended: 0
-    }
-  }
-};
-
-// Local storage utilities for users
-const LOCAL_STORAGE_KEYS = {
-  USERS: 'lumora_users',
-  CURRENT_USER: 'lumora_current_user',
-  SESSIONS: 'lumora_sessions'
-};
-
-const localStorageCRUD = {
-  get: (key) => {
-    try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error(`Error reading ${key} from localStorage:`, error);
-      return [];
-    }
-  },
-
-  set: (key, data) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-      return true;
-    } catch (error) {
-      console.error(`Error writing ${key} to localStorage:`, error);
-      return false;
-    }
-  },
-
-  add: (key, item) => {
-    const items = localStorageCRUD.get(key);
-    items.push(item);
-    return localStorageCRUD.set(key, items);
-  },
-
-  update: (key, id, updates) => {
-    const items = localStorageCRUD.get(key);
-    const updatedItems = items.map(item => item.id === id ? { ...item, ...updates } : item);
-    return localStorageCRUD.set(key, updatedItems);
-  },
-
-  remove: (key, id) => {
-    const items = localStorageCRUD.get(key);
-    const filteredItems = items.filter(item => item.id !== id);
-    return localStorageCRUD.set(key, filteredItems);
+// Admin fallback account (for initial setup)
+const ADMIN_FALLBACK = {
+  email: 'admin@lumora.com',
+  password: 'AdminPassword123!',
+  profile: {
+    id: 'admin-fallback-id',
+    user_id: 'admin-fallback-user-id',
+    email: 'admin@lumora.com',
+    role: 'admin' as UserRole,
+    display_name: 'Platform Admin',
+    avatar_url: null,
+    avatar_id: null,
+    school_id: null,
+    score: 0,
+    class: null,
+    is_active: true,
+    progress: 0,
+    login_streak: 0,
+    competitions_attended: 0
   }
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<any | null>(null);
-  const [session, setSession] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<UserRole | null>(() => {
@@ -127,186 +81,156 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
   const isAdmin = profile?.role === 'admin';
 
-  // Check if we're using demo accounts
-  const isDemoAccount = (email: string) => {
-    return DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS] !== undefined;
+  // Fetch user profile from Supabase
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
+      }
+
+      return data as Profile;
+    } catch (error) {
+      console.error('Exception fetching profile:', error);
+      return null;
+    }
   };
 
-  // Initialize users in local storage if not present
+  // Initialize auth state and listen for changes
   useEffect(() => {
-    const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
-    if (users.length === 0) {
-      // Add demo accounts to local storage
-      Object.values(DEMO_ACCOUNTS).forEach(demoAccount => {
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, demoAccount.profile);
-      });
-    }
-  }, []);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
 
-  // Load current user from local storage
-  useEffect(() => {
-    const currentUser = localStorage.getItem(LOCAL_STORAGE_KEYS.CURRENT_USER);
-    if (currentUser) {
-      try {
-        const userData = JSON.parse(currentUser);
-        setUser(userData.user);
-        setSession(userData.session);
-        setProfile(userData.profile);
-      } catch (error) {
-        console.error('Error parsing current user:', error);
+      if (session?.user) {
+        fetchProfile(session.user.id).then(profile => {
+          setProfile(profile);
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        setProfile(profile);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    console.log('Attempting sign in with:', email);
-
-    // Check if this is a demo account
-    if (isDemoAccount(email)) {
-      const demoAccount = DEMO_ACCOUNTS[email as keyof typeof DEMO_ACCOUNTS];
-
-      if (demoAccount.password === password) {
-        // Set up a mock session for demo accounts
-        const mockUser = {
-          id: demoAccount.profile.user_id,
-          email: demoAccount.profile.email,
-          app_metadata: {},
-          user_metadata: {},
-          aud: 'authenticated',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-
-        const mockSession = {
-          access_token: 'demo-access-token',
-          token_type: 'bearer',
-          user: mockUser,
-          expires_in: 3600,
-          expires_at: Math.floor(Date.now() / 1000) + 3600,
-          refresh_token: 'demo-refresh-token'
-        };
-
-        setUser(mockUser);
-        setSession(mockSession);
-        setProfile(demoAccount.profile);
-
-        // Save to local storage
-        localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify({
-          user: mockUser,
-          session: mockSession,
-          profile: demoAccount.profile
-        }));
-
-        return { error: null };
-      } else {
-        return { error: new Error('Invalid login credentials') };
-      }
-    }
-
-    // Check regular users in local storage
     try {
-      const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
-      const user = users.find(u => u.email === email);
-
-      if (!user) {
-        return { error: new Error('User not found') };
+      // Check if this is the admin fallback account
+      if (email === ADMIN_FALLBACK.email && password === ADMIN_FALLBACK.password) {
+        // Use fallback admin (for when Supabase is not set up)
+        setUser({ id: ADMIN_FALLBACK.profile.user_id, email: ADMIN_FALLBACK.email } as User);
+        setProfile(ADMIN_FALLBACK.profile);
+        console.log('Logged in with admin fallback account');
+        return { error: null };
       }
 
-      // For demo purposes, we'll accept any password for non-demo accounts
-      // In a real app, you would store hashed passwords and compare them
-      const mockUser = {
-        id: user.user_id,
-        email: user.email,
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      // Try Supabase authentication
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      const mockSession = {
-        access_token: 'local-access-token',
-        token_type: 'bearer',
-        user: mockUser,
-        expires_in: 3600,
-        expires_at: Math.floor(Date.now() / 1000) + 3600,
-        refresh_token: 'local-refresh-token'
-      };
+      if (error) {
+        console.error('Supabase sign in error:', error);
+        return { error: new Error(error.message) };
+      }
 
-      setUser(mockUser);
-      setSession(mockSession);
-      setProfile(user);
-
-      // Save to local storage
-      localStorage.setItem(LOCAL_STORAGE_KEYS.CURRENT_USER, JSON.stringify({
-        user: mockUser,
-        session: mockSession,
-        profile: user
-      }));
-
+      // Profile will be fetched by the auth state change listener
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign in exception:', error);
-      return { error: new Error(error.message) };
+      return { error: new Error(error.message || 'Sign in failed') };
     }
   };
 
   const signUp = async (email: string, password: string, role: UserRole = 'student') => {
-    console.log('Attempting sign up with:', email, 'role:', role);
-
-    // For demo accounts, we don't need to actually create them
-    if (isDemoAccount(email)) {
-      return { error: null };
-    }
-
     try {
-      // Check if user already exists
-      const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
-      const existingUser = users.find(u => u.email === email);
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: role,
+            display_name: email.split('@')[0]
+          }
+        }
+      });
 
-      if (existingUser) {
-        return { error: new Error('User already exists') };
+      if (authError) {
+        console.error('Supabase sign up error:', authError);
+        return { error: new Error(authError.message) };
       }
 
-      // Create new user
-      const newUser = {
-        id: `user-${Date.now()}`,
-        user_id: `user-${Date.now()}`,
-        email: email,
-        role: role,
-        display_name: email.split('@')[0],
-        avatar_url: null,
-        avatar_id: null,
-        school_id: null,
-        score: 0,
-        class: null,
-        is_active: true,
-        progress: 0,
-        login_streak: 1,
-        competitions_attended: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
+      if (!authData.user) {
+        return { error: new Error('User creation failed') };
+      }
 
-      // Add to local storage
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, newUser);
+      // Create profile in profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          user_id: authData.user.id,
+          email: email,
+          role: role,
+          display_name: email.split('@')[0],
+          avatar_id: null,
+          school_id: null,
+          score: 0,
+          class: null,
+          is_active: true,
+          progress: 0,
+          login_streak: 1,
+          competitions_attended: 0
+        });
 
-      console.log('Sign up successful');
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        // User was created in auth but profile failed - this is okay, profile can be created later
+      }
+
       return { error: null };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign up exception:', error);
-      return { error: new Error(error.message) };
+      return { error: new Error(error.message || 'Sign up failed') };
     }
   };
 
   const signOut = async () => {
-    // Clear current user from local storage
-    localStorage.removeItem(LOCAL_STORAGE_KEYS.CURRENT_USER);
-    setProfile(null);
-    setCurrentView(null);
-    setUser(null);
-    setSession(null);
+    try {
+      await supabase.auth.signOut();
+      setProfile(null);
+      setCurrentView(null);
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
   return (

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,53 +9,60 @@ import { Eye, EyeOff, Loader2, RefreshCw, User, Lock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { db } from '@/lib/firebase';
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    doc,
+    updateDoc,
+    serverTimestamp
+} from 'firebase/firestore';
 
 const RANDOM_ADJECTIVES = ['Swift', 'Blue', 'Happy', 'Clever', 'Brave', 'Calm', 'Bright', 'Neon', 'Cyber', 'Pixel'];
 const RANDOM_NOUNS = ['Fox', 'Eagle', 'Panda', 'Tiger', 'Star', 'Moon', 'Comet', 'Ninja', 'Wizard', 'Robot'];
 
 export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-    const { profile } = useAuth();
+    const { profile, setProfile } = useAuth();
     const [displayName, setDisplayName] = useState(profile?.display_name || '');
     const [showPassword, setShowPassword] = useState(false);
     const [selectedAvatar, setSelectedAvatar] = useState(profile?.avatar_id || null);
     const { toast } = useToast();
     const queryClient = useQueryClient();
 
-    // Load avatars from local storage
-    const [avatars, setAvatars] = useState([]);
+    // Load avatars from Firestore
+    const [avatars, setAvatars] = useState<any[]>([]);
 
     useEffect(() => {
-        const storedAvatars = localStorage.getItem('lumora_avatars');
-        if (storedAvatars) {
+        const fetchAvatars = async () => {
             try {
-                setAvatars(JSON.parse(storedAvatars));
+                const avatarsSnap = await getDocs(collection(db, 'avatars'));
+                const avatarsList = avatarsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setAvatars(avatarsList);
             } catch (e) {
-                console.error('Error parsing avatars:', e);
+                console.error('Error fetching avatars:', e);
             }
-        }
+        };
+        fetchAvatars();
     }, []);
 
     const updateProfile = useMutation({
         mutationFn: async () => {
-            const updates: any = {
-                id: profile?.id,
+            if (!profile?.id) throw new Error('No user profile found');
+
+            const updates = {
                 display_name: displayName,
                 avatar_id: selectedAvatar,
-                updated_at: new Date().toISOString(),
+                updated_at: serverTimestamp(),
             };
 
-            // Update in local storage
-            const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
-            const updatedUsers = users.map(user =>
-                user.id === profile?.id ? { ...user, ...updates } : user
-            );
-            localStorage.setItem('lumora_users', JSON.stringify(updatedUsers));
+            const userRef = doc(db, 'profiles', profile.id);
+            await updateDoc(userRef, updates);
 
-            // Update current user in local storage
-            const currentUser = JSON.parse(localStorage.getItem('lumora_current_user') || '{}');
-            if (currentUser.profile) {
-                currentUser.profile = { ...currentUser.profile, ...updates };
-                localStorage.setItem('lumora_current_user', JSON.stringify(currentUser));
+            // Update local context
+            if (setProfile) {
+                setProfile({ ...profile, ...updates });
             }
 
             return { success: true };
@@ -66,7 +72,7 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
             queryClient.invalidateQueries({ queryKey: ['profile'] });
             onOpenChange(false);
         },
-        onError: (error) => {
+        onError: (error: any) => {
             toast({ title: 'Error updating profile', description: error.message, variant: 'destructive' });
         },
     });
@@ -83,11 +89,11 @@ export function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenCha
                 const num = Math.floor(Math.random() * 1000);
                 username = `${adj}-${noun}${num}`;
 
-                // Check if username exists
-                const users = JSON.parse(localStorage.getItem('lumora_users') || '[]');
-                const existingUser = users.find(u => u.display_name === username);
+                // Check if username exists in Firestore
+                const q = query(collection(db, 'profiles'), where('display_name', '==', username));
+                const querySnapshot = await getDocs(q);
 
-                if (!existingUser) {
+                if (querySnapshot.empty) {
                     isUnique = true;
                 }
                 attempts++;

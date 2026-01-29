@@ -589,14 +589,13 @@ function TeacherLeaderboardTab() {
     setLoading(true);
     try {
       // Fetch competitions from Firestore
-      const competitionsSnap = await getDocs(collection(db, 'competitions'));
-      const comps = competitionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const compsSnap = await getDocs(collection(db, 'competitions'));
+      const comps = compsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCompetitions(comps as any);
 
-      // Fetch student profiles from Firestore
-      const studentsQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
-      const studentsSnap = await getDocs(studentsQuery);
-      let filteredData = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Fetch leaderboard data
+      const profilesSnap = await getDocs(query(collection(db, 'profiles'), where('role', '==', 'student')));
+      let filteredData = profilesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Exclude demo accounts
       const demoEmails = [
@@ -605,27 +604,26 @@ function TeacherLeaderboardTab() {
         'demo.teacher@lumora.com',
         'demo.student@lumora.com'
       ];
-      filteredData = filteredData.filter(u => !demoEmails.includes((u as any).email));
+      filteredData = filteredData.filter((u: any) => !demoEmails.includes(u.email));
 
       if (selectedCompId !== 'all') {
-        // Fetch results for the selected competition
-        const resultsQuery = query(collection(db, 'results'), where('competition_id', '==', selectedCompId));
-        const resultsSnap = await getDocs(resultsQuery);
-        const results = resultsSnap.docs.map(doc => doc.data());
+        const resultsSnap = await getDocs(collection(db, 'results'));
+        const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const compResults = (results || []).filter((r: any) => r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId);
 
         const userScores: Record<string, number> = {};
-        results.forEach(r => {
+        compResults.forEach((r: any) => {
           if (!userScores[r.student_id] || r.score > userScores[r.student_id]) {
             userScores[r.student_id] = r.score;
           }
         });
 
         filteredData = filteredData
-          .filter(u => u.id && userScores[u.id] !== undefined)
-          .map(u => ({ ...u, score: userScores[u.id] }));
+          .filter((u: any) => u?.id && userScores[u.id] !== undefined)
+          .map((u: any) => ({ ...u, score: userScores[u.id] }));
       }
 
-      const sortedUsers = filteredData.sort((a, b) => ((b as any).score || 0) - ((a as any).score || 0));
+      const sortedUsers = filteredData.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
       setLeaderboardData(sortedUsers as any);
     } catch (error: any) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
@@ -718,21 +716,26 @@ function TeacherSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }
     const fetchSchools = async () => {
       setLoading(true);
       try {
-        const schools = localStorage.getItem('lumora_schools') ? JSON.parse(localStorage.getItem('lumora_schools')) : [];
-        const users = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
-        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
+        const schoolsSnap = await getDocs(collection(db, 'schools'));
+        const schools = schoolsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        const aggregatedSchools = (schools || []).map(school => {
-          const schoolStudents = (users || []).filter(u => u?.school_id === school?.id);
+        const usersSnap = await getDocs(query(collection(db, 'profiles'), where('role', '==', 'student')));
+        const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const resultsSnap = await getDocs(collection(db, 'results'));
+        const results = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const aggregatedSchools = (schools || []).map((school: any) => {
+          const schoolStudents = (users || []).filter((u: any) => u?.school_id === school?.id);
           let totalPoints = 0;
 
           if (selectedCompId === 'all') {
-            totalPoints = schoolStudents.reduce((sum, u) => sum + (u.score || 0), 0);
+            totalPoints = schoolStudents.reduce((sum, u: any) => sum + (u.score || 0), 0);
           } else {
-            schoolStudents.forEach(student => {
-              const studentResults = (results || []).filter(r => (r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId) && r?.student_id === student?.id);
+            schoolStudents.forEach((student: any) => {
+              const studentResults = (results || []).filter((r: any) => (r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId) && r?.student_id === student?.id);
               if (studentResults.length > 0) {
-                totalPoints += studentResults.length > 0 ? Math.max(...studentResults.map(r => r?.score || 0)) : 0;
+                totalPoints += Math.max(...studentResults.map((r: any) => r?.score || 0));
               }
             });
           }
@@ -741,7 +744,7 @@ function TeacherSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }
         });
 
         const sortedSchools = aggregatedSchools.sort((a, b) => b.totalPoints - a.totalPoints);
-        setSchoolData(sortedSchools);
+        setSchoolData(sortedSchools as any);
       } catch (e) { console.error(e); }
       setLoading(false);
     };
@@ -793,30 +796,25 @@ function ReportIssueDialog({ open, onOpenChange }: { open: boolean, onOpenChange
 
     setLoading(true);
     try {
-      const msg = {
-        id: `msg-${Date.now()}`,
+      await addDoc(collection(db, 'messages'), {
         sender: profile?.display_name || profile?.email || 'Teacher',
-        senderId: profile?.id,
-        senderRole: 'teacher',
-        recipientRole: 'admin', // Directed to admins/mods
+        sender_id: profile?.id,
+        sender_role: 'teacher',
+        receiver_role: 'admin',
         subject: `[ISSUE] ${subject}`,
         content,
-        date: new Date().toISOString(),
+        created_at: serverTimestamp(),
         read: false,
         status: 'pending',
         replies: []
-      };
-
-      const messages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-      messages.push(msg);
-      localStorage.setItem('lumora_messages', JSON.stringify(messages));
+      });
 
       toast({ title: 'Issue reported!', description: 'Admins will review your report shortly.' });
       onOpenChange(false);
       setSubject('');
       setContent('');
-    } catch (e) {
-      toast({ title: 'Error sending report', variant: 'destructive' });
+    } catch (e: any) {
+      toast({ title: 'Error sending report', description: e.message, variant: 'destructive' });
     }
     setLoading(false);
   };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,47 +20,14 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const { signIn, signInWithMicrosoft, user, profile, loading: authLoading } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false); // Toggle between sign in and sign up
+  const { signIn, signInWithMicrosoft, signUp } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Automatic redirection when auth is ready
-  useEffect(() => {
-    if (user && profile && !authLoading) {
-      console.log('User detected, auto-redirecting to dashboard...');
-      navigate('/dashboard');
-    }
-  }, [user, profile, authLoading, navigate]);
-
   const handleMicrosoftLogin = async () => {
     setLoading(true);
-    try {
-      const { error } = await signInWithMicrosoft();
-
-      if (error) {
-        toast({
-          title: 'Login failed',
-          description: error.message || 'An unknown error occurred',
-          variant: 'destructive',
-        });
-        setLoading(false);
-      } else {
-        toast({
-          title: 'Success!',
-          description: 'Logged in with Microsoft. Redirecting...',
-        });
-        navigate('/dashboard');
-      }
-    } catch (e: any) {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    const { error } = await signIn(email, password);
+    const { error } = await signInWithMicrosoft();
 
     if (error) {
       toast({
@@ -70,10 +37,52 @@ export default function Login() {
       });
     } else {
       toast({
-        title: 'Welcome back!',
-        description: 'Successfully logged in.',
+        title: 'Welcome!',
+        description: 'Successfully logged in with Microsoft.',
       });
       navigate('/dashboard');
+    }
+    setLoading(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (isSignUp) {
+      // Sign up flow
+      const { error } = await signUp(email, password);
+
+      if (error) {
+        toast({
+          title: 'Sign up failed',
+          description: error.message || 'An unknown error occurred',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Account created!',
+          description: 'Welcome to Lumora! Redirecting to your dashboard...',
+        });
+        navigate('/dashboard');
+      }
+    } else {
+      // Sign in flow
+      const { error } = await signIn(email, password);
+
+      if (error) {
+        toast({
+          title: 'Login failed',
+          description: error.message || 'An unknown error occurred',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Welcome back!',
+          description: 'Successfully logged in.',
+        });
+        navigate('/dashboard');
+      }
     }
 
     setLoading(false);
@@ -84,8 +93,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 gradient-hero opacity-5" />
-      <div className="absolute top-20 left-20 w-96 h-96 bg-accent/5 rounded-full blur-xl animate-float" />
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-primary/5 rounded-full blur-xl animate-float" style={{ animationDelay: '-2s' }} />
+      <div className="absolute top-20 left-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" />
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '-2s' }} />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -105,9 +114,13 @@ export default function Login() {
             <Link to="/" className="inline-flex items-center gap-6 justify-center mb-1">
               <Logo size="lg" textSize="xl" />
             </Link>
-            <CardTitle className="text-2xl font-display">Welcome!</CardTitle>
+            <CardTitle className="text-2xl font-display">
+              {isSignUp ? 'Create Account' : 'Welcome!'}
+            </CardTitle>
             <CardDescription className="text-sm">
-              Sign in to continue your learning journey
+              {isSignUp
+                ? 'Sign up to start your learning journey'
+                : 'Sign in to continue your learning journey'}
             </CardDescription>
           </CardHeader>
 
@@ -138,7 +151,7 @@ export default function Login() {
                 <Separator />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or sign in with email</span>
+                <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
               </div>
             </div>
 
@@ -148,7 +161,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="name@example.com"
+                  placeholder="admin@lumora.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -186,18 +199,27 @@ export default function Login() {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing In...
+                    {isSignUp ? 'Creating Account...' : 'Checking...'}
                   </>
                 ) : (
-                  'Sign In'
+                  isSignUp ? 'Create Account' : 'Sign In'
                 )}
               </Button>
             </form>
 
             <div className="text-center space-y-2">
               <p className="text-center text-xs text-muted-foreground">
-                Don't have an account?
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
               </p>
+              <Button
+                variant="link"
+                size="sm"
+                className="text-xs h-auto p-0 text-primary hover:text-primary/80"
+                onClick={() => setIsSignUp(!isSignUp)}
+              >
+                {isSignUp ? 'Sign in instead' : 'Create a new account'}
+              </Button>
+              <div className="text-xs text-muted-foreground">or</div>
               <Button
                 variant="link"
                 size="sm"

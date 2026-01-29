@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 interface QuestionRepetitionToggleProps {
   questionId: string;
@@ -22,39 +23,22 @@ export function QuestionRepetitionToggle({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  // Load setting from localStorage on component mount
-  useEffect(() => {
-    const savedSetting = localStorage.getItem(`questionRepetition_${questionId}`);
-    if (savedSetting !== null) {
-      setAllowRepetition(savedSetting === 'true');
-    }
-  }, [questionId]);
-
   const handleToggle = async (checked: boolean) => {
     setLoading(true);
     try {
       setAllowRepetition(checked);
-      // Save to localStorage
-      localStorage.setItem(`questionRepetition_${questionId}`, checked.toString());
 
       // Dispatch custom event to notify other components
       window.dispatchEvent(new CustomEvent('questionRepetitionChanged', {
         detail: { questionId, sectionId, allowRepetition: checked }
       }));
 
-      // API call to update question repetition settings
-      const { error } = await supabase
-        .from('questions')
-        .update({
-          allow_repetition: checked,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', questionId);
-
-      if (error) {
-        console.warn('Supabase save failed:', error.message);
-        // Don't show error to user since it's not critical
-      }
+      // API call to update question repetition settings in Firestore
+      const questionRef = doc(db, 'questions', questionId);
+      await updateDoc(questionRef, {
+        allow_repetition: checked,
+        updated_at: serverTimestamp()
+      });
 
       onToggle?.(checked);
 
@@ -62,7 +46,7 @@ export function QuestionRepetitionToggle({
         title: 'Question repetition updated',
         description: `Question repetition is now ${checked ? 'allowed' : 'not allowed'}`
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error updating question repetition',
         description: error.message,

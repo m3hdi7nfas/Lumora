@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface LandingPageEditorProps {
     isOpen: boolean;
@@ -25,46 +26,40 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
     const { data: fetchedContent } = useQuery({
         queryKey: ['landing-content-edit'],
         queryFn: async () => {
-            const { data, error } = await (supabase as any)
-                .from('site_settings')
-                .select('value')
-                .eq('key', 'landing_page')
-                .single();
+            try {
+                const docRef = doc(db, 'site_settings', 'landing_page');
+                const docSnap = await getDoc(docRef);
 
-            if (error || !data) return defaultSiteContent;
-            return data.value as SiteContent;
+                if (docSnap.exists()) {
+                    return docSnap.data().value as SiteContent;
+                }
+                return defaultSiteContent;
+            } catch (error) {
+                console.error('Error fetching landing content:', error);
+                return defaultSiteContent;
+            }
         },
-        enabled: isOpen, // Only fetch when open
+        enabled: isOpen,
     });
 
     useEffect(() => {
-        if (fetchedContent && JSON.stringify(fetchedContent) !== JSON.stringify(content)) {
+        if (fetchedContent) {
             setContent(fetchedContent);
         }
-    }, [fetchedContent, isOpen]);
+    }, [fetchedContent]);
 
     const saveContent = useMutation({
         mutationFn: async () => {
-            // Always save to localStorage first
-            localStorage.setItem('lumora-landing-content', JSON.stringify(content));
-
-            try {
-                const { error } = await (supabase as any)
-                    .from('site_settings')
-                    .upsert({ key: 'landing_page', value: content });
-
-                if (error) {
-                    console.warn('Supabase save failed (ignore if table site_settings is missing):', error.message);
-                }
-            } catch (e) {
-                console.warn('Supabase save failed');
-            }
+            const docRef = doc(db, 'site_settings', 'landing_page');
+            await setDoc(docRef, {
+                value: content,
+                updated_at: serverTimestamp()
+            });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['landing-content'] });
             queryClient.invalidateQueries({ queryKey: ['landing-content-edit'] });
             toast({ title: 'Landing page updated successfully!' });
-            // Don't close automatically, allow more edits
         },
         onError: (error: Error) => {
             toast({ title: 'Error updating content', description: error.message, variant: 'destructive' });
@@ -173,8 +168,8 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
                                         <Input value={content.hero.stats.questions} onChange={(e) => updateHero('stats.questions', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Answers</Label>
-                                        <Input value={content.hero.stats.answers} onChange={(e) => updateHero('stats.answers', e.target.value)} />
+                                        <Label>Schools Joined</Label>
+                                        <Input value={content.hero.stats.schools} onChange={(e) => updateHero('stats.schools', e.target.value)} />
                                     </div>
                                 </div>
                             </CardContent>

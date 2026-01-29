@@ -8,17 +8,26 @@ import TeacherDashboard from '@/components/dashboards/TeacherDashboard';
 import StudentDashboard from '@/components/dashboards/StudentDashboard';
 import AdminDashboard from '@/components/dashboards/AdminDashboard';
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: any) {
     return { hasError: true, error: error };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: any, errorInfo: any) {
     console.error("Dashboard Error:", error, errorInfo);
   }
 
@@ -65,12 +74,42 @@ export default function Dashboard() {
     }
   }, [user, profile, loading]);
 
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+  const loadingMessages = [
+    "Preparing your workspace...",
+    "Syncing your learning data...",
+    "Unlocking Lumora features...",
+    "Readying your toolkit...",
+    "Connecting to the cloud...",
+    "Finalizing setup..."
+  ];
+
+  useEffect(() => {
+    if (loading || (user && !profile)) {
+      const interval = setInterval(() => {
+        setLoadingMsgIndex(prev => (prev + 1) % loadingMessages.length);
+      }, 800);
+      return () => clearInterval(interval);
+    }
+  }, [loading, user, profile]);
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="relative text-center space-y-6 max-w-sm px-4">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 blur-2xl bg-primary/20 animate-pulse" />
+            <Loader2 className="w-16 h-16 animate-spin text-primary relative z-10 mx-auto" strokeWidth={1.5} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-display font-bold animate-in fade-in slide-in-from-bottom-2 duration-500">
+              Welcome back to Lumora
+            </h2>
+            <p className="text-muted-foreground animate-pulse text-sm font-medium h-4">
+              {loadingMessages[loadingMsgIndex]}
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -82,15 +121,26 @@ export default function Dashboard() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading your profile...</p>
-          {profileTimeout && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Taking longer than expected. Please wait or try refreshing.
+      <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+        <div className="relative text-center space-y-6 max-w-sm px-4">
+          <div className="relative inline-block">
+            <div className="absolute inset-0 blur-2xl bg-primary/20 animate-pulse" />
+            <Loader2 className="w-16 h-16 animate-spin text-primary relative z-10 mx-auto" strokeWidth={1.5} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-display font-bold animate-in fade-in slide-in-from-bottom-2 duration-500">
+              Authorizing Profile
+            </h2>
+            <p className="text-muted-foreground animate-pulse text-sm font-medium h-4">
+              {loadingMessages[loadingMsgIndex]}
             </p>
-          )}
+            {profileTimeout && (
+              <p className="text-xs text-muted-foreground mt-4 animate-in fade-in duration-700">
+                Taking longer than expected. Please wait or try refreshing.
+              </p>
+            )}
+          </div>
         </div>
       </div>
     );

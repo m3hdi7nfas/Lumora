@@ -28,7 +28,18 @@ import {
   Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  deleteDoc,
+  addDoc,
+  serverTimestamp
+} from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -117,20 +128,19 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
     queryKey: ['teacher-stats'],
     queryFn: async () => {
       try {
-        // Get students for this teacher
-        const { data: students, error: studentsError } = await supabase.from('profiles').select('*').eq('role', 'student');
-        if (studentsError) throw studentsError;
+        // Get students (profiles) from Firestore
+        const studentsQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
+        const studentsSnap = await getDocs(studentsQuery);
 
-        // Get competitions
-        const { data: competitions, error: compError } = await supabase.from('competitions').select('*');
-        if (compError) throw compError;
+        // Get competitions from Firestore
+        const competitionsSnap = await getDocs(collection(db, 'competitions'));
 
         return {
-          totalStudents: students.length,
-          activeStudents: students.length,
-          competitions: competitions.length,
-          questionsAnswered: 0, // This would come from a more complex query
-          avgScore: 0, // This would come from a more complex query
+          totalStudents: studentsSnap.size,
+          activeStudents: studentsSnap.size,
+          competitions: competitionsSnap.size,
+          questionsAnswered: 0,
+          avgScore: 0,
           recentActivity: []
         };
       } catch (error) {
@@ -307,18 +317,12 @@ function StudentsTab() {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      // Fetch students - if admin/moderator viewing as teacher, show all students
-      let query = supabase.from('profiles').select('*').eq('role', 'student');
-
-      if (!isAdminOrModerator || !currentView) {
-        // Regular teacher can only see students from their school
-        // query = query.eq('school_id', profile?.school_id);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setStudents(data || []);
-    } catch (error) {
+      // Fetch students from Firestore
+      const studentsQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
+      const studentsSnap = await getDocs(studentsQuery);
+      const studentsList = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setStudents(studentsList as any);
+    } catch (error: any) {
       toast({ title: 'Error fetching students', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -326,9 +330,9 @@ function StudentsTab() {
 
   const fetchClasses = async () => {
     try {
-      const { data, error } = await supabase.from('schools').select('*');
-      if (error) throw error;
-      setClasses(data || []);
+      const schoolsSnap = await getDocs(collection(db, 'schools'));
+      const schoolsList = schoolsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClasses(schoolsList as any);
     } catch (error) {
       console.error('Error fetching classes:', error);
     }
@@ -343,17 +347,17 @@ function StudentsTab() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.from('profiles').update({
+      const studentRef = doc(db, 'profiles', editingStudent.id);
+      await updateDoc(studentRef, {
         display_name: editingStudent.name,
-        is_active: editingStudent.is_active
-      }).eq('id', editingStudent.id);
-
-      if (error) throw error;
+        is_active: editingStudent.is_active,
+        updated_at: serverTimestamp()
+      });
 
       toast({ title: 'Student updated successfully!' });
       setEditingStudent(null);
       fetchStudents();
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error updating student', description: error.message, variant: 'destructive' });
     }
 
@@ -363,12 +367,12 @@ function StudentsTab() {
   const handleDeleteStudent = async (studentId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('profiles').delete().eq('id', studentId);
-      if (error) throw error;
+      const studentRef = doc(db, 'profiles', studentId);
+      await deleteDoc(studentRef);
 
       toast({ title: 'Student deleted successfully!' });
       fetchStudents();
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error deleting student', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -584,48 +588,46 @@ function TeacherLeaderboardTab() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      // Fetch competitions from local storage (to match StudentDashboard logic)
-      const comps = localStorage.getItem('lumora_competitions') ? JSON.parse(localStorage.getItem('lumora_competitions')) : [];
-      setCompetitions(comps);
+      // Fetch competitions from Firestore
+      const competitionsSnap = await getDocs(collection(db, 'competitions'));
+      const comps = competitionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCompetitions(comps as any);
 
-      // Fetch leaderboard data
-      const usersData = localStorage.getItem('lumora_users') ? JSON.parse(localStorage.getItem('lumora_users')) : [];
+      // Fetch student profiles from Firestore
+      const studentsQuery = query(collection(db, 'profiles'), where('role', '==', 'student'));
+      const studentsSnap = await getDocs(studentsQuery);
+      let filteredData = studentsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      let filteredData = (usersData || []).filter(u => {
-        // Only show students
-        if (u.role !== 'student') return false;
-
-        // Exclude demo accounts
-        const demoEmails = [
-          'demo.admin@lumora.com',
-          'demo.moderator@lumora.com',
-          'demo.teacher@lumora.com',
-          'demo.student@lumora.com'
-        ];
-        if (demoEmails.includes(u.email)) return false;
-
-        return true;
-      });
+      // Exclude demo accounts
+      const demoEmails = [
+        'demo.admin@lumora.com',
+        'demo.moderator@lumora.com',
+        'demo.teacher@lumora.com',
+        'demo.student@lumora.com'
+      ];
+      filteredData = filteredData.filter(u => !demoEmails.includes((u as any).email));
 
       if (selectedCompId !== 'all') {
-        const results = localStorage.getItem('lumora_results') ? JSON.parse(localStorage.getItem('lumora_results')) : [];
-        const compResults = (results || []).filter(r => r?.question_set_id === selectedCompId || r?.competition_id === selectedCompId);
+        // Fetch results for the selected competition
+        const resultsQuery = query(collection(db, 'results'), where('competition_id', '==', selectedCompId));
+        const resultsSnap = await getDocs(resultsQuery);
+        const results = resultsSnap.docs.map(doc => doc.data());
 
-        const userScores = {};
-        compResults.forEach(r => {
+        const userScores: Record<string, number> = {};
+        results.forEach(r => {
           if (!userScores[r.student_id] || r.score > userScores[r.student_id]) {
             userScores[r.student_id] = r.score;
           }
         });
 
         filteredData = filteredData
-          .filter(u => u?.id && userScores[u.id] !== undefined)
+          .filter(u => u.id && userScores[u.id] !== undefined)
           .map(u => ({ ...u, score: userScores[u.id] }));
       }
 
-      const sortedUsers = filteredData.sort((a, b) => (b.score || 0) - (a.score || 0));
-      setLeaderboardData(sortedUsers);
-    } catch (error) {
+      const sortedUsers = filteredData.sort((a, b) => ((b as any).score || 0) - ((a as any).score || 0));
+      setLeaderboardData(sortedUsers as any);
+    } catch (error: any) {
       toast({ title: 'Error fetching leaderboard', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -869,18 +871,17 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Fetch messages - if admin/moderator viewing as teacher, show all messages
-      let query = supabase.from('messages').select('*').eq('receiver_id', profile?.id);
-
+      let messagesQuery;
       if (isAdminOrModerator && currentView) {
-        // Admin/moderator can see all messages
-        query = supabase.from('messages').select('*');
+        messagesQuery = collection(db, 'messages');
+      } else {
+        messagesQuery = query(collection(db, 'messages'), where('receiver_id', '==', profile?.id));
       }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
+      const messagesSnap = await getDocs(messagesQuery);
+      const messagesList = messagesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setMessages(messagesList as any);
+    } catch (error: any) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
@@ -892,18 +893,17 @@ function MessagesTab() {
     setSendingReply(true);
 
     try {
-      const { error } = await supabase.from('messages').insert({
+      await addDoc(collection(db, 'messages'), {
         content: replyContent,
-        receiver_id: selectedMessage.senderEmail,
+        receiver_id: (selectedMessage as any).senderEmail,
         sender_id: profile?.email,
-        subject: `Re: ${selectedMessage.subject}`
+        subject: `Re: ${(selectedMessage as any).subject}`,
+        created_at: serverTimestamp()
       });
-
-      if (error) throw error;
 
       toast({ title: 'Reply sent successfully!' });
       setReplyContent('');
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
     }
 
@@ -913,15 +913,14 @@ function MessagesTab() {
   const handleDeleteMessage = async (messageId: string) => {
     setLoading(true);
     try {
-      const { error } = await supabase.from('messages').delete().eq('id', messageId);
-      if (error) throw error;
+      await deleteDoc(doc(db, 'messages', messageId));
 
       toast({ title: 'Message deleted successfully!' });
-      setMessages(messages.filter(msg => msg.id !== messageId));
+      setMessages(messages.filter(msg => (msg as any).id !== messageId));
       if (selectedMessage?.id === messageId) {
         setSelectedMessage(null);
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
     }
     setLoading(false);

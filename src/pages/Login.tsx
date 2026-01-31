@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,9 +20,41 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, signInWithMicrosoft, user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Automatic redirection when auth is ready
+  useEffect(() => {
+    if (user && profile && !authLoading) {
+      console.log('User detected, auto-redirecting to dashboard...');
+      navigate('/dashboard');
+    }
+  }, [user, profile, authLoading, navigate]);
+
+  const handleMicrosoftLogin = async () => {
+    setLoading(true);
+    try {
+      const { error } = await signInWithMicrosoft();
+
+      if (error) {
+        toast({
+          title: 'Login failed',
+          description: error.message || 'An unknown error occurred',
+          variant: 'destructive',
+        });
+        setLoading(false);
+      } else {
+        toast({
+          title: 'Success!',
+          description: 'Logged in with Microsoft. Redirecting...',
+        });
+        navigate('/dashboard');
+      }
+    } catch (e: any) {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,8 +84,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 gradient-hero opacity-5" />
-      <div className="absolute top-20 left-20 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-float" />
-      <div className="absolute bottom-20 right-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '-2s' }} />
+      <div className="absolute top-20 left-20 w-96 h-96 bg-accent/5 rounded-full blur-xl animate-float" />
+      <div className="absolute bottom-20 right-20 w-80 h-80 bg-primary/5 rounded-full blur-xl animate-float" style={{ animationDelay: '-2s' }} />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -80,6 +112,35 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="space-y-4 pb-4 px-6">
+            <Button
+              onClick={handleMicrosoftLogin}
+              className="w-full h-11 text-sm bg-white text-black hover:bg-gray-50 border border-border shadow-sm flex items-center justify-center gap-3 transition-all hover:scale-[1.02]"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <svg className="w-5 h-5" viewBox="0 0 23 23">
+                    <path fill="#f3f3f3" d="M0 0h23v23H0z" />
+                    <path fill="#f35325" d="M1 1h10v10H1z" />
+                    <path fill="#81bc06" d="M12 1h10v10H12z" />
+                    <path fill="#05a6f0" d="M1 12h10v10H1z" />
+                    <path fill="#ffba08" d="M12 12h10v10H12z" />
+                  </svg>
+                  Login with Microsoft
+                </>
+              )}
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or sign in with email</span>
+              </div>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
@@ -87,7 +148,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@school.com"
+                  placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -119,13 +180,13 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full h-9 text-sm gradient-hero shadow-glow hover:scale-[1.02] transition-transform mt-1"
+                className="w-full h-9 text-sm variant-outline hover:bg-muted transition-transform mt-1"
                 disabled={loading}
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
+                    Signing In...
                   </>
                 ) : (
                   'Sign In'

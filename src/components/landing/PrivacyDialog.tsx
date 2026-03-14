@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Shield, FileText, Calendar, Globe, User, Lock, Mail } from 'lucide-react';
+import { Shield, FileText, Calendar, Globe, User, Lock, Mail, Instagram } from 'lucide-react';
 
 interface PrivacyDialogProps {
   open: boolean;
@@ -27,7 +27,7 @@ export function PrivacyDialog({ open, onOpenChange }: PrivacyDialogProps) {
               Introduction
             </h2>
             <p className="text-muted-foreground mb-3">
-              Welcome to Lumora ("we", "our", "us"). We are committed to protecting your personal information and your right to privacy. If you have any questions or concerns about our policy, or our practices with regards to your personal information, please contact us at privacy@lumora.com.
+              Welcome to Lumora ("we", "our", "us"). We are committed to protecting your personal information and your right to privacy. If you have any questions or concerns about our policy, or our practices with regards to your personal information, please contact us at connect.lumora@hotmail.com.
             </p>
           </section>
 
@@ -175,13 +175,12 @@ export function PrivacyDialog({ open, onOpenChange }: PrivacyDialogProps) {
               Contact Us
             </h2>
             <p className="text-muted-foreground mb-3">
-              If you have questions or comments about this policy, you may email us at privacy@lumora.com or by post to:
+              If you have questions or comments about this policy, you may email us at <a href="mailto:connect.lumora@hotmail.com" className="text-primary hover:underline">connect.lumora@hotmail.com</a>, reach out via Instagram at <a href="https://instagram.com/lumora.connect" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><Instagram className="w-3 h-3" /> @lumora.connect</a>, or by post to:
             </p>
             <div className="ml-4 text-muted-foreground">
-              <p>Lumora Education</p>
-              <p>123 Education Street</p>
-              <p>Knowledge City, KC 12345</p>
-              <p>United States</p>
+              <p>Lumora</p>
+              <p>United Arab Emirates</p>
+              <p>Abu Dhabi</p>
             </div>
           </section>
         </div>

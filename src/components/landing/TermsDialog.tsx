@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { FileText, Calendar, User, Shield, Trophy, BookOpen, AlertTriangle, Mail } from 'lucide-react';
+import { FileText, Calendar, User, Shield, Trophy, BookOpen, AlertTriangle, Mail, Instagram } from 'lucide-react';
 
 interface TermsDialogProps {
   open: boolean;
@@ -45,7 +45,7 @@ export function TermsDialog({ open, onOpenChange }: TermsDialogProps) {
             <div className="space-y-2 ml-4">
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">You are at least 13 years of age or have obtained parental consent.</span>
+                <span className="text-muted-foreground">You are a student from year 7.</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary">•</span>
@@ -195,7 +195,7 @@ export function TermsDialog({ open, onOpenChange }: TermsDialogProps) {
               Contact Us
             </h2>
             <p className="text-muted-foreground mb-3">
-              If you have any questions about these Terms, please contact us at legal@lumora.com.
+              If you have any questions about these Terms, please contact us at <a href="mailto:connect.lumora@hotmail.com" className="text-primary hover:underline">connect.lumora@hotmail.com</a> or via Instagram at <a href="https://instagram.com/lumora.connect" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline"><Instagram className="w-3 h-3" /> @lumora.connect</a>.
             </p>
           </section>
         </div>

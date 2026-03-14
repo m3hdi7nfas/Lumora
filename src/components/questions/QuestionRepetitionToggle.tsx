@@ -3,8 +3,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 interface QuestionRepetitionToggleProps {
   questionId: string;
@@ -33,12 +32,16 @@ export function QuestionRepetitionToggle({
         detail: { questionId, sectionId, allowRepetition: checked }
       }));
 
-      // API call to update question repetition settings in Firestore
-      const questionRef = doc(db, 'questions', questionId);
-      await updateDoc(questionRef, {
-        allow_repetition: checked,
-        updated_at: serverTimestamp()
-      });
+      // API call to update question repetition settings in Supabase
+      const { error } = await supabase
+        .from('questions')
+        .update({
+          allow_repetition: checked,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', questionId);
+
+      if (error) throw error;
 
       onToggle?.(checked);
 

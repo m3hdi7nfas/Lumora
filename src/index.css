@@ -1,9 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 /* EduQuest Design System - Gamified Educational Platform */
 
@@ -131,7 +131,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: hsl(var(--border));
   }
 
   html {
@@ -139,8 +139,11 @@
   }
 
   body {
-    @apply bg-background text-foreground font-body antialiased;
-    font-family: 'Roboto', 'Poppins', sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Quicksand', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Custom Scrollbar - Flying Thumb, no track */
@@ -194,8 +197,9 @@
   h4,
   h5,
   h6 {
-    @apply font-display font-bold tracking-tight;
-    font-family: 'Poppins', 'Roboto', sans-serif;
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.025em;
   }
 }
 
@@ -225,12 +229,17 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
     background-image: var(--gradient-hero);
   }
 
   .glass {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    background-color: hsl(var(--card) / 0.8);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid hsl(var(--border) / 0.5);
   }
 
   .animate-float {

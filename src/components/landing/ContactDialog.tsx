@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mail, Phone, User, MessageSquare, Loader2, Send } from 'lucide-react';
+import { Mail, Phone, User, MessageSquare, Loader2, Send, Instagram } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface ContactDialogProps {
@@ -76,16 +76,36 @@ export function ContactDialog({ open, onOpenChange }: ContactDialogProps) {
             Contact Administration
           </DialogTitle>
           <DialogDescription>
-            Contact the Lumora administration team
+            Contact the Lumora administration team.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4 pt-4 border-t border-border/50">
-          <h3 className="font-medium mb-2">Contact Information</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <span>admin@lumora.com</span>
+        <div className="pt-2 border-t border-border">
+          <h3 className="font-semibold mb-3 text-base">Contact Information</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Mail className="w-4 h-4 text-primary" />
+              </div>
+              <a
+                href="mailto:connect.lumora@hotmail.com"
+                className="text-sm font-medium hover:text-primary transition-colors hover:underline"
+              >
+                connect.lumora@hotmail.com
+              </a>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Instagram className="w-4 h-4 text-primary" />
+              </div>
+              <a
+                href="https://instagram.com/lumora.connect"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-white hover:text-primary transition-colors hover:underline"
+              >
+                @lumora.connect
+              </a>
             </div>
           </div>
         </div>

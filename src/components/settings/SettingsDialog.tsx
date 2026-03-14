@@ -20,7 +20,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Settings</DialogTitle>
                     <DialogDescription>
-                        Customize your interface and experience. (Admin controls migrated to Header)
+                        Customize your interface and experience.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -30,7 +30,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <h3 className="text-sm font-medium flex items-center gap-2">
                             <Sun className="w-4 h-4" /> Appearance
                         </h3>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                             <Button
                                 variant={theme === 'light' ? 'default' : 'outline'}
                                 className="flex flex-col gap-2 h-20"
@@ -46,14 +46,6 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             >
                                 <Moon className="w-5 h-5" />
                                 <span className="text-xs">Dark</span>
-                            </Button>
-                            <Button
-                                variant={theme === 'system' ? 'default' : 'outline'}
-                                className="flex flex-col gap-2 h-20"
-                                onClick={() => setTheme('system')}
-                            >
-                                <Monitor className="w-5 h-5" />
-                                <span className="text-xs">System</span>
                             </Button>
                         </div>
                     </div>

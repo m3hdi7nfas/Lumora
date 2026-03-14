@@ -38,6 +38,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           <div className="text-center space-y-4">
             <h2 className="text-2xl font-bold text-destructive">Something went wrong</h2>
             <p className="text-muted-foreground">An error occurred while loading the dashboard</p>
+            {this.state.error && (
+              <div className="mt-4 max-w-lg mx-auto text-left text-xs bg-muted/40 border border-destructive/30 rounded-lg p-3 font-mono break-words">
+                <p className="font-semibold mb-1 text-destructive-foreground">Error details (copy this for support):</p>
+                <p className="text-destructive-foreground">{String(this.state.error?.message || this.state.error)}</p>
+              </div>
+            )}
             <button
               onClick={() => window.location.reload()}
               className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -100,7 +106,8 @@ export default function Dashboard() {
         <div className="relative text-center space-y-6 max-w-sm px-4">
           <div className="relative inline-block">
             <div className="absolute inset-0 blur-2xl bg-primary/20 animate-pulse" />
-            <Loader2 className="w-16 h-16 animate-spin text-primary relative z-10 mx-auto" strokeWidth={1.5} />
+            <img src="/logo.png" className="w-20 h-20 object-contain mx-auto mb-4 relative z-10" alt="Lumora" />
+            <Loader2 className="w-10 h-10 animate-spin text-primary relative z-10 mx-auto" strokeWidth={1.5} />
           </div>
           <div className="space-y-2">
             <h2 className="text-xl font-display font-bold animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -165,10 +172,10 @@ export default function Dashboard() {
           </ErrorBoundary>
         );
       case 'moderator':
-        console.log('Rendering ModeratorDashboard');
+        console.log('Rendering AdminDashboard (for moderator)');
         return (
           <ErrorBoundary>
-            <ModeratorDashboard />
+            <AdminDashboard />
           </ErrorBoundary>
         );
       case 'teacher':

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProfileDialog } from '@/components/profile/ProfileDialog';
 import { SettingsDialog } from '@/components/settings/SettingsDialog';
+import { AdBanner } from '@/components/ads/AdBanner';
 import { MessagesDialog } from '@/components/messaging/MessagesDialog';
+import { MessageDetailDialog } from '@/components/messaging/MessageDetailDialog';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -25,47 +28,69 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, sidebar, title, onNavItemClick }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [messagesDialogOpen, setMessagesDialogOpen] = useState(false);
+  const [messageDetailDialogOpen, setMessageDetailDialogOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const { signOut, profile, currentView, setCurrentView, isAdmin, isAdminOrModerator } = useAuth();
+  const { signOut, profile, currentView, setCurrentView, isAdmin, isAdminOrModerator, isProfileDialogOpen, setIsProfileDialogOpen } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const { theme, setTheme } = useTheme();
+  // Store IDs of messages recently marked as read to prevent polling reversion
+  const [recentlyReadIds, setRecentlyReadIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('lumora_recently_read');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    }
+    return new Set();
+  });
+
+  // Persist recentlyReadIds to survive refresh
+  useEffect(() => {
+    sessionStorage.setItem('lumora_recently_read', JSON.stringify(Array.from(recentlyReadIds)));
+  }, [recentlyReadIds]);
 
   // Sync notifications with messages from localStorage
   useEffect(() => {
-    const syncNotifications = () => {
+    const syncNotifications = async () => {
       try {
-        const messages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-        // Convert messages to notification format
-        const notifs = messages.map((m: any) => ({
-          id: m.id,
-          text: `${m.sender}: ${m.subject}`,
-          time: new Date(m.date).toLocaleDateString(),
-          read: m.read,
-          isSystem: m.senderRole === 'system'
-        }));
-        setNotifications(notifs.slice(0, 10)); // Show last 10
-        setUnreadCount(messages.filter((m: any) => !m.read).length);
+        const { data: messages } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`recipient_id.eq.${profile?.id},recipient_role.eq.${profile?.role},recipient_role.eq.all`)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (messages) {
+          const notifs = messages.map((m: any) => ({
+            id: m.id,
+            text: `${m.sender_name}: ${m.subject}`,
+            time: new Date(m.created_at).toLocaleDateString(),
+            // Optimistic check: if we just read it, treat it as read even if DB hasn't synced yet
+            read: recentlyReadIds.has(m.id) || m.is_read || false,
+            isSystem: m.sender_role === 'system'
+          }));
+          setNotifications(notifs);
+
+          // Count unread, excluding those we just marked as read
+          const unread = messages.filter((m: any) => !m.is_read && !recentlyReadIds.has(m.id));
+          setUnreadCount(unread.length);
+        }
       } catch (e) {
         console.error('Error syncing notifications:', e);
       }
     };
 
-    syncNotifications();
-    window.addEventListener('storage', syncNotifications);
-    const interval = setInterval(syncNotifications, 10000); // Periodic check
-
-    return () => {
-      window.removeEventListener('storage', syncNotifications);
-      clearInterval(interval);
-    };
-  }, []);
+    if (profile?.id) {
+      syncNotifications();
+      const interval = setInterval(syncNotifications, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [profile?.id, recentlyReadIds]);
 
   // Handle sidebar toggle
   const handleSidebarToggle = () => {
@@ -78,7 +103,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
       await signOut();
       navigate('/login');
       toast({ title: 'Signed out successfully' });
-    } catch (error) {
+    } catch (error: any) {
       toast({ title: 'Error signing out', description: error.message, variant: 'destructive' });
     }
   };
@@ -91,28 +116,56 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
   };
 
   const handleProfileClick = () => {
-    setProfileDialogOpen(true);
+    setIsProfileDialogOpen(true);
   };
 
-  // Handle Mark All as Read
-  const handleMarkAllRead = () => {
+  // Handle click on notification
+  const handleNotificationClick = async (notif: any) => {
     try {
-      const messages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-      const updatedMessages = messages.map((m: any) => ({ ...m, read: true }));
-      localStorage.setItem('lumora_messages', JSON.stringify(updatedMessages));
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
-      toast({ title: 'Marked all as read' });
-      // Trigger storage event for other components
-      window.dispatchEvent(new Event('storage'));
+      if (!notif.read) {
+        // Add to recently read immediately (Optimistic UI)
+        setRecentlyReadIds(prev => new Set([...prev, notif.id]));
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+
+        await supabase.from('messages').update({ is_read: true }).eq('id', notif.id);
+      }
+      setSelectedMessageId(notif.id);
+      setNotificationsOpen(false);
+      setMessageDetailDialogOpen(true);
     } catch (e) { console.error(e); }
   };
 
+  // Handle Mark All as Read
+  const handleMarkAllRead = async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      if (unreadIds.length === 0) return;
+
+      setRecentlyReadIds(prev => new Set([...prev, ...unreadIds]));
+
+      // Update specifically by IDs to handle both direct and role-based messages
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .in('id', unreadIds);
+
+      if (error) throw error;
+
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setUnreadCount(0);
+      toast({ title: 'Marked all as read' });
+    } catch (e) {
+      console.error(e);
+      toast({ title: 'Error marking messages as read', variant: 'destructive' });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Top navigation */}
       <header className="fixed top-0 left-0 right-0 h-16 border-b border-border bg-card z-50">
-        <div className="flex items-center justify-between h-full px-4">
+        <div className="flex items-center justify-between h-full px-4 lg:px-6">
           <div className="flex items-center gap-4">
             <button
               onClick={handleSidebarToggle}
@@ -123,8 +176,8 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
 
             {/* Dashboard logo stays on the right side as requested */}
             <div className="flex-1 flex justify-end">
-              <Link to="/" className="flex items-center gap-6">
-                <Logo size="md" textSize="md" />
+              <Link to="/" className="flex items-center gap-6 ml-6">
+                <Logo size="md" textSize="md" logoClassName="translate-y-1" />
               </Link>
             </div>
           </div>
@@ -203,7 +256,11 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                   {notifications.length > 0 ? (
                     <div className="divide-y divide-border">
                       {notifications.map((n) => (
-                        <div key={n.id} className={`p-4 hover:bg-muted/50 transition-all ${!n.read ? 'bg-primary/5' : ''}`}>
+                        <div
+                          key={n.id}
+                          className={`p-4 hover:bg-muted/50 transition-all cursor-pointer ${!n.read ? 'bg-primary/5' : ''}`}
+                          onClick={() => handleNotificationClick(n)}
+                        >
                           <div className="flex items-start gap-3">
                             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!n.read ? 'bg-primary' : 'bg-transparent'}`} />
                             <div className="space-y-1">
@@ -226,7 +283,11 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
                     className="w-full text-xs text-primary font-medium hover:bg-primary/5"
                     onClick={() => {
                       setNotificationsOpen(false);
-                      setMessagesDialogOpen(true);
+                      if (onNavItemClick) {
+                        onNavItemClick('messages');
+                      } else {
+                        setMessagesDialogOpen(true);
+                      }
                     }}
                   >
                     View all messages
@@ -239,8 +300,22 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
-                    {profile?.display_name?.substring(0, 2).toUpperCase() || 'US'}
+                  <div className="w-8 h-8 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm overflow-hidden border border-border">
+                    {profile?.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : profile?.avatar_id ? (
+                      <img
+                        src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.avatar_id}`}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      profile?.display_name?.substring(0, 2).toUpperCase() || 'US'
+                    )}
                   </div>
                   <span className="hidden md:inline font-medium">{profile?.display_name || 'User'}</span>
                   <ChevronDown className="w-4 h-4" />
@@ -266,7 +341,7 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
       </header>
 
       {/* Main content area */}
-      <div className="pt-16 flex min-h-screen">
+      <div className="flex-1 flex overflow-hidden mt-16">
         {/* Sidebar - hidden on mobile, shown on desktop */}
         <div className="hidden lg:block w-[280px] flex-shrink-0 border-r border-border">
           <div className="h-full overflow-y-auto p-4 custom-scrollbar">
@@ -292,13 +367,30 @@ export function DashboardLayout({ children, sidebar, title, onNavItemClick }: Da
       </div>
 
       {/* Profile Dialog - only opens when Profile is clicked */}
-      <ProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
+      <ProfileDialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen} />
 
       {/* Settings Dialog */}
       <SettingsDialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen} />
 
       {/* Messages Dialog */}
-      <MessagesDialog open={messagesDialogOpen} onOpenChange={setMessagesDialogOpen} />
+      <MessagesDialog
+        open={messagesDialogOpen}
+        onOpenChange={(open) => {
+          setMessagesDialogOpen(open);
+          if (!open) setSelectedMessageId(null);
+        }}
+        initialMessageId={selectedMessageId}
+      />
+
+      {/* Message Detail Dialog */}
+      <MessageDetailDialog
+        open={messageDetailDialogOpen}
+        onOpenChange={setMessageDetailDialogOpen}
+        messageId={selectedMessageId}
+      />
+
+      {/* Ad Banner - shown to all users in dashboard */}
+      <AdBanner />
     </div>
   );
 }

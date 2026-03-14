@@ -19,8 +19,10 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Space Grotesk", "sans-serif"],
-        body: ["Plus Jakarta Sans", "sans-serif"],
+        display: ["Quicksand", "sans-serif"],
+        modern: ["Space Grotesk", "sans-serif"],
+        logo: ["Quicksand", "sans-serif"],
+        body: ["Quicksand", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { GraduationCap, Users, Trophy, BookOpen, Target, Award, Swords, Star, Globe, Heart } from 'lucide-react';
+import { GraduationCap, Users, Trophy, BookOpen, Target, Award, Swords, Star, Globe, Heart, Instagram } from 'lucide-react';
 
 interface AboutDialogProps {
   open: boolean;
@@ -12,19 +12,23 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-primary" />
+            <img src="/logo.png" className="w-5 h-5 object-contain" alt="Lumora" />
             About Lumora
           </DialogTitle>
-          <DialogDescription>
-            Transforming education through gamified learning experiences
+          <DialogDescription className="flex flex-col gap-1">
+            <span>Transforming education through gamified learning experiences.</span>
+            <span className="flex items-center gap-1.5 text-primary">
+              <Instagram className="w-3.5 h-3.5" /> 
+              Stay updated <a href="https://instagram.com/lumora.connect" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline">@lumora.connect</a>
+            </span>
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
           <section className="text-center">
             <div className="mb-4">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl gradient-hero flex items-center justify-center">
-                <GraduationCap className="w-10 h-10 text-primary-foreground" />
+              <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                <img src="/logo.png" className="w-16 h-16 object-contain" alt="Lumora Logo" />
               </div>
               <h2 className="text-2xl font-display font-bold">Welcome to Lumora</h2>
               <p className="text-muted-foreground mt-2">
@@ -215,9 +219,16 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
             <p className="text-muted-foreground mb-3">
               Whether you're a student looking to enhance your learning, a teacher seeking innovative teaching tools, or a school aiming to improve academic performance, Lumora has something for you.
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mb-4">
               Join thousands of students and educators who are already experiencing the benefits of gamified learning with Lumora.
             </p>
+            <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 p-4 rounded-xl border border-border/50">
+              <Instagram className="w-5 h-5 text-primary" />
+              <span>Follow us on Instagram: </span>
+              <a href="https://instagram.com/lumora.connect" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+                @lumora.connect
+              </a>
+            </div>
           </section>
 
           <section className="text-center py-4">

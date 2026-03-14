@@ -20,14 +20,22 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false); // Toggle between sign in and sign up
-  const { signIn, signInWithMicrosoft, signUp } = useAuth();
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  /* 
   const handleMicrosoftLogin = async () => {
+    // Disabled per user request
+  };
+  */
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    const { error } = await signInWithMicrosoft();
+
+    // Sign in flow
+    const { error } = await signIn(email, password);
 
     if (error) {
       toast({
@@ -37,52 +45,10 @@ export default function Login() {
       });
     } else {
       toast({
-        title: 'Welcome!',
-        description: 'Successfully logged in with Microsoft.',
+        title: 'Welcome back!',
+        description: 'Successfully logged in.',
       });
       navigate('/dashboard');
-    }
-    setLoading(false);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    if (isSignUp) {
-      // Sign up flow
-      const { error } = await signUp(email, password);
-
-      if (error) {
-        toast({
-          title: 'Sign up failed',
-          description: error.message || 'An unknown error occurred',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Account created!',
-          description: 'Welcome to Lumora! Redirecting to your dashboard...',
-        });
-        navigate('/dashboard');
-      }
-    } else {
-      // Sign in flow
-      const { error } = await signIn(email, password);
-
-      if (error) {
-        toast({
-          title: 'Login failed',
-          description: error.message || 'An unknown error occurred',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Welcome back!',
-          description: 'Successfully logged in.',
-        });
-        navigate('/dashboard');
-      }
     }
 
     setLoading(false);
@@ -111,49 +77,19 @@ export default function Login() {
         </Link>
         <Card className="w-full shadow-card-hover border-border/50">
           <CardHeader className="text-center space-y-2 pt-4 pb-3">
-            <Link to="/" className="inline-flex items-center gap-6 justify-center mb-1">
-              <Logo size="lg" textSize="xl" />
+            <Link to="/" className="flex justify-center mb-1">
+              <Logo size="lg" />
             </Link>
             <CardTitle className="text-2xl font-display">
-              {isSignUp ? 'Create Account' : 'Welcome!'}
+              Welcome!
             </CardTitle>
             <CardDescription className="text-sm">
-              {isSignUp
-                ? 'Sign up to start your learning journey'
-                : 'Sign in to continue your learning journey'}
+              Sign in to continue your learning journey
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-4 pb-4 px-6">
-            <Button
-              onClick={handleMicrosoftLogin}
-              className="w-full h-11 text-sm bg-white text-black hover:bg-gray-50 border border-border shadow-sm flex items-center justify-center gap-3 transition-all hover:scale-[1.02]"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <svg className="w-5 h-5" viewBox="0 0 23 23">
-                    <path fill="#f3f3f3" d="M0 0h23v23H0z" />
-                    <path fill="#f35325" d="M1 1h10v10H1z" />
-                    <path fill="#81bc06" d="M12 1h10v10H12z" />
-                    <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                    <path fill="#ffba08" d="M12 12h10v10H12z" />
-                  </svg>
-                  Login with Microsoft
-                </>
-              )}
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
-              </div>
-            </div>
+            {/* Microsoft Login Removed */}
 
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="space-y-1.5">
@@ -161,7 +97,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@lumora.com"
+                  placeholder="student@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -193,33 +129,24 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full h-9 text-sm variant-outline hover:bg-muted transition-transform mt-1"
+                className="w-full h-11 text-sm gradient-hero text-white transition-all hover:scale-[1.02] mt-2 group"
                 disabled={loading}
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {isSignUp ? 'Creating Account...' : 'Checking...'}
+                    Checking...
                   </>
                 ) : (
-                  isSignUp ? 'Create Account' : 'Sign In'
+                  <>
+                    <Shield className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
+                    Sign In
+                  </>
                 )}
               </Button>
             </form>
 
             <div className="text-center space-y-2">
-              <p className="text-center text-xs text-muted-foreground">
-                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-              </p>
-              <Button
-                variant="link"
-                size="sm"
-                className="text-xs h-auto p-0 text-primary hover:text-primary/80"
-                onClick={() => setIsSignUp(!isSignUp)}
-              >
-                {isSignUp ? 'Sign in instead' : 'Create a new account'}
-              </Button>
-              <div className="text-xs text-muted-foreground">or</div>
               <Button
                 variant="link"
                 size="sm"
@@ -232,6 +159,11 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+        <div className="text-center mt-4">
+          <p className="text-[12px] text-muted-foreground/60 font-medium uppercase tracking-widest opacity-80">
+            Established in 2024
+          </p>
+        </div>
       </motion.div>
 
       {/* Ad Banner */}

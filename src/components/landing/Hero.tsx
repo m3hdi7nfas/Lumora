@@ -5,6 +5,9 @@ import { ScrollAnimation } from '@/components/animations/ScrollAnimation';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
 import { CountingNumber } from '@/components/animations/CountingNumber';
 import { EditableText } from './EditableText';
+import { useState } from 'react';
+import { AboutDialog } from './AboutDialog';
+import { HowItWorksDialog } from './HowItWorksDialog';
 
 interface HeroProps {
   content?: SiteContent['hero'];
@@ -17,6 +20,9 @@ export function Hero({
   isEditingGlobal = false,
   updateContent
 }: HeroProps) {
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden pt-20 md:pt-24 pb-20 md:pb-32">
       {/* Background gradient */}
@@ -43,7 +49,7 @@ export function Hero({
 
           {/* Main headline */}
           <ScrollAnimation delay={0.1}>
-            <h1 className="text-5xl md:text-7xl font-display font-bold mb-6">
+            <h1 className="text-5xl md:text-7xl font-modern font-bold mb-6">
               <EditableText
                 value={content.title_prefix}
                 isEditingGlobal={isEditingGlobal}
@@ -83,7 +89,11 @@ export function Hero({
                   <Zap className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="text-lg px-8 py-6 hover:bg-secondary w-full sm:w-auto">
+              <Button
+                onClick={() => setHowItWorksOpen(true)}
+                size="lg"
+                variant="outline"
+                className="text-lg px-8 py-6 hover:bg-secondary w-full sm:w-auto">
                 <EditableText
                   value={content.cta_secondary}
                   isEditingGlobal={isEditingGlobal}
@@ -107,7 +117,7 @@ export function Hero({
               <StatCard
                 icon={Star}
                 value={content.stats.questions}
-                label="Questions"
+                label="Countries"
                 isEditingGlobal={isEditingGlobal}
                 onSave={(val) => updateContent?.('stats.questions', val)}
               />
@@ -130,6 +140,9 @@ export function Hero({
           </ScrollAnimation>
         </div>
       </div>
+      
+      <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+      <HowItWorksDialog open={howItWorksOpen} onOpenChange={setHowItWorksOpen} />
     </section>
   );
 }

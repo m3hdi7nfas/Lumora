@@ -1,23 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { auth, db, microsoftProvider } from '@/lib/firebase';
-import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  User
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, query, collection, where, getDocs, updateDoc } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
+import { User } from '@supabase/supabase-js';
 
 type UserRole = 'moderator' | 'teacher' | 'student' | 'admin';
 
 interface Profile {
-  id: string;
-  user_id: string;
+  id: string; // Auth User ID
   email: string;
   role: UserRole;
   display_name: string | null;
   avatar_url?: string | null;
   avatar_id: string | null;
+  last_reroll_at?: string | null;
   school_id?: string | null;
   score?: number | null;
   class?: string | null;
@@ -25,55 +19,40 @@ interface Profile {
   progress?: number | null;
   login_streak?: number | null;
   competitions_attended?: number | null;
+  password_text?: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signInWithMicrosoft: () => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, role?: UserRole) => Promise<{ error: Error | null }>;
+  // signInWithMicrosoft removed per user request
+  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, role?: UserRole) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   currentView: UserRole | null;
   setCurrentView: (role: UserRole | null) => void;
   isAdminOrModerator: boolean;
   isAdmin: boolean;
   setProfile: (profile: Profile | null) => void;
+  isProfileDialogOpen: boolean;
+  setIsProfileDialogOpen: (open: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Admin fallback account (for initial setup)
-const ADMIN_FALLBACK = {
-  email: 'admin@lumora.com',
-  password: 'AdminPassword123!',
-  profile: {
-    id: 'admin-fallback-id',
-    user_id: 'admin-fallback-user-id',
-    email: 'admin@lumora.com',
-    role: 'admin' as UserRole,
-    display_name: 'Platform Admin',
-    avatar_url: null,
-    avatar_id: null,
-    school_id: null,
-    score: 0,
-    class: null,
-    is_active: true,
-    progress: 0,
-    login_streak: 0,
-    competitions_attended: 0
-  }
-};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [currentView, setCurrentView] = useState<UserRole | null>(() => {
     const savedView = localStorage.getItem('lumora_current_view');
     return (savedView as UserRole) || null;
   });
+
+  const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
+  const isAdmin = profile?.role === 'admin';
 
   // Persist currentView when it changes
   useEffect(() => {
@@ -84,311 +63,136 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [currentView]);
 
-  const isAdminOrModerator = profile?.role === 'admin' || profile?.role === 'moderator';
-  const isAdmin = profile?.role === 'admin';
-
-  // Fetch user profile from Firestore
-  const fetchProfile = async (userId: string, email?: string) => {
+  const fetchProfile = async (userId: string, authUser?: User | null): Promise<Profile | null> => {
     try {
-      console.log('🔍 Fetching profile for UID:', userId, 'Email:', email);
+      console.log('Fetching profile for:', userId);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, avatars(url)')
+        .eq('id', userId)
+        .single();
 
-      // PRIORITY 1: Try by lowercase email (most common for pre-registered users)
-      if (email) {
-        const lowerEmail = email.toLowerCase();
-        console.log('📧 Trying email-based lookup:', lowerEmail);
-
-        try {
-          const emailDocRef = doc(db, 'profiles', lowerEmail);
-          const emailDocSnap = await getDoc(emailDocRef);
-
-          if (emailDocSnap.exists()) {
-            console.log('✅ Found profile by email ID:', lowerEmail);
-            const data = emailDocSnap.data() as Profile;
-
-            // Link UID to this profile if not already linked
-            if (data.user_id !== userId) {
-              console.log('🔗 Linking UID to email-based profile');
-              try {
-                await updateDoc(emailDocRef, {
-                  user_id: userId,
-                  updated_at: serverTimestamp()
-                });
-              } catch (e) {
-                console.warn('⚠️ Could not link UID (permission issue, but login will proceed):', e);
-              }
-            }
-
-            return { ...data, id: lowerEmail, user_id: userId };
-          } else {
-            console.log('❌ No profile found with email as document ID');
-          }
-        } catch (e: any) {
-          console.error('❌ Email lookup failed:', e);
-        }
+      if (data) {
+        const profileData = {
+          ...data,
+          avatar_url: (data as any).avatars?.url || data.avatar_url || null
+        };
+        return profileData as Profile;
       }
 
-      // PRIORITY 2: Try by UID (for users created with email/password)
-      console.log('🔑 Trying UID-based lookup:', userId);
-      try {
-        const docRef = doc(db, 'profiles', userId);
-        const docSnap = await getDoc(docRef);
+      if (error) console.log('Profile fetch error:', error.message);
 
-        if (docSnap.exists()) {
-          console.log('✅ Found profile by UID:', userId);
-          return docSnap.data() as Profile;
-        } else {
-          console.log('❌ No profile found with UID as document ID');
-        }
-      } catch (e: any) {
-        console.error('❌ UID lookup failed:', e);
+      // Fallback: Use authUser metadata if provided, otherwise check session
+      const userToUse = authUser || (await supabase.auth.getUser()).data.user;
+
+      if (userToUse && userToUse.id === userId) {
+        console.log('Using fallback profile from metadata');
+        return {
+          id: userToUse.id,
+          email: userToUse.email || '',
+          role: (userToUse.user_metadata?.role as UserRole) || 'student',
+          display_name: userToUse.user_metadata?.display_name || userToUse.email?.split('@')[0] || 'User',
+          avatar_id: null
+        };
       }
 
-      // PRIORITY 3: Query by email field (fallback for any edge cases)
-      if (email) {
-        const lowerEmail = email.toLowerCase();
-        console.log('🔎 Trying query by email field:', lowerEmail);
-
-        try {
-          const q = query(collection(db, 'profiles'), where('email', '==', lowerEmail));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            console.log('✅ Found profile via email field query');
-            const profileDoc = querySnapshot.docs[0];
-            const data = profileDoc.data() as Profile;
-
-            // Try to link UID
-            try {
-              await updateDoc(doc(db, 'profiles', profileDoc.id), {
-                user_id: userId,
-                updated_at: serverTimestamp()
-              });
-            } catch (e) {
-              console.warn('⚠️ Could not link UID via query (permission issue):', e);
-            }
-
-            return { ...data, id: profileDoc.id, user_id: userId };
-          } else {
-            console.log('❌ No profile found via email field query');
-          }
-        } catch (queryErr: any) {
-          console.error('❌ Email field query failed:', queryErr);
-        }
-      }
-
-      console.log('❌ Profile not found after all strategies');
       return null;
-    } catch (error: any) {
-      console.error('💥 Critical error in fetchProfile:', error);
-      if (error.code === 'permission-denied') {
-        throw new Error('Database permission denied. Please check Firestore Rules.');
-      }
+    } catch (error) {
+      console.error('Error in fetchProfile:', error);
       return null;
     }
   };
 
-  // Sync auth state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // 1. Initial check is handled by onAuthStateChange's 'INITIAL_SESSION' event or immediate trigger
+    // But we'll keep a simple check as well just in case
+    const initialize = async () => {
       try {
-        if (currentUser) {
-          // Check if it's the fallback admin
-          if (currentUser.email === ADMIN_FALLBACK.email) {
-            setUser({
-              uid: ADMIN_FALLBACK.profile.user_id,
-              email: ADMIN_FALLBACK.email
-            } as any);
-            setProfile(ADMIN_FALLBACK.profile);
-            // Artificial delay to show the nice loading state and ensure DB is ready
-            await new Promise(resolve => setTimeout(resolve, 1200));
-            setLoading(false);
-            return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          const p = await fetchProfile(session.user.id, session.user);
+          setProfile(p);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initialize();
+
+    // 2. Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth event:', event);
+
+      if (session?.user) {
+        setUser(session.user);
+
+        // Fetch profile without blocking the listener
+        const updateProfile = async () => {
+          // If we don't have a profile yet, or it's for a different user
+          if (!profile || profile.id !== session?.user?.id) {
+            const userProfile = await fetchProfile(session!.user.id, session!.user);
+            if (userProfile) setProfile(userProfile);
           }
-
-          let userProfile = await fetchProfile(currentUser.uid, currentUser.email || undefined);
-
-          // Give a small moment for the user to see the Preparing screen
-          await new Promise(resolve => setTimeout(resolve, 800));
-
-          if (!userProfile) {
-            console.warn('User not registered in Lumora profiles. Signing out.');
-            await firebaseSignOut(auth);
-            setUser(null);
-            setProfile(null);
-          } else {
-            setUser(currentUser);
-            setProfile(userProfile);
-          }
-        } else {
+          setLoading(false);
+        };
+        updateProfile();
+      } else {
+        if (event === 'SIGNED_OUT') {
           setUser(null);
           setProfile(null);
         }
-      } catch (error) {
-        console.error('Error in auth state change:', error);
-        setUser(null);
-        setProfile(null);
-      } finally {
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
-
-  const signInWithMicrosoft = async () => {
-    try {
-      const result = await signInWithPopup(auth, microsoftProvider);
-      const currentUser = result.user;
-
-      // Check if it's the fallback admin
-      if (currentUser.email === ADMIN_FALLBACK.email) {
-        return { error: null };
-      }
-
-      // Important: We must verify if this user exists in our profiles collection
-      // before allowing them to proceed. fetchProfile handles linking and registration check.
-      let userProfile = await fetchProfile(currentUser.uid, currentUser.email || undefined);
-
-      if (!userProfile) {
-        // Domain Check for Auto-Registration
-        if (currentUser.email) {
-          try {
-            const domain = currentUser.email.split('@')[1]?.toLowerCase();
-            if (domain) {
-              const settingsRef = doc(db, 'settings', 'auth_domains');
-              const settingsSnap = await getDoc(settingsRef);
-              const allowedDomains = settingsSnap.exists() ? (settingsSnap.data().allowed_domains || []) : [];
-
-              if (allowedDomains.includes(domain)) {
-                console.log(`✅ Domain '${domain}' is allowed. Auto-registering user.`);
-                // Create new profile
-                const newProfileData = {
-                  email: currentUser.email.toLowerCase(),
-                  display_name: currentUser.displayName || currentUser.email.split('@')[0],
-                  role: 'student' as UserRole,
-                  school_id: null,
-                  is_active: true,
-                  score: 0,
-                  progress: 0,
-                  avatar_id: null,
-                  user_id: currentUser.uid,
-                  created_at: serverTimestamp(),
-                  updated_at: serverTimestamp()
-                };
-
-                await setDoc(doc(db, 'profiles', currentUser.uid), newProfileData);
-                setProfile({ ...newProfileData, id: currentUser.uid } as Profile);
-                return { error: null };
-              }
-            }
-          } catch (err) {
-            console.error("Error checking allowed domains:", err);
-          }
-        }
-
-        console.warn('Login attempt with unregistered Microsoft account:', currentUser.email);
-        await firebaseSignOut(auth);
-
-        // Detailed error for debugging the specific failure case
-        const debugInfo = `Email: ${currentUser.email}, UID: ${currentUser.uid}`;
-        const lowerEmail = currentUser.email?.toLowerCase();
-
-        return {
-          error: new Error(`Login failed for ${currentUser.email}. Account not found and domain not whitelisted. Please ask admin to 'Grant Access' or add your domain.`)
-        };
-      }
-
-      setProfile(userProfile);
-      return { error: null };
-    } catch (error: any) {
-      console.error('Microsoft sign in error:', error);
-      return { error: new Error(error.message) };
-    }
-  };
 
   const signIn = async (email: string, password: string) => {
     try {
-      // 1. Try Fallback Admin first specific credentials (hardcoded backdoor for testing)
-      if (email === ADMIN_FALLBACK.email && password === ADMIN_FALLBACK.password) {
-        setUser({
-          uid: ADMIN_FALLBACK.profile.user_id,
-          email: ADMIN_FALLBACK.email
-        } as any);
-        setProfile(ADMIN_FALLBACK.profile);
-        return { error: null };
-      }
-
-      // 2. Try actual Firebase Auth
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      await signInWithEmailAndPassword(auth, email, password);
-      // The onAuthStateChanged listener will handle setting user/profile
-      return { error: null };
+      // Don't set global loading true here, as it triggers the dashboard spinner before the user is actually authed
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { data, error };
     } catch (error: any) {
-      console.error("Login Error:", error);
-      return { error: new Error(error.message) };
+      return { error: error };
     }
   };
 
   const signUp = async (email: string, password: string, role: UserRole = 'student') => {
     try {
-      console.log('📝 Creating new user account:', email);
-
-      // Import Firebase Auth functions
-      const { createUserWithEmailAndPassword } = await import('firebase/auth');
-
-      // Create the authentication user
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCredential.user;
-
-      console.log('✅ Auth user created with UID:', newUser.uid);
-
-      // Create the Firestore profile
-      const profileData = {
-        email: email.toLowerCase(),
-        display_name: email.split('@')[0],
-        role: role,
-        school_id: null,
-        is_active: true,
-        score: 0,
-        progress: 0,
-        avatar_id: null,
-        user_id: newUser.uid,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp()
-      };
-
-      // Use UID as document ID for email/password users
-      const profileRef = doc(db, 'profiles', newUser.uid);
-      await setDoc(profileRef, profileData);
-
-      console.log('✅ Profile created successfully');
-
-      return { error: null };
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: role,
+            display_name: email.split('@')[0],
+          },
+        },
+      });
+      return { data, error };
     } catch (error: any) {
-      console.error('❌ Sign up error:', error);
-
-      // Provide user-friendly error messages
-      let errorMessage = error.message;
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered. Please sign in instead.';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please use at least 6 characters.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      }
-
-      return { error: new Error(errorMessage) };
+      return { error: error };
     }
   };
 
+  // signInWithMicrosoft removed per user request
+
   const signOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      await supabase.auth.signOut();
+      setUser(null);
       setProfile(null);
       setCurrentView(null);
-      setUser(null);
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Supabase Sign Out Error:', error);
     }
   };
 
@@ -397,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       loading,
-      signInWithMicrosoft,
+      // signInWithMicrosoft removed per user request
       signIn,
       signUp,
       signOut,
@@ -405,7 +209,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentView,
       isAdminOrModerator,
       isAdmin,
-      setProfile
+      setProfile,
+      isProfileDialogOpen,
+      setIsProfileDialogOpen
     }}>
       {children}
     </AuthContext.Provider>

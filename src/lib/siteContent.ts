@@ -1,16 +1,16 @@
 export const defaultSiteContent = {
     hero: {
-        badge: "Empowering Students Worldwide",
-        title_prefix: "Learn, Compete, ",
-        title_highlight: "Excel",
-        description: "Join thousands of students in interactive learning competitions. Challenge yourself, earn badges, and climb the leaderboard!",
+        badge: "Established in 2024",
+        title_prefix: "Elevate Your ",
+        title_highlight: "Learning Journey",
+        description: "Join thousands of students in STEM competitions and quizzes. Earn points, badges, and climb the leaderboards.",
         cta_primary: "Get Started",
-        cta_secondary: "Learn More",
+        cta_secondary: "How It Works",
         stats: {
-            students: "1000+",
-            competitions: "50+",
-            questions: "10K+",
-            schools: "500+"
+            students: "35K+",
+            competitions: "25+",
+            questions: "7+",
+            schools: "70+"
         }
     },
     features: [

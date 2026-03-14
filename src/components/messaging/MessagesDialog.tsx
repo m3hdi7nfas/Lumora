@@ -1,110 +1,129 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Search, MessageSquare, Trash2, Loader2, Clock } from 'lucide-react';
+import { Search, MessageSquare, Trash2, Loader2, Clock, Mail, MailOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { supabase } from '@/lib/supabase';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface MessagesDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    initialMessageId?: string | null;
 }
 
-export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
+export function MessagesDialog({ open, onOpenChange, initialMessageId }: MessagesDialogProps) {
+    const { profile } = useAuth();
     const [messages, setMessages] = useState<any[]>([]);
-    const [selectedMessage, setSelectedMessage] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+    const [selectedMessage, setSelectedMessage] = useState<any | null>(null);
     const [replyContent, setReplyContent] = useState('');
     const [sendingReply, setSendingReply] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(false);
 
     const [isComposeMode, setIsComposeMode] = useState(false);
-    const [recipient, setRecipient] = useState('');
+    const [recipientEmail, setRecipientEmail] = useState('');
     const [subject, setSubject] = useState('');
     const [composeContent, setComposeContent] = useState('');
     const [sendingMessage, setSendingMessage] = useState(false);
 
     const { toast } = useToast();
-    const { profile } = useAuth();
 
     const isAdminOrMod = profile?.role === 'admin' || profile?.role === 'moderator';
 
     const filteredMessages = (messages || []).filter(message =>
         (message?.subject || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (message?.sender || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (message?.content || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+        (message?.sender_name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+        (message?.body || "").toLowerCase().includes((searchTerm || "").toLowerCase())
     );
 
     const fetchMessages = async () => {
+        if (!profile?.id) return;
         setLoading(true);
         try {
-            const storedMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .or(`recipient_id.eq.${profile.id},recipient_role.eq.${profile.role},recipient_role.eq.all`)
+                .order('created_at', { ascending: false });
 
-            // Filter logic:
-            // 1. Admins see everything.
-            // 2. Others see messages sent to them (if approved or from Admin).
-            // 3. Sender sees their own messages regardless of status.
+            if (error) throw error;
+            setMessages(data || []);
 
-            const filtered = storedMessages.filter((m: any) => {
-                const isAdmin = profile?.role === 'admin';
-                const isModerator = profile?.role === 'moderator';
-                const isSender = m.senderId === profile?.id;
-                const isRecipient = m.recipient === profile?.email || m.recipient === profile?.role;
-
-                if (isAdmin) return true;
-                if (isSender) return true;
-                if (isRecipient) {
-                    // Only show approved messages or messages from Admin
-                    return m.status === 'approved' || m.senderRole === 'admin';
+            // Handle initial message selection
+            if (initialMessageId) {
+                const found = (data || []).find((m: any) => m.id === initialMessageId);
+                if (found) {
+                    setSelectedMessage(found);
+                    if (!found.is_read) {
+                        handleMarkRead(found.id);
+                    }
                 }
-                return false;
-            });
-
-            setMessages(filtered.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        } catch (error: any) {
-            toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+            } else if (!selectedMessage && data && data.length > 0) {
+                // Optionally select first message
+            }
+        } catch (e: any) {
+            console.error('Error fetching messages:', e);
         }
         setLoading(false);
     };
 
+    const handleMarkRead = async (id: string) => {
+        try {
+            const { error } = await supabase.from('messages').update({ is_read: true }).eq('id', id);
+            if (error) throw error;
+            setMessages(prev => prev.map(m => m.id === id ? { ...m, is_read: true } : m));
+            if (selectedMessage?.id === id) {
+                setSelectedMessage((prev: any) => prev ? { ...prev, is_read: true } : null);
+            }
+        } catch (e) {
+            console.error('Error marking as read:', e);
+        }
+    };
+
     const handleSendMessage = async () => {
-        if (!recipient || !subject || !composeContent) {
+        if (!recipientEmail || !subject || !composeContent) {
             toast({ title: 'Please fill all fields', variant: 'destructive' });
             return;
         }
 
         setSendingMessage(true);
         try {
+            const { data: recipientUser, error: userError } = await supabase
+                .from('profiles')
+                .select('id, role')
+                .eq('email', recipientEmail.trim().toLowerCase())
+                .single();
+
+            if (userError || !recipientUser) {
+                toast({ title: 'Recipient not found', description: 'No user with that email exists.', variant: 'destructive' });
+                setSendingMessage(false);
+                return;
+            }
+
             const newMessage = {
-                id: `msg-${Date.now()}`,
-                sender: profile?.display_name || profile?.email || 'User',
-                senderEmail: profile?.email,
-                senderId: profile?.id,
-                senderRole: profile?.role,
-                recipient, // Email or role
-                subject,
-                content: composeContent,
-                date: new Date().toISOString(),
-                read: false,
-                status: profile?.role === 'moderator' ? 'pending_approval' : 'approved'
+                sender_id: profile?.id,
+                sender_name: profile?.display_name || profile?.email || 'User',
+                sender_role: profile?.role,
+                recipient_id: recipientUser.id,
+                recipient_role: 'specific',
+                subject: subject,
+                body: composeContent,
+                is_read: false,
+                status: 'approved' // Direct messages are usually approved
             };
 
-            // Save to localStorage
-            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-            allMessages.push(newMessage);
-            localStorage.setItem('lumora_messages', JSON.stringify(allMessages));
+            const { error } = await supabase.from('messages').insert(newMessage);
+            if (error) throw error;
 
-            toast({
-                title: profile?.role === 'moderator' ? 'Message submitted for approval!' : 'Message sent successfully!',
-                description: profile?.role === 'moderator' ? 'An Admin will review your message shortly.' : undefined
-            });
+            toast({ title: 'Message sent successfully!' });
             setIsComposeMode(false);
-            setRecipient('');
+            setRecipientEmail('');
             setSubject('');
             setComposeContent('');
             fetchMessages();
@@ -119,53 +138,47 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
 
         setSendingReply(true);
         try {
-            // Mock send reply
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            const newMessage = {
+                sender_id: profile?.id,
+                sender_name: profile?.display_name || profile?.email || 'User',
+                sender_role: profile?.role,
+                recipient_id: selectedMessage.sender_id,
+                recipient_role: 'specific',
+                subject: `Re: ${selectedMessage.subject}`,
+                body: replyContent,
+                is_read: false,
+                status: 'approved'
+            };
+
+            const { error } = await supabase.from('messages').insert(newMessage);
+            if (error) throw error;
+
             toast({ title: 'Reply sent successfully!' });
             setReplyContent('');
+            fetchMessages();
         } catch (error: any) {
             toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
         }
         setSendingReply(false);
     };
 
-    const handleUpdateStatus = (messageId: string, newStatus: string) => {
-        try {
-            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-            const updated = allMessages.map((m: any) =>
-                m.id === messageId ? { ...m, status: newStatus } : m
-            );
-            localStorage.setItem('lumora_messages', JSON.stringify(updated));
-            toast({ title: `Message ${newStatus}!` });
-            fetchMessages();
-            if (selectedMessage?.id === messageId) {
-                setSelectedMessage({ ...selectedMessage, status: newStatus });
-            }
-        } catch (e) { toast({ title: 'Error updating status' }); }
-    };
-
     const handleDeleteMessage = async (messageId: string) => {
-        setLoading(true);
         try {
-            const allMessages = JSON.parse(localStorage.getItem('lumora_messages') || '[]');
-            const updated = allMessages.filter((msg: any) => msg.id !== messageId);
-            localStorage.setItem('lumora_messages', JSON.stringify(updated));
+            const { error } = await supabase.from('messages').delete().eq('id', messageId);
+            if (error) throw error;
             setMessages(messages.filter(msg => msg.id !== messageId));
-            if (selectedMessage?.id === messageId) {
-                setSelectedMessage(null);
-            }
-            toast({ title: 'Message deleted successfully!' });
+            if (selectedMessage?.id === messageId) setSelectedMessage(null);
+            toast({ title: 'Message deleted' });
         } catch (error: any) {
             toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
         }
-        setLoading(false);
     };
 
     useEffect(() => {
         if (open) {
             fetchMessages();
         }
-    }, [open]);
+    }, [open, initialMessageId]);
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,8 +186,8 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                 <DialogHeader className="p-6 pb-0 shrink-0">
                     <div className="flex justify-between items-start">
                         <div>
-                            <DialogTitle className="text-2xl font-display font-bold">Inbox</DialogTitle>
-                            <DialogDescription>Your communications and notifications</DialogDescription>
+                            <DialogTitle className="text-2xl font-display font-bold">Messages</DialogTitle>
+                            <DialogDescription>Your inbox and notifications</DialogDescription>
                         </div>
                         {isAdminOrMod && (
                             <Button onClick={() => setIsComposeMode(!isComposeMode)} variant={isComposeMode ? "outline" : "default"} className={!isComposeMode ? "gradient-hero" : ""}>
@@ -196,91 +209,61 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                             />
                         </div>
 
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                            {loading ? (
-                                <div className="text-center py-4">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                                </div>
-                            ) : filteredMessages.length === 0 ? (
-                                <p className="text-center text-muted-foreground py-4 text-sm">No messages found</p>
-                            ) : (
-                                filteredMessages.map((message) => (
-                                    <button
-                                        key={message.id}
-                                        onClick={() => setSelectedMessage(message)}
-                                        className={`w-full text-left p-3 rounded-xl transition-all border ${selectedMessage?.id === message.id ? 'bg-primary/10 border-primary shadow-sm' : 'hover:bg-muted border-transparent'} ${!message.read && 'font-semibold'}`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold flex-shrink-0 text-primary">
-                                                {message.sender.split(' ').map((n: string) => n[0]).join('')}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-sm truncate">{message.sender}</p>
-                                                    <p className="text-[10px] text-muted-foreground whitespace-nowrap">{message.date}</p>
-                                                </div>
-                                                <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                                                <div className="flex gap-2 mt-1">
-                                                    {!message.read && (
-                                                        <span className="w-2 h-2 bg-primary rounded-full" />
-                                                    )}
-                                                    {message.status === 'pending_approval' && (
-                                                        <span className="text-[10px] px-1 bg-warning/20 text-warning rounded-sm">PENDING</span>
-                                                    )}
+                        <ScrollArea className="flex-1 pr-4">
+                            <div className="space-y-2">
+                                {loading ? (
+                                    <div className="text-center py-8"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
+                                ) : filteredMessages.length === 0 ? (
+                                    <p className="text-center text-muted-foreground py-8 text-sm">No messages</p>
+                                ) : (
+                                    filteredMessages.map((msg) => (
+                                        <button
+                                            key={msg.id}
+                                            onClick={() => {
+                                                setSelectedMessage(msg);
+                                                if (!msg.is_read) handleMarkRead(msg.id);
+                                            }}
+                                            className={`w-full text-left p-3 rounded-xl transition-all border ${selectedMessage?.id === msg.id ? 'bg-primary/10 border-primary' : 'hover:bg-muted border-transparent'} ${!msg.is_read ? 'font-semibold' : ''}`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${!msg.is_read ? 'bg-primary' : 'bg-transparent'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <p className="text-xs font-medium truncate">{msg.sender_name}</p>
+                                                        <p className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                                            {new Date(msg.created_at).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-sm truncate">{msg.subject}</p>
+                                                    <p className="text-xs text-muted-foreground truncate opacity-70">{msg.body}</p>
                                                 </div>
                                             </div>
-                                            {profile?.role !== 'student' && profile?.role !== 'teacher' && (
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Delete Message</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Are you sure you want to delete this message? This action cannot be undone.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                className="bg-destructive hover:bg-destructive/90"
-                                                                onClick={() => handleDeleteMessage(message.id)}
-                                                            >
-                                                                Delete
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            )}
-                                        </div>
-                                    </button>
-                                ))
-                            )}
-                        </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </ScrollArea>
                     </div>
 
-                    <div className="md:col-span-2 overflow-y-auto h-full border rounded-xl bg-muted/30 p-6">
+                    <div className="md:col-span-2 overflow-hidden flex flex-col border rounded-xl bg-muted/30 p-6 min-h-0">
                         {isComposeMode ? (
-                            <div className="space-y-6">
+                            <div className="space-y-4">
                                 <h2 className="text-xl font-bold">New Message</h2>
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label>Recipient (Email)</Label>
-                                        <Input value={recipient} onChange={e => setRecipient(e.target.value)} placeholder="student@example.com" />
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
+                                        <Label>Recipient Email</Label>
+                                        <Input value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} placeholder="user@example.com" />
                                     </div>
-                                    <div className="space-y-2">
+                                    <div className="space-y-1">
                                         <Label>Subject</Label>
                                         <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Message subject" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Message Content</Label>
-                                        <Textarea value={composeContent} onChange={e => setComposeContent(e.target.value)} placeholder="Type your message here..." className="min-h-[200px] resize-none bg-card" />
+                                    <div className="space-y-1">
+                                        <Label>Body</Label>
+                                        <Textarea value={composeContent} onChange={e => setComposeContent(e.target.value)} placeholder="Type your message here..." className="min-h-[250px] resize-none" />
                                     </div>
                                     <div className="flex justify-end">
-                                        <Button onClick={handleSendMessage} disabled={sendingMessage || !recipient || !subject || !composeContent} className="gradient-hero">
+                                        <Button onClick={handleSendMessage} disabled={sendingMessage || !recipientEmail || !subject || !composeContent} className="gradient-hero">
                                             {sendingMessage && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                             Send Message
                                         </Button>
@@ -288,74 +271,69 @@ export function MessagesDialog({ open, onOpenChange }: MessagesDialogProps) {
                                 </div>
                             </div>
                         ) : selectedMessage ? (
-                            <div className="space-y-6">
-                                <div>
-                                    <h2 className="text-xl font-bold">{selectedMessage.subject}</h2>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        From: <span className="font-semibold text-foreground">{selectedMessage.sender}</span> &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
-                                    </p>
-                                </div>
-
-                                <div className="p-6 bg-card rounded-xl border shadow-sm space-y-3">
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedMessage.content}</p>
-
-                                    {selectedMessage.status === 'pending_approval' && (
-                                        <div className="mt-2 px-3 py-1 rounded-full bg-warning/20 text-warning text-[10px] font-bold uppercase w-fit inline-flex items-center gap-1">
-                                            <Clock className="w-3 h-3" /> Pending Approval
-                                        </div>
+                            <div className="flex flex-col h-full overflow-hidden">
+                                <div className="shrink-0 mb-4 flex justify-between items-start">
+                                    <div>
+                                        <h2 className="text-xl font-bold">{selectedMessage.subject}</h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            From: <span className="font-semibold text-foreground">{selectedMessage.sender_name}</span> • {new Date(selectedMessage.created_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                    {profile?.role === 'admin' && (
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="hover:text-destructive shrink-0">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Delete Message</AlertDialogTitle>
+                                                    <AlertDialogDescription>Delete this message permanently? This cannot be undone.</AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDeleteMessage(selectedMessage.id)}>Delete</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     )}
                                 </div>
 
+                                <ScrollArea className="flex-1 bg-card rounded-lg border p-4 mb-4">
+                                    <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
+                                </ScrollArea>
 
-                                {profile?.role === 'admin' && selectedMessage.status === 'pending_approval' && (
-                                    <div className="flex gap-3 pt-4 justify-end border-t border-dashed">
-                                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10" onClick={() => handleUpdateStatus(selectedMessage.id, 'rejected')}>Reject</Button>
-                                        <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground" onClick={() => handleUpdateStatus(selectedMessage.id, 'approved')}>Approve Message</Button>
-                                    </div>
-                                )}
-
-                                <div className="space-y-6 pt-4 border-t">
+                                <div className="shrink-0 space-y-3">
                                     {isAdminOrMod ? (
                                         <>
-                                            <Label className="text-sm font-semibold">Your Reply</Label>
                                             <Textarea
                                                 value={replyContent}
                                                 onChange={(e) => setReplyContent(e.target.value)}
-                                                placeholder="Type your reply here..."
-                                                className="min-h-[150px] resize-none bg-card"
+                                                placeholder="Type your reply..."
+                                                className="min-h-[100px] resize-none"
                                             />
                                             <div className="flex justify-end">
-                                                <Button
-                                                    onClick={handleSendReply}
-                                                    disabled={sendingReply || !replyContent}
-                                                    className="gradient-hero"
-                                                >
+                                                <Button onClick={handleSendReply} disabled={sendingReply || !replyContent} className="gradient-hero">
                                                     {sendingReply && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                                     Send Reply
                                                 </Button>
                                             </div>
                                         </>
                                     ) : (
-                                        <div className="p-4 bg-muted/50 rounded-lg text-center">
-                                            <p className="text-sm text-muted-foreground italic">Reply functionality is limited to Administrators and Moderators.</p>
-                                        </div>
+                                        <p className="text-xs text-center text-muted-foreground italic">Reply restricted to Admins/Moderators.</p>
                                     )}
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
-                                    <MessageSquare className="w-8 h-8 text-muted-foreground" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold">No message selected</h3>
-                                    <p className="text-sm text-muted-foreground max-w-[250px] mx-auto">Select a message from the list to view its details and reply.</p>
-                                </div>
+                            <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
+                                <MessageSquare className="w-12 h-12 text-muted-foreground opacity-20" />
+                                <p className="text-muted-foreground">Select a message to read it.</p>
                             </div>
                         )}
                     </div>
                 </div>
             </DialogContent>
-        </Dialog >
+        </Dialog>
     );
 }

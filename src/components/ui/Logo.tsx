@@ -1,55 +1,51 @@
-import { GraduationCap, Star, Trophy, BookOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  logoClassName?: string;
   withText?: boolean;
   textSize?: 'sm' | 'md' | 'lg' | 'xl';
+  textClassName?: string;
 }
 
-export function Logo({ size = 'md', className = '', withText = true, textSize }: LogoProps) {
+export function Logo({ size = 'md', className = '', logoClassName = '', withText = true, textSize, textClassName = '' }: LogoProps) {
   const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-12 h-12',
-    xl: 'w-16 h-16'
+    sm: 'w-10 h-10',
+    md: 'w-16 h-16',
+    lg: 'w-40 h-16',
+    xl: 'w-64 h-64',
   };
 
   const textSizeClasses = {
     sm: 'text-base',
-    md: 'text-lg',
-    lg: 'text-xl',
-    xl: 'text-2xl'
+    md: 'text-xl',
+    lg: 'text-2xl',
+    xl: 'text-4xl'
+  };
+
+  const overlapClasses = {
+    sm: 'ml-0',
+    md: 'ml-4',
+    lg: '-ml-10',
+    xl: '-ml-16'
   };
 
   // Determine text size based on logo size if not specified
   const effectiveTextSize = textSize || size;
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <div className={`relative ${sizeClasses[size]}`}>
-        {/* Background circle with enhanced gradient */}
-        <div className="absolute inset-0 rounded-full gradient-hero opacity-90" />
-
-        {/* Main graduation cap - larger and more prominent */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <GraduationCap className={`w-3/4 h-3/4 text-primary-foreground`} />
-        </div>
-
-        {/* Enhanced decorative elements */}
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full flex items-center justify-center shadow-lg">
-          <Star className="w-3 h-3 text-gold-foreground animate-pulse" />
-        </div>
-
-        <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-accent rounded-full shadow-lg" />
-
-        {/* Additional decorative elements for more sophistication */}
-        <div className="absolute top-1/2 -right-2 w-2 h-2 bg-success rounded-full" />
-        <div className="absolute top-1/3 -left-2 w-1.5 h-1.5 bg-warning rounded-full" />
+    <div className={`flex items-center ${className}`}>
+      <div className={`${sizeClasses[size]} relative flex-shrink-0`}>
+        <img
+          src="/logo.png"
+          alt="Lumora Logo"
+          className={`absolute inset-0 w-full h-full object-contain z-0 scale-[2.5] translate-y-2 pointer-events-none transition-transform ${logoClassName}`}
+        />
       </div>
 
       {withText && (
-        <span className={`font-display font-bold ${textSizeClasses[effectiveTextSize]} tracking-wide`}>
+        <span className={`font-logo font-medium tracking-tighter text-foreground ${textSizeClasses[effectiveTextSize]} ${overlapClasses[size]} pr-10 relative z-10 ${textClassName}`}>
           Lumora
         </span>
       )}

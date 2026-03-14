@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { defaultSiteContent, SiteContent } from '@/lib/siteContent';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '@/lib/supabase';
 
 interface LandingPageEditorProps {
     isOpen: boolean;
@@ -27,11 +26,14 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
         queryKey: ['landing-content-edit'],
         queryFn: async () => {
             try {
-                const docRef = doc(db, 'site_settings', 'landing_page');
-                const docSnap = await getDoc(docRef);
+                const { data, error } = await supabase
+                    .from('site_settings')
+                    .select('value')
+                    .eq('id', 'landing_page')
+                    .single();
 
-                if (docSnap.exists()) {
-                    return docSnap.data().value as SiteContent;
+                if (data && data.value) {
+                    return data.value as SiteContent;
                 }
                 return defaultSiteContent;
             } catch (error) {
@@ -50,11 +52,15 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
 
     const saveContent = useMutation({
         mutationFn: async () => {
-            const docRef = doc(db, 'site_settings', 'landing_page');
-            await setDoc(docRef, {
-                value: content,
-                updated_at: serverTimestamp()
-            });
+            const { error } = await supabase
+                .from('site_settings')
+                .upsert({
+                    id: 'landing_page',
+                    value: content,
+                    updated_at: new Date().toISOString()
+                });
+            
+            if (error) throw error;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['landing-content'] });
@@ -164,7 +170,7 @@ export function LandingPageEditor({ isOpen, onClose }: LandingPageEditorProps) {
                                         <Input value={content.hero.stats.competitions} onChange={(e) => updateHero('stats.competitions', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Questions</Label>
+                                        <Label>Countries</Label>
                                         <Input value={content.hero.stats.questions} onChange={(e) => updateHero('stats.questions', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">

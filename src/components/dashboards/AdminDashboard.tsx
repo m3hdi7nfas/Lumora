@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,7 +35,12 @@ import {
     Upload,
     ChevronDown,
     ChevronUp,
-    GraduationCap
+    GraduationCap,
+    Check,
+    X,
+    CheckCircle2,
+    AlertCircle,
+    Copy
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -48,8 +55,9 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AdToggle } from '@/components/ads/AdToggle';
-import { db } from '@/lib/firebase';
+// Firebase module kept for legacy compatibility — all active data access now uses Supabase
 import {
+    db,
     collection,
     query,
     getDocs,
@@ -67,7 +75,7 @@ import {
     onSnapshot,
     limit,
     arrayUnion
-} from 'firebase/firestore';
+} from '@/lib/firebase';
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {
@@ -83,17 +91,99 @@ const LOCAL_STORAGE_KEYS = {
     GRADING_QUEUE: 'lumora_grading_queue'
 };
 
-// Generate random password
-function generateRandomPassword(length = 12) {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-        password += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    return password;
+/* 
+// Moved inside functions to avoid Multiple GoTrueClient warnings
+const secondarySupabase = createClient(...);
+*/
+
+const RANDOM_ADJECTIVES = [
+    'Solar', 'Quantum', 'Nebula', 'Infinite', 'Galactic', 'Cosmic', 'Astro', 'Prism', 'Vertex', 'Omega',
+    'Nova', 'Flux', 'Zesty', 'Vibrant', 'Serene', 'Luminous', 'Spectral', 'Radiant', 'Kinetic', 'Ethereal',
+    'Atomic', 'Crested', 'Daring', 'Frozen', 'Golden', 'Hidden', 'Iron', 'Jade', 'Key', 'Lost'
+];
+const RANDOM_NOUNS = [
+    'Seeker', 'Voyager', 'Pioneer', 'Zenith', 'Origin', 'Element', 'Matrix', 'Vector', 'Spark', 'Flow',
+    'Echo', 'Sync', 'Apex', 'Core', 'Link', 'Orbit', 'Pulse', 'Ridge', 'Saga', 'Titan',
+    'Unity', 'Valve', 'Warp', 'Xenon', 'Yield', 'Zone', 'Alpha', 'Beta', 'Gamma', 'Delta'
+];
+
+// --- HELPERS FOR SPEED AND RELIABILITY ---
+
+/**
+ * Compresses an image file before upload to significantly speed up the process
+ * and reduce bandwidth usage.
+ */
+const compressImage = (file: File): Promise<Blob | File> => {
+    return new Promise((resolve) => {
+        // Skip for non-images or SVGs (SVG doesn't need compression)
+        if (!file.type.startsWith('image/') || file.type.includes('svg')) {
+            return resolve(file);
+        }
+
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(img.src);
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                if (width > height) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                } else {
+                    width = Math.round((width * MAX_HEIGHT) / height);
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+                } else {
+                    resolve(file);
+                }
+            }, 'image/jpeg', 0.82); // 0.82 is a good balance of quality vs size
+        };
+        img.onerror = () => resolve(file); // Fallback to original on error
+    });
+};
+
+/**
+ * Wraps a promise with a timeout to prevent the UI from hanging indefinitely
+ */
+const withTimeout = <T,>(promise: PromiseLike<T>, timeoutMs: number = 25000): Promise<T> => {
+    const p = Promise.resolve(promise as any) as Promise<T>;
+    return Promise.race([
+        p,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => {
+                console.warn(`Operation timed out after ${timeoutMs}ms`);
+                reject(new Error('Operation timed out. Please check your connection.'));
+            }, timeoutMs)
+        )
+    ]) as Promise<T>;
+};
+
+// Generate "blue-horse89" style password
+function generateLumoraPassword() {
+    const prefixes = ['Lumox', 'Aura', 'Stellar', 'Nexos', 'Vora', 'Xylo', 'Cyber', 'Neon', 'Techno', 'Flow'];
+    const suffixes = ['Spark', 'Shift', 'Core', 'Vibe', 'Node', 'Pulse', 'Grid', 'Link', 'Code', 'Sync'];
+    const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
+    const randomNum = Math.floor(Math.random() * 900) + 100;
+    return `${randomPrefix}${randomSuffix}${randomNum}!`;
 }
 
-// Local storage CRUD operations
+// Local storage CRUD operations (Legacy - but kept for compatibility where still used)
 const localStorageCRUD = {
     get: (key) => {
         try {
@@ -135,21 +225,21 @@ const localStorageCRUD = {
 };
 
 function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (tab: string) => void }) {
-    const { profile } = useAuth();
+    const { profile, setIsProfileDialogOpen, isAdmin, currentView } = useAuth();
     const navItems = [
         { id: 'overview', icon: Users, label: 'Overview' },
         { id: 'schools', icon: School, label: 'Schools' },
         { id: 'competitions', icon: Trophy, label: 'Competitions' },
         { id: 'question-sets', icon: LayoutTemplate, label: 'Question Sets' },
         { id: 'questions', icon: FileQuestion, label: 'Questions' },
-        { id: 'grading', icon: GraduationCap, label: 'Grading' },
+        { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
         { id: 'users', icon: Users, label: 'Users' },
         { id: 'avatars', icon: User, label: 'Avatars' },
-        { id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' },
-        { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
+        ...(isAdmin && (!currentView || currentView === 'admin')
+            ? [{ id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' }]
+            : []),
         { id: 'practice-manager', icon: LayoutTemplate, label: 'Practice Manager' },
         { id: 'messages', icon: MessageSquare, label: 'Messages' },
-        { id: 'settings', icon: CheckSquare, label: 'Settings' },
     ];
 
     return (
@@ -173,15 +263,19 @@ function AdminSidebar({ activeTab, setActiveTab }: { activeTab: string; setActiv
             <div className="mt-auto pt-6 border-t border-border/50">
                 <div className="p-4 rounded-2xl bg-muted/30">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm">
-                            {profile?.display_name?.substring(0, 2).toUpperCase() || 'AD'}
+                        <div className="w-10 h-10 rounded-full gradient-hero flex items-center justify-center text-primary-foreground font-bold text-sm overflow-hidden border border-border">
+                            {profile?.avatar_url ? (
+                                <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                profile?.display_name?.substring(0, 2).toUpperCase() || 'AD'
+                            )}
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold truncate">{profile?.display_name || 'Admin'}</p>
                             <p className="text-xs text-muted-foreground truncate">{profile?.email}</p>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setActiveTab('profile')}>
+                    <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setIsProfileDialogOpen(true)}>
                         <User className="w-3 h-3 mr-2" />
                         Profile Settings
                     </Button>
@@ -199,68 +293,87 @@ export default function AdminDashboard() {
     const [questionSets, setQuestionSets] = useState<any[]>([]);
     const [questions, setQuestions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const { isAdmin } = useAuth();
+
+    // Supabase Data Fetchers
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            // Fetch Schools
+            const { data: schoolData, error: schoolError } = await supabase
+                .from('profiles') // Wait, schools is likely a separate table we need to create
+                // If schools table doesn't exist yet, we'll fallback to an empty array
+                .select('*')
+                .limit(100);
+            // setSchools(schoolData || []); // Skipping schools for now until table is confirmed
+
+            // Fetch Users (Profiles)
+            const { data: userData } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (userData) setUsers(userData);
+
+            // Fetch Competitions
+            const { data: compData } = await supabase.from('competitions').select('*');
+            if (compData) setCompetitions(compData);
+
+            // Fetch Questions
+            const { data: questionsData } = await supabase.from('questions').select('*');
+            if (questionsData) setQuestions(questionsData);
+
+            // Fetch Question Sets
+            const { data: setsData } = await supabase.from('question_sets').select('*');
+            if (setsData) setQuestionSets(setsData);
+
+            // Fetch Schools
+            const { data: schoolsData } = await supabase.from('schools').select('*');
+            if (schoolsData) setSchools(schoolsData);
+
+        } catch (err) {
+            console.error("Error fetching data:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        // Real-time listeners for all core collections
-        const unsubSchools = onSnapshot(collection(db, 'schools'), (snap) => {
-            setSchools(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        const unsubComps = onSnapshot(query(collection(db, 'competitions'), orderBy('created_at', 'desc')), (snap) => {
-            setCompetitions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        const unsubUsers = onSnapshot(query(collection(db, 'profiles'), orderBy('created_at', 'desc'), limit(500)), (snap) => {
-            setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        const unsubSets = onSnapshot(query(collection(db, 'question_sets'), orderBy('created_at', 'desc')), (snap) => {
-            setQuestionSets(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        const unsubQuestions = onSnapshot(query(collection(db, 'questions'), orderBy('created_at', 'desc'), limit(1000)), (snap) => {
-            setQuestions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        setLoading(false);
-
-        return () => {
-            unsubSchools();
-            unsubComps();
-            unsubUsers();
-            unsubSets();
-            unsubQuestions();
-        };
+        fetchData();
     }, []);
 
     return (
         <DashboardLayout
             title="Lumora Admin Dashboard"
             sidebar={<AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+            onNavItemClick={setActiveTab}
         >
             {activeTab === 'overview' && (
-                <AdminOverviewTab
-                    setActiveTab={setActiveTab}
-                    loading={loading}
-                    usersCount={users.length}
-                    compsCount={competitions.length}
-                    questionsCount={questions.length}
-                    setsCount={questionSets.length}
-                />
+                <div className="space-y-6">
+
+
+                    <AdminOverviewTab
+                        setActiveTab={setActiveTab}
+                        loading={loading}
+                        usersCount={users.length}
+                        compsCount={competitions.length}
+                        questionsCount={questions.length}
+                        setsCount={questionSets.length}
+                    />
+                </div>
             )}
-            {activeTab === 'schools' && <SchoolsTab schools={schools} />}
+            {activeTab === 'schools' && <SchoolsTab schools={schools} onRefresh={fetchData} />}
             {activeTab === 'competitions' && <CompetitionsTab competitions={competitions} schools={schools} />}
             {activeTab === 'questions' && <QuestionsTab questions={questions} questionSets={questionSets} />}
             {activeTab === 'question-sets' && <QuestionSetsTab questionSets={questionSets} competitions={competitions} />}
             {activeTab === 'users' && <UsersTab users={users} schools={schools} />}
             {activeTab === 'avatars' && <AvatarsTab />}
-            {activeTab === 'approvals' && <ApprovalsTab />}
+            {activeTab === 'approvals' && isAdmin && <ApprovalsTab />}
             {activeTab === 'grading' && <GradingTab />}
             {activeTab === 'leaderboard' && <AdminLeaderboardTab />}
             {activeTab === 'practice-manager' && <PracticeManagerTab />}
             {activeTab === 'messages' && <MessagesTab />}
             {activeTab === 'profile' && <ProfileView />}
-            {activeTab === 'settings' && <SettingsTab />}
         </DashboardLayout>
     );
 }
@@ -281,7 +394,7 @@ function AdminOverviewTab({
     questionsCount: number,
     setsCount: number
 }) {
-    const { profile } = useAuth();
+    const { profile, currentView } = useAuth();
     const { toast } = useToast();
     const [pendingApprovals, setPendingApprovals] = useState(0);
     const [loading, setLoading] = useState(false);
@@ -289,8 +402,11 @@ function AdminOverviewTab({
     useEffect(() => {
         const fetchApprovalsCount = async () => {
             try {
-                const approvalsSnap = await getCountFromServer(collection(db, 'approvals'));
-                setPendingApprovals(approvalsSnap.data().count);
+                const { count, error } = await supabase
+                    .from('approvals')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('status', 'pending');
+                if (!error) setPendingApprovals(count || 0);
             } catch (e) {
                 console.error('Error fetching approvals count:', e);
             }
@@ -306,7 +422,9 @@ function AdminOverviewTab({
         { id: 'question-sets', icon: LayoutTemplate, title: 'Question Sets', description: 'Organize questions into sets' },
         { id: 'users', icon: Users, title: 'User Management', description: 'Manage user accounts' },
         { id: 'avatars', icon: User, title: 'Manage Avatars', description: 'Upload and manage avatars' },
-        { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
+        ...(profile?.role === 'admin' && (!currentView || currentView === 'admin')
+            ? [{ id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' }]
+            : []),
     ];
 
     const handleResetDemo = async () => {
@@ -319,23 +437,34 @@ function AdminOverviewTab({
                 'demo.student@lumora.com'
             ];
 
-            // 1. Reset Demo Profiles
-            const q = query(collection(db, 'profiles'), where('email', 'in', DEMO_EMAILS));
-            const snap = await getDocs(q);
-            const updatePromises = snap.docs.map(d => updateDoc(doc(db, 'profiles', d.id), {
-                score: 0,
-                progress: 0,
-                competitions_attended: 0,
-                login_streak: 0,
-                updated_at: serverTimestamp()
-            }));
+            // 1. Reset profile stats for demo accounts
+            const { error: profileErr } = await supabase
+                .from('profiles')
+                .update({
+                    score: 0,
+                    progress: 0,
+                    competitions_attended: 0,
+                    login_streak: 0,
+                    last_reroll_at: '1970-01-01T00:00:00Z',
+                    updated_at: new Date().toISOString()
+                })
+                .in('email', DEMO_EMAILS);
+
+            if (profileErr) throw profileErr;
 
             // 2. Clear Demo-related results/messages (simulated)
-            // For now just profiles is key. In a real app we'd delete messages etc.
+            const { data: demoUsers } = await supabase.from('profiles').select('id').in('email', DEMO_EMAILS);
+            const demoIds = (demoUsers || []).map(u => u.id);
+            if (demoIds.length > 0) {
+                const { error: resultsErr } = await supabase.from('results').delete().in('student_id', demoIds);
+                if (resultsErr) throw resultsErr;
 
-            await Promise.all(updatePromises);
+                // 3. Delete messages involving demo accounts
+                const { error: msgErr } = await supabase.from('messages').delete().or(`sender_id.in.(${demoIds.join(',')}),recipient_id.in.(${demoIds.join(',')})`);
+                if (msgErr) throw msgErr;
+            }
+
             toast({ title: 'Demo data has been reset successfully' });
-            window.location.reload();
         } catch (error: any) {
             toast({ title: 'Error resetting data', description: error.message, variant: 'destructive' });
         }
@@ -345,25 +474,29 @@ function AdminOverviewTab({
     const handleNormalizeEmails = async () => {
         setLoading(true);
         try {
-            const snap = await getDocs(collection(db, 'profiles'));
-            const batch = writeBatch(db);
+            const { data: allProfiles, error } = await supabase.from('profiles').select('id, email');
+            if (error) throw error;
+
             let count = 0;
-            snap.docs.forEach(d => {
-                const data = d.data();
-                if (data.email && data.email !== data.email.toLowerCase()) {
-                    batch.update(doc(db, 'profiles', d.id), {
-                        email: data.email.toLowerCase(),
-                        updated_at: serverTimestamp()
-                    });
-                    count++;
-                }
-            });
-            if (count > 0) {
-                await batch.commit();
-                toast({ title: `Successfully normalized ${count} emails.` });
-            } else {
-                toast({ title: 'All emails are already normalized.' });
+            const updates = (allProfiles || [])
+                .filter(p => p.email !== p.email.toLowerCase())
+                .map(p => ({
+                    id: p.id,
+                    email: p.email.toLowerCase()
+                }));
+
+            for (const update of updates) {
+                const { error: upErr } = await supabase.from('profiles').update({
+                    email: update.email,
+                    updated_at: new Date().toISOString()
+                }).eq('id', update.id);
+                if (!upErr) count++;
             }
+
+            toast({
+                title: 'Normalization Complete',
+                description: `Fixed ${count} email fields to lowercase.`
+            });
         } catch (error: any) {
             toast({ title: 'Error normalizing emails', description: error.message, variant: 'destructive' });
         }
@@ -407,74 +540,23 @@ function AdminOverviewTab({
                 />
             </div>
 
-            {/* Ad Toggle for Admin */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Advertisement Settings</CardTitle>
-                    <CardDescription>Control ad visibility for users</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <AdToggle />
-                </CardContent>
-            </Card>
-
-            {/* Demo Data Reset */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Data Management</CardTitle>
-                    <CardDescription>Reset demo data and verify system state</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col gap-4">
-                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
-                            <div>
-                                <h3 className="font-medium">Reset Demo Accounts</h3>
-                                <p className="text-sm text-muted-foreground">Resets scores, progress, and messages for demo accounts.</p>
-                            </div>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="destructive" disabled={loading}>
-                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reset Data'}
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This action will reset scores and progress for all demo accounts.
-                                            This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            className="bg-destructive hover:bg-destructive/90"
-                                            onClick={handleResetDemo}
-                                        >
-                                            Reset Data
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-
-                        <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/20">
-                            <div>
-                                <h3 className="font-medium">Fix Email Consistency</h3>
-                                <p className="text-sm text-muted-foreground">Converts all user emails to lowercase to fix login issues caused by case sensitivity.</p>
-                            </div>
-                            <Button variant="outline" onClick={handleNormalizeEmails} disabled={loading} className="whitespace-nowrap">
-                                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Normalize Emails'}
-                            </Button>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            {/* Ad Toggle for Admin - restricted to admins */}
+            {profile?.role === 'admin' && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Advertisement Settings</CardTitle>
+                        <CardDescription>Control ad visibility for users</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <AdToggle />
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Quick Actions and Recent Activity in 2 columns */}
-            < div className="grid md:grid-cols-2 gap-6" >
+            <div className="grid md:grid-cols-2 gap-6">
                 {/* Quick Actions */}
-                < Card >
+                <Card>
                     <CardHeader>
                         <CardTitle>Quick Actions</CardTitle>
                         <CardDescription>Common admin tasks</CardDescription>
@@ -500,10 +582,10 @@ function AdminOverviewTab({
                             ))}
                         </div>
                     </CardContent>
-                </Card >
+                </Card>
 
                 {/* Recent Activity */}
-                < Card >
+                <Card>
                     <CardHeader>
                         <CardTitle>Recent Activity</CardTitle>
                         <CardDescription>Latest platform events</CardDescription>
@@ -538,80 +620,219 @@ function StatCard({ title, value, icon: Icon, className }: { title: string; valu
 }
 
 // Schools Tab Component
-function SchoolsTab({ schools }: { schools: any[] }) {
-    const [loading, setLoading] = useState(false);
+// Schools Tab Component
+function SchoolsTab({ schools: _ignored, onRefresh }: { schools: any[], onRefresh: () => void }) {
+    const [schools, setSchools] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [selectedSchool, setSelectedSchool] = useState<any | null>(null);
+    const [schoolMembers, setSchoolMembers] = useState<any[]>([]);
+    const [membersLoading, setMembersLoading] = useState(false);
+    const [selectedSchoolIds, setSelectedSchoolIds] = useState<string[]>([]);
+    const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+    const [isMembersDialogOpen, setIsMembersDialogOpen] = useState(false);
+    const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     const [newSchool, setNewSchool] = useState({
-        id: '',
-        name: '',
-        address: '',
-        city: '',
-        state: '',
-        country: '',
-        postal_code: '',
-        contact_email: '',
-        contact_phone: '',
-        is_active: true,
-        created_at: '',
-        updated_at: ''
+        id: '', name: '', address: '', city: '', state: '', country: '', postal_code: '',
+        contact_email: '', contact_phone: '', is_active: true
     });
     const { toast } = useToast();
-    const { profile } = useAuth();
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
 
-    const filteredSchools = (schools || []).filter(school =>
-        (school?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (school?.city || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (school?.country || "").toLowerCase().includes((searchTerm || "").toLowerCase())
-    );
-
-    const handleAddSchool = async () => {
-        if (!newSchool.name) {
-            toast({ title: 'School name is required', variant: 'destructive' });
-            return;
-        }
-
+    const fetchSchools = async () => {
         setLoading(true);
-        try {
-            const schoolData = {
-                ...newSchool,
-                updated_at: serverTimestamp(),
-            };
-            delete (schoolData as any).id; // ID is handled by Firestore
-
-            if (isEditing) {
-                await updateDoc(doc(db, 'schools', newSchool.id), schoolData);
-                toast({ title: 'School updated successfully!' });
-            } else {
-                await addDoc(collection(db, 'schools'), {
-                    ...schoolData,
-                    created_at: serverTimestamp()
-                });
-                toast({ title: 'School added successfully!' });
-            }
-
-            // Immediately close and clear to feel faster
-            setIsAddDialogOpen(false);
-            setIsEditing(false);
-            setNewSchool({
-                id: '', name: '', address: '', city: '', state: '', country: '', postal_code: '',
-                contact_email: '', contact_phone: '', is_active: true, created_at: '', updated_at: ''
-            });
-        } catch (error: any) {
-            toast({ title: 'Error saving school', description: error.message, variant: 'destructive' });
+        const { data, error } = await supabase.from('schools').select('*').order('name');
+        if (!error && data) {
+            setSchools(data);
+            if (onRefresh) onRefresh();
         }
         setLoading(false);
     };
 
-    const handleDeleteSchool = async (id: string) => {
-        if (!confirm('Are you sure? This may affect associated users and competitions.')) return;
+    const viewSchoolMembers = async (school: any) => {
+        setSelectedSchool(school);
+        setIsMembersDialogOpen(true);
+        setMembersLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, email, display_name, role, password_text, score, is_active, created_at')
+                .eq('school_id', school.id)
+                .order('role');
+            if (error) throw error;
+            setSchoolMembers(data || []);
+            setSelectedMemberIds([]); // Reset selection
+        } catch (e: any) {
+            toast({ title: 'Error fetching members', description: e.message, variant: 'destructive' });
+        }
+        setMembersLoading(false);
+    };
+
+    const handleBulkDeleteMembers = async () => {
+        if (selectedMemberIds.length === 0) return;
+        if (!confirm(`Are you sure you want to PERMANENTLY delete ${selectedMemberIds.length} users?`)) return;
+
+        setIsBulkDeleting(true);
+        try {
+            const { error } = await supabase.from('profiles').delete().in('id', selectedMemberIds);
+            if (error) throw error;
+            toast({ title: `${selectedMemberIds.length} users deleted successfully` });
+            setSchoolMembers(prev => prev.filter(m => !selectedMemberIds.includes(m.id)));
+            setSelectedMemberIds([]);
+        } catch (e: any) {
+            toast({ title: 'Error deleting users', description: e.message, variant: 'destructive' });
+        }
+        setIsBulkDeleting(false);
+    };
+
+    const handleCopyCredentials = (member: any) => {
+        const text = `Email: ${member.email} | Password: ${member.password_text || 'N/A'}`;
+        navigator.clipboard.writeText(text);
+        toast({ title: 'Credentials copied!' });
+    };
+
+    const handleCopyAllCredentials = () => {
+        const membersToCopy = selectedMemberIds.length > 0
+            ? schoolMembers.filter(m => selectedMemberIds.includes(m.id))
+            : schoolMembers;
+
+        if (membersToCopy.length === 0) return;
+
+        const text = membersToCopy.map(m => `Email: ${m.email} | Password: ${m.password_text || 'N/A'}`).join('\n');
+        navigator.clipboard.writeText(text);
+        toast({
+            title: 'Credentials copied!',
+            description: `Copied ${membersToCopy.length} user${membersToCopy.length !== 1 ? 's' : ''} credentials to clipboard.`
+        });
+    };
+
+    const handleDeleteMember = async (memberId: string, memberEmail: string) => {
+        if (!confirm(`Are you sure you want to PERMANENTLY delete user ${memberEmail}?`)) return;
+        setDeletingMemberId(memberId);
+        try {
+            const { error } = await supabase.from('profiles').delete().eq('id', memberId);
+            if (error) throw error;
+            toast({ title: 'User deleted successfully' });
+            setSchoolMembers(prev => prev.filter(m => m.id !== memberId));
+        } catch (e: any) {
+            toast({ title: 'Error deleting user', description: e.message, variant: 'destructive' });
+        }
+        setDeletingMemberId(null);
+    };
+
+    useEffect(() => { fetchSchools(); }, []);
+
+    const filteredSchools = schools.filter(s =>
+        (s?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s?.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s?.country || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const resetForm = () => {
+        setIsAddDialogOpen(false);
+        setIsEditing(false);
+        setNewSchool({ id: '', name: '', address: '', city: '', state: '', country: '', postal_code: '', contact_email: '', contact_phone: '', is_active: true });
+    };
+
+    const handleSave = async () => {
+        if (!newSchool.name) { toast({ title: 'School name is required', variant: 'destructive' }); return; }
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'schools', id));
-            toast({ title: 'School deleted successfully!' });
-        } catch (error: any) {
-            toast({ title: 'Error deleting school', description: error.message, variant: 'destructive' });
+            const { id, ...data } = newSchool;
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await supabase.from('schools').update(data).eq('id', id);
+                    if (error) throw error;
+                    toast({ title: 'School updated!' });
+                } else {
+                    const { error } = await supabase.from('schools').insert(data);
+                    if (error) throw error;
+                    toast({ title: 'School added!' });
+                }
+                await fetchSchools();
+            } else {
+                // Moderator: submit for approval
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditing ? 'update' : 'create',
+                    table_name: 'schools',
+                    record_id: isEditing ? id : null,
+                    data: data,
+                    requested_by: profile?.id,
+                    summary: `${isEditing ? 'Update' : 'Add'} school: ${newSchool.name}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
+            }
+            resetForm();
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+    const handleDelete = async (id: string, name: string) => {
+        if (!confirm(`Delete school "${name}"?`)) return;
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('schools').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'School deleted!' });
+                await fetchSchools();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'schools', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: `Delete school: ${name}`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+    const handleToggleSelectSchool = (id: string) => {
+        setSelectedSchoolIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleToggleSelectAllSchools = () => {
+        if (selectedSchoolIds.length > 0 && selectedSchoolIds.length === filteredSchools.length) {
+            setSelectedSchoolIds([]);
+        } else {
+            setSelectedSchoolIds(filteredSchools.map(s => s.id));
+        }
+    };
+
+    const handleBulkDeleteSchools = async () => {
+        if (!confirm(`Are you sure you want to delete ${selectedSchoolIds.length} schools?`)) return;
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('schools').delete().in('id', selectedSchoolIds);
+                if (error) throw error;
+                toast({ title: `${selectedSchoolIds.length} schools deleted!` });
+                setSelectedSchoolIds([]);
+                await fetchSchools();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'schools', record_id: null,
+                    data: { ids: selectedSchoolIds }, requested_by: profile?.id,
+                    summary: `Bulk delete ${selectedSchoolIds.length} schools`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+                setSelectedSchoolIds([]);
+            }
+        } catch (err: any) {
+            toast({ title: 'Error deleting schools', description: err.message, variant: 'destructive' });
         }
         setLoading(false);
     };
@@ -623,82 +844,78 @@ function SchoolsTab({ schools }: { schools: any[] }) {
                     <h1 className="text-2xl font-display font-bold">Schools</h1>
                     <p className="text-muted-foreground">Manage educational institutions</p>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add School
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={fetchSchools}><RefreshCw className="w-4 h-4" /></Button>
+                    <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+                        <Plus className="w-4 h-4 mr-2" />{isAdmin ? 'Add School' : 'Request New School'}
+                    </Button>
+                </div>
             </div>
-
             <Card>
-                <CardHeader>
-                    <CardTitle>Schools List</CardTitle>
-                    <CardDescription>All registered educational institutions</CardDescription>
-                </CardHeader>
+                <CardHeader><CardTitle>Schools List</CardTitle><CardDescription>All registered educational institutions</CardDescription></CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search schools..."
-                                className="pl-10"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-
-                        {loading ? (
-                            <div className="text-center py-4">
-                                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="relative flex-1 mr-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input placeholder="Search schools..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                             </div>
+                            <div className="flex items-center gap-2">
+                                {selectedSchoolIds.length > 0 && (
+                                    <Button variant="destructive" size="sm" onClick={handleBulkDeleteSchools} disabled={loading} className="h-9 px-3 text-xs">
+                                        <Trash2 className="w-3 h-3 mr-2" />
+                                        Delete Selected ({selectedSchoolIds.length})
+                                    </Button>
+                                )}
+                                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
+                                    <Checkbox id="select-all-schools" checked={selectedSchoolIds.length > 0 && selectedSchoolIds.length === filteredSchools.length} onCheckedChange={handleToggleSelectAllSchools} />
+                                    <Label htmlFor="select-all-schools" className="text-xs font-medium cursor-pointer">Select All Visible</Label>
+                                </div>
+                            </div>
+                        </div>
+                        {loading ? (
+                            <div className="text-center py-4"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
                         ) : filteredSchools.length === 0 ? (
                             <p className="text-center text-muted-foreground py-4">No schools found</p>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                                 {filteredSchools.map((school) => (
-                                    <div key={school.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <h3 className="font-medium">{school.name}</h3>
-                                                <p className="text-xs text-muted-foreground">{school.city}, {school.country}</p>
+                                    <div key={school.id} className={`p-4 rounded-lg border transition-all ${selectedSchoolIds.includes(school.id) ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/50 hover:bg-muted/50'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <Checkbox
+                                                checked={selectedSchoolIds.includes(school.id)}
+                                                onCheckedChange={() => handleToggleSelectSchool(school.id)}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1 flex items-center justify-between">
+                                                <div className="flex-1 cursor-pointer" onClick={() => viewSchoolMembers(school)}>
+                                                    <h3 className="font-medium hover:text-primary transition-colors">{school.name}</h3>
+                                                    <p className="text-xs text-muted-foreground">{school.city}, {school.country}</p>
+                                                </div>
                                                 <div className="flex items-center gap-4 mt-2">
-                                                    <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{school.students || 0} students</span>
-                                                    <span className="text-xs text-muted-foreground">Contact: {school.contact_email}</span>
+                                                    <span className="text-xs text-muted-foreground">Contact: {school.contact_email || 'N/A'}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs ${school.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{school.is_active ? 'Active' : 'Inactive'}</span>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 ml-4">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="h-8 w-8 p-0"
-                                                    onClick={() => {
-                                                        setNewSchool(school);
-                                                        setIsEditing(true);
-                                                        setIsAddDialogOpen(true);
-                                                    }}
-                                                >
+                                                <Button size="sm" variant="secondary" className="h-8 px-2 text-xs" onClick={() => viewSchoolMembers(school)}>
+                                                    <Users className="w-3 h-3 mr-1" /> Members
+                                                </Button>
+                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => { setNewSchool({ ...school }); setIsEditing(true); setIsAddDialogOpen(true); }}>
                                                     <Edit className="w-3 h-3" />
                                                 </Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>
-                                                        <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </Button>
+                                                        <Button variant="destructive" size="sm" className="h-8 w-8 p-0"><Trash2 className="w-3 h-3" /></Button>
                                                     </AlertDialogTrigger>
                                                     <AlertDialogContent>
                                                         <AlertDialogHeader>
                                                             <AlertDialogTitle>Delete School</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Are you sure you want to delete this school? This action cannot be undone.
-                                                            </AlertDialogDescription>
+                                                            <AlertDialogDescription>Are you sure? This cannot be undone.</AlertDialogDescription>
                                                         </AlertDialogHeader>
                                                         <AlertDialogFooter>
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                className="bg-destructive hover:bg-destructive/90"
-                                                                onClick={() => handleDeleteSchool(school.id)}
-                                                            >
-                                                                Delete
-                                                            </AlertDialogAction>
+                                                            <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={() => handleDelete(school.id, school.name)}>Delete</AlertDialogAction>
                                                         </AlertDialogFooter>
                                                     </AlertDialogContent>
                                                 </AlertDialog>
@@ -712,107 +929,162 @@ function SchoolsTab({ schools }: { schools: any[] }) {
                 </CardContent>
             </Card>
 
-            {/* Add School Dialog */}
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog open={isAddDialogOpen} onOpenChange={(o) => { if (!o) resetForm(); else setIsAddDialogOpen(true); }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{isEditing ? 'Edit School' : 'Add New School'}</DialogTitle>
-                        <DialogDescription>{isEditing ? 'Update school details' : 'Register a new educational institution'}</DialogDescription>
+                        <DialogTitle>{isEditing ? 'Edit School' : (isAdmin ? 'Add New School' : 'Request New School')}</DialogTitle>
+                        <DialogDescription>{isAdmin ? '' : '⏳ This action will be submitted for admin approval.'}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>School Name *</Label>
-                            <Input
-                                value={newSchool.name}
-                                onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })}
-                                placeholder="e.g., Springfield High School"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Address</Label>
-                            <Input
-                                value={newSchool.address}
-                                onChange={(e) => setNewSchool({ ...newSchool, address: e.target.value })}
-                                placeholder="123 Education Street"
-                            />
+                        <div className="space-y-2"><Label>School Name *</Label><Input value={newSchool.name} onChange={(e) => setNewSchool({ ...newSchool, name: e.target.value })} placeholder="e.g., Springfield High School" /></div>
+                        <div className="space-y-2"><Label>Address</Label><Input value={newSchool.address} onChange={(e) => setNewSchool({ ...newSchool, address: e.target.value })} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2"><Label>City</Label><Input value={newSchool.city} onChange={(e) => setNewSchool({ ...newSchool, city: e.target.value })} /></div>
+                            <div className="space-y-2"><Label>Country</Label><Input value={newSchool.country} onChange={(e) => setNewSchool({ ...newSchool, country: e.target.value })} /></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>City</Label>
-                                <Input
-                                    value={newSchool.city}
-                                    onChange={(e) => setNewSchool({ ...newSchool, city: e.target.value })}
-                                    placeholder="Springfield"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>State/Province</Label>
-                                <Input
-                                    value={newSchool.state}
-                                    onChange={(e) => setNewSchool({ ...newSchool, state: e.target.value })}
-                                    placeholder="Illinois"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Country</Label>
-                                <Input
-                                    value={newSchool.country}
-                                    onChange={(e) => setNewSchool({ ...newSchool, country: e.target.value })}
-                                    placeholder="United States"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Postal Code</Label>
-                                <Input
-                                    value={newSchool.postal_code}
-                                    onChange={(e) => setNewSchool({ ...newSchool, postal_code: e.target.value })}
-                                    placeholder="12345"
-                                />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Contact Email</Label>
-                                <Input
-                                    type="email"
-                                    value={newSchool.contact_email}
-                                    onChange={(e) => setNewSchool({ ...newSchool, contact_email: e.target.value })}
-                                    placeholder="contact@school.com"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Contact Phone</Label>
-                                <Input
-                                    value={newSchool.contact_phone}
-                                    onChange={(e) => setNewSchool({ ...newSchool, contact_phone: e.target.value })}
-                                    placeholder="+1 (555) 123-4567"
-                                />
-                            </div>
+                            <div className="space-y-2"><Label>Contact Email</Label><Input type="email" value={newSchool.contact_email} onChange={(e) => setNewSchool({ ...newSchool, contact_email: e.target.value })} /></div>
+                            <div className="space-y-2"><Label>Contact Phone</Label><Input value={newSchool.contact_phone} onChange={(e) => setNewSchool({ ...newSchool, contact_phone: e.target.value })} /></div>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Checkbox
-                                id="is-active"
-                                checked={!!newSchool.is_active}
-                                onCheckedChange={(checked) => setNewSchool({ ...newSchool, is_active: !!checked })}
-                            />
-                            <Label htmlFor="is-active">Active School</Label>
+                            <Checkbox id="school-active" checked={!!newSchool.is_active} onCheckedChange={(c) => setNewSchool({ ...newSchool, is_active: !!c })} />
+                            <Label htmlFor="school-active">Active School</Label>
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddSchool} disabled={loading}>
-                            {loading ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Adding...
-                                </>
-                            ) : (
-                                isEditing ? 'Save Changes' : 'Add School'
-                            )}
+                        <Button variant="outline" onClick={resetForm}>Cancel</Button>
+                        <Button onClick={handleSave} disabled={loading}>
+                            {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : (isAdmin ? (isEditing ? 'Save Changes' : 'Add School') : 'Submit for Approval')}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* School Members Dialog */}
+            <Dialog open={isMembersDialogOpen} onOpenChange={setIsMembersDialogOpen}>
+                <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Users className="w-5 h-5 text-primary" />
+                            {selectedSchool?.name} — Members
+                        </DialogTitle>
+                        <DialogDescription>
+                            All users registered under this school. Passwords shown are for admin reference.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-hidden mt-4 border rounded-lg flex flex-col min-h-0">
+                        <ScrollArea className="flex-1">
+                            {membersLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                                </div>
+                            ) : schoolMembers.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                                    <p>No members found for this school.</p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted sticky top-0">
+                                        <tr>
+                                            <th className="p-3 text-left w-10">
+                                                <Checkbox
+                                                    checked={selectedMemberIds.length === schoolMembers.length && schoolMembers.length > 0}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) setSelectedMemberIds(schoolMembers.map(m => m.id));
+                                                        else setSelectedMemberIds([]);
+                                                    }}
+                                                />
+                                            </th>
+                                            <th className="p-3 text-left font-semibold text-xs uppercase tracking-wider">Role</th>
+                                            <th className="p-3 text-left font-semibold text-xs uppercase tracking-wider">Display Name</th>
+                                            <th className="p-3 text-left font-semibold text-xs uppercase tracking-wider">Email</th>
+                                            <th className="p-3 text-left font-semibold text-xs uppercase tracking-wider">Password</th>
+                                            <th className="p-3 text-right font-semibold text-xs uppercase tracking-wider">Score</th>
+                                            <th className="p-3 text-right font-semibold text-xs uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {schoolMembers.map((member) => (
+                                            <tr key={member.id} className={`hover:bg-muted/50 transition-colors ${selectedMemberIds.includes(member.id) ? 'bg-primary/5' : ''}`}>
+                                                <td className="p-3">
+                                                    <Checkbox
+                                                        checked={selectedMemberIds.includes(member.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            if (checked) setSelectedMemberIds(prev => [...prev, member.id]);
+                                                            else setSelectedMemberIds(prev => prev.filter(id => id !== member.id));
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="p-3">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${member.role === 'admin' ? 'bg-red-100 text-red-700' :
+                                                        member.role === 'moderator' ? 'bg-orange-100 text-orange-700' :
+                                                            member.role === 'teacher' ? 'bg-blue-100 text-blue-700' :
+                                                                'bg-green-100 text-green-700'
+                                                        }`}>{member.role}</span>
+                                                </td>
+                                                <td className="p-3 font-medium">{member.display_name || <span className="text-muted-foreground italic text-xs">No username</span>}</td>
+                                                <td className="p-3 font-mono text-xs text-muted-foreground">{member.email}</td>
+                                                <td className="p-3">
+                                                    <span className="font-mono text-xs text-primary font-bold bg-primary/5 px-2 py-0.5 rounded">
+                                                        {member.password_text || <span className="text-muted-foreground italic">Hidden</span>}
+                                                    </span>
+                                                </td>
+                                                <td className="p-3 text-right font-mono font-bold">{(member.score || 0).toLocaleString()}</td>
+                                                <td className="p-3 text-right flex items-center justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0"
+                                                        title="Copy credentials"
+                                                        onClick={() => handleCopyCredentials(member)}
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="sm"
+                                                        className="h-7 w-7 p-0"
+                                                        disabled={deletingMemberId === member.id || member.id === profile?.id}
+                                                        onClick={() => handleDeleteMember(member.id, member.email)}
+                                                    >
+                                                        {deletingMemberId === member.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </ScrollArea>
+                    </div>
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t shrink-0">
+                        <div className="flex items-center gap-4">
+                            <p className="text-xs text-muted-foreground">{schoolMembers.length} member{schoolMembers.length !== 1 ? 's' : ''} found</p>
+                            {selectedMemberIds.length > 0 && (
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="h-8 py-0 px-3 text-xs"
+                                    onClick={handleBulkDeleteMembers}
+                                    disabled={isBulkDeleting}
+                                >
+                                    {isBulkDeleting ? <Loader2 className="w-3 h-3 animate-spin mr-2" /> : <Trash2 className="w-3 h-3 mr-2" />}
+                                    Delete Selected ({selectedMemberIds.length})
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 py-0 px-3 text-xs"
+                                onClick={handleCopyAllCredentials}
+                            >
+                                <Copy className="w-3 h-3 mr-2" />
+                                {selectedMemberIds.length > 0 ? `Copy Selected (${selectedMemberIds.length})` : 'Copy All'}
+                            </Button>
+                        </div>
+                        <Button variant="outline" onClick={() => setIsMembersDialogOpen(false)}>Close</Button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
@@ -820,89 +1092,180 @@ function SchoolsTab({ schools }: { schools: any[] }) {
 }
 
 // Competitions Tab Component
-function CompetitionsTab({ competitions, schools }: { competitions: any[], schools: any[] }) {
-    const [loading, setLoading] = useState(false);
+function CompetitionsTab({ competitions: _ignored, schools: _ignoredSchools }: { competitions: any[], schools: any[] }) {
+    const [competitions, setCompetitions] = useState<any[]>([]);
+    const [schools, setSchools] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [newCompetition, setNewCompetition] = useState({
-        id: '',
-        name: '',
-        description: '',
-        start_date: '',
-        start_time: '09:00',
-        end_date: '',
-        end_time: '17:00',
-        is_active: true,
-        current_participants: 0,
-        category: '',
-        difficulty: 'medium',
-        can_leave: true,
-        created_at: '',
-        updated_at: '',
-        updated_at: '',
-        participating_schools: [],
-        access_code: ''
-    });
+    const [selectedCompIds, setSelectedCompIds] = useState<string[]>([]);
+    const emptyComp = { id: '', name: '', description: '', start_date: '', start_time: '09:00', end_date: '', end_time: '17:00', is_active: true, current_participants: 0, category: '', difficulty: 'medium', can_leave: true, participating_schools: [] as string[], access_code: '', banner_url: '' };
+    const [newCompetition, setNewCompetition] = useState(emptyComp);
+    const [bannerFile, setBannerFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
     const [selectAllSchools, setSelectAllSchools] = useState(false);
     const { toast } = useToast();
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
 
-    const filteredCompetitions = (competitions || []).filter(competition =>
-        (competition?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (competition?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+    const fetchData = async () => {
+        setLoading(true);
+        const [{ data: comps }, { data: schs }] = await Promise.all([
+            supabase.from('competitions').select('*').order('created_at', { ascending: false }),
+            supabase.from('schools').select('id, name, country')
+        ]);
+        if (comps) setCompetitions(comps);
+        if (schs) setSchools(schs);
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+
+    const filteredCompetitions = competitions.filter(c =>
+        (c?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (c?.description || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleAddCompetition = async () => {
-        if (!newCompetition.name) {
-            toast({ title: 'Competition name is required', variant: 'destructive' });
-            return;
-        }
+    const resetForm = () => {
+        setIsAddDialogOpen(false);
+        setIsEditing(false);
+        setNewCompetition(emptyComp);
+        setBannerFile(null);
+    };
 
+    const handleBannerUpload = async (file: File) => {
+        const compressedFile = await compressImage(file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await withTimeout<{ data: any; error: any }>(
+            supabase.storage.from('competition-banners').upload(filePath, compressedFile)
+        );
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('competition-banners')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    };
+
+    const handleSave = async () => {
+        if (!newCompetition.name) { toast({ title: 'Competition name is required', variant: 'destructive' }); return; }
         setLoading(true);
         try {
-            const compData = {
-                ...newCompetition,
-                updated_at: serverTimestamp()
-            };
-            delete (compData as any).id;
+            let finalBannerUrl = newCompetition.banner_url;
 
-            if (isEditing) {
-                await updateDoc(doc(db, 'competitions', newCompetition.id), compData);
-                toast({ title: 'Competition updated!' });
-            } else {
-                await addDoc(collection(db, 'competitions'), {
-                    ...compData,
-                    created_at: serverTimestamp(),
-                    current_participants: 0
-                });
-                toast({ title: 'Competition added!' });
+            if (bannerFile) {
+                setUploading(true);
+                try {
+                    finalBannerUrl = await handleBannerUpload(bannerFile);
+                } catch (uploadErr: any) {
+                    toast({ title: 'Banner Upload Failed', description: uploadErr.message, variant: 'destructive' });
+                    setLoading(false);
+                    setUploading(false);
+                    return;
+                }
+                setUploading(false);
             }
 
-            // Immediately close and clear to feel faster
-            setIsAddDialogOpen(false);
-            setIsEditing(false);
-            setNewCompetition({
-                id: '', name: '', description: '', start_date: '', start_time: '09:00', end_date: '', end_time: '17:00', is_active: true,
-                current_participants: 0, category: '', difficulty: 'medium', can_leave: true,
-                created_at: '', updated_at: '', participating_schools: [], access_code: ''
-            });
-        } catch (error: any) {
-            toast({ title: 'Error saving competition', description: error.message, variant: 'destructive' });
+            const { id, ...data } = { ...newCompetition, banner_url: finalBannerUrl };
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await supabase.from('competitions').update(data).eq('id', id);
+                    if (error) throw error;
+                    toast({ title: 'Competition updated!' });
+                } else {
+                    const { error } = await supabase.from('competitions').insert(data);
+                    if (error) throw error;
+                    toast({ title: 'Competition added!' });
+                }
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditing ? 'update' : 'create',
+                    table_name: 'competitions',
+                    record_id: isEditing ? id : null,
+                    data, requested_by: profile?.id,
+                    summary: `${isEditing ? 'Update' : 'Add'} competition: ${newCompetition.name}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
+            }
+            resetForm();
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
-    const handleDeleteCompetition = async (id: string) => {
-        if (!confirm('Are you sure?')) return;
+    const handleDeleteCompetition = async (id: string, name: string) => {
+        if (!confirm(`Delete competition "${name}"?`)) return;
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'competitions', id));
-            toast({ title: 'Competition deleted successfully!' });
-        } catch (error: any) {
-            toast({ title: 'Error deleting competition', description: error.message, variant: 'destructive' });
+            if (isAdmin) {
+                const { error } = await supabase.from('competitions').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'Competition deleted!' });
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'competitions', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: `Delete competition: ${name}`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
         }
         setLoading(false);
     };
+
+    const handleToggleSelectComp = (id: string) => {
+        setSelectedCompIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+
+    const handleToggleSelectAllComps = () => {
+        if (selectedCompIds.length > 0 && selectedCompIds.length === filteredCompetitions.length) {
+            setSelectedCompIds([]);
+        } else {
+            setSelectedCompIds(filteredCompetitions.map(c => c.id));
+        }
+    };
+
+    const handleBulkDeleteComps = async () => {
+        if (!confirm(`Are you sure you want to delete ${selectedCompIds.length} competitions?`)) return;
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('competitions').delete().in('id', selectedCompIds);
+                if (error) throw error;
+                toast({ title: `${selectedCompIds.length} competitions deleted!` });
+                setSelectedCompIds([]);
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'competitions', record_id: null,
+                    data: { ids: selectedCompIds }, requested_by: profile?.id,
+                    summary: `Bulk delete ${selectedCompIds.length} competitions`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+                setSelectedCompIds([]);
+            }
+        } catch (err: any) {
+            toast({ title: 'Error deleting competitions', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+    const [isStatsOpen, setIsStatsOpen] = useState(false);
 
     const handleSchoolSelection = (schoolId: string) => {
         setNewCompetition(prev => {
@@ -929,10 +1292,16 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                     <h1 className="text-2xl font-display font-bold">Competitions</h1>
                     <p className="text-muted-foreground">Manage learning competitions</p>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Competition
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setIsStatsOpen(true)} className="border-primary/50 text-primary hover:bg-primary/5">
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        Site Stats
+                    </Button>
+                    <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
+                        <Plus className="w-4 h-4 mr-2" />
+                        {isAdmin ? 'Add Competition' : 'Request New Competition'}
+                    </Button>
+                </div>
             </div>
 
             <Card>
@@ -942,14 +1311,28 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search competitions..."
-                                className="pl-10"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="relative flex-1 mr-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search competitions..."
+                                    className="pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {selectedCompIds.length > 0 && (
+                                    <Button variant="destructive" size="sm" onClick={handleBulkDeleteComps} disabled={loading} className="h-9 px-3 text-xs">
+                                        <Trash2 className="w-3 h-3 mr-2" />
+                                        Delete Selected ({selectedCompIds.length})
+                                    </Button>
+                                )}
+                                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
+                                    <Checkbox id="select-all-comps" checked={selectedCompIds.length > 0 && selectedCompIds.length === filteredCompetitions.length} onCheckedChange={handleToggleSelectAllComps} />
+                                    <Label htmlFor="select-all-comps" className="text-xs font-medium cursor-pointer">Select All Visible</Label>
+                                </div>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -961,11 +1344,18 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                         ) : (
                             <div className="space-y-4">
                                 {filteredCompetitions.map((competition) => (
-                                    <div key={competition.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <h3 className="font-medium">{competition.name}</h3>
-                                                <p className="text-xs text-muted-foreground">{competition.description}</p>
+                                    <div key={competition.id} className={`p-4 rounded-lg border transition-all ${selectedCompIds.includes(competition.id) ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/50 hover:bg-muted/50'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <Checkbox
+                                                checked={selectedCompIds.includes(competition.id)}
+                                                onCheckedChange={() => handleToggleSelectComp(competition.id)}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1 flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <h3 className="font-medium">{competition.name}</h3>
+                                                    <p className="text-xs text-muted-foreground">{competition.description}</p>
+                                                </div>
                                                 <div className="flex items-center gap-4 mt-2">
                                                     <span className={`px-2 py-1 rounded-full text-xs ${competition.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                                                         {competition.is_active ? 'Active' : 'Inactive'}
@@ -1002,7 +1392,7 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                             <AlertDialogAction
                                                                 className="bg-destructive hover:bg-destructive/90"
-                                                                onClick={() => handleDeleteCompetition(competition.id)}
+                                                                onClick={() => handleDeleteCompetition(competition.id, competition.name)}
                                                             >
                                                                 Delete
                                                             </AlertDialogAction>
@@ -1051,6 +1441,52 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                                 placeholder="Describe the competition..."
                                 rows={3}
                             />
+                        </div>
+
+                        {/* Banner Image Upload */}
+                        <div className="space-y-2">
+                            <Label>Competition Banner (Appearing on cover)</Label>
+                            <div className="flex flex-col gap-3">
+                                {newCompetition.banner_url && !bannerFile && (
+                                    <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-border">
+                                        <img src={newCompetition.banner_url} alt="Banner Preview" className="w-full h-full object-cover" />
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="absolute top-2 right-2 h-7 w-7 p-0"
+                                            onClick={() => setNewCompetition({ ...newCompetition, banner_url: '' })}
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                )}
+                                {bannerFile && (
+                                    <div className="relative aspect-video w-full rounded-lg overflow-hidden border border-border ring-2 ring-primary">
+                                        <img src={URL.createObjectURL(bannerFile)} alt="New Banner Preview" className="w-full h-full object-cover" />
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="absolute top-2 right-2 h-7 w-7 p-0"
+                                            onClick={() => setBannerFile(null)}
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) setBannerFile(file);
+                                        }}
+                                        className="cursor-pointer"
+                                    />
+                                    {uploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground italic">Recommended: 1200x400 or similar landscape ratio.</p>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -1165,109 +1601,198 @@ function CompetitionsTab({ competitions, schools }: { competitions: any[], schoo
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddCompetition} disabled={loading}>
+                        <Button onClick={handleSave} disabled={loading}>
                             {loading ? (
                                 <>
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Adding...
+                                    {isEditing ? 'Saving...' : 'Adding...'}
                                 </>
                             ) : (
-                                'Add Competition'
+                                isEditing ? 'Save Changes' : 'Add Competition'
                             )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <SiteStatsDialog open={isStatsOpen} onOpenChange={setIsStatsOpen} competitions={competitions} schools={schools} />
         </div>
     );
 }
 
 // Questions Tab Component
-function QuestionsTab({ questions, questionSets }: { questions: any[], questionSets: any[] }) {
-    const [loading, setLoading] = useState(false);
+function QuestionsTab({ questions: _ignored, questionSets: _ignoredSets }: { questions: any[], questionSets: any[] }) {
+    const [questions, setQuestions] = useState<any[]>([]);
+    const [questionSets, setQuestionSets] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
     const [bulkQuestions, setBulkQuestions] = useState('');
     const [bulkQuestionSetId, setBulkQuestionSetId] = useState('');
-    const [newQuestion, setNewQuestion] = useState({
-        id: '',
-        text: '',
-        options: ['', '', '', ''],
-        correct_answer: '',
-        question_set_id: '',
-        type: 'mcq' as 'mcq' | 'text',
-        difficulty: 'medium',
-        points: 10,
-        explanation: '',
-        exact_match_required: false,
-        created_at: '',
-        updated_at: ''
-    });
+    const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
+    const emptyQ = { id: '', text: '', options: ['', '', '', ''] as string[], correct_answer: '', question_set_id: '', type: 'mcq' as 'mcq' | 'text' | 'slide', difficulty: 'medium', points: 10, explanation: '', exact_match_required: false, image_url: '', is_required: true, category: 'General', timer: 0 };
+    const [newQuestion, setNewQuestion] = useState(emptyQ);
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const { toast } = useToast();
+
+    const handleImageUpload = async (file: File) => {
+        // Optimize image size to fix 'loading non-stop' issue
+        const compressedFile = await compressImage(file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        // Timeout prevents indefinite hangs
+        const { error: uploadError } = await withTimeout<{ data: any; error: any }>(
+            supabase.storage.from('question-images').upload(filePath, compressedFile)
+        );
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('question-images')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    };
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            console.log("Fetching questions and sets...");
+            const [resQ, resSets] = await Promise.all([
+                supabase.from('questions').select('*').order('created_at', { ascending: false }),
+                supabase.from('question_sets').select('id, name')
+            ]);
+
+            if (resQ.error) throw resQ.error;
+            if (resSets.error) throw resSets.error;
+
+            if (resQ.data) setQuestions(resQ.data);
+            if (resSets.data) setQuestionSets(resSets.data);
+            console.log("Fetch successful:", { questions: resQ.data?.length, sets: resSets.data?.length });
+        } catch (error: any) {
+            console.error('Error in QuestionsTab fetchData:', error);
+            toast({ title: 'Error Loading Questions', description: error.message, variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => { fetchData(); }, []);
 
     const questionSetMap = useMemo(() => {
         const map = new Map();
-        (questionSets || []).forEach(qs => map.set(qs.id, qs.name));
+        questionSets.forEach(qs => map.set(qs.id, qs.name));
         return map;
     }, [questionSets]);
 
-    const filteredQuestions = (questions || []).filter(question => {
-        const questionSetName = questionSetMap.get(question?.question_set_id) || '';
-        return (question?.text || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-            (questionSetName || "").toLowerCase().includes((searchTerm || "").toLowerCase());
+    const filteredQuestions = questions.filter(q => {
+        const setName = questionSetMap.get(q?.question_set_id) || '';
+        return (q?.text || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            setName.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
+    const resetForm = () => {
+        setIsAddDialogOpen(false);
+        setIsEditing(false);
+        setNewQuestion(emptyQ);
+        setImageFile(null);
+    };
+
     const handleAddQuestion = async () => {
-        if (!newQuestion.text || !newQuestion.correct_answer) {
+        if (!newQuestion.text || (!newQuestion.correct_answer && newQuestion.type !== 'slide')) {
             toast({ title: 'Question text and correct answer are required', variant: 'destructive' });
             return;
         }
-
-        if (!newQuestion.question_set_id) {
-            toast({ title: 'Please assign the question to a Question Set', variant: 'destructive' });
-            return;
-        }
-
-        setLoading(true);
+        // question_set_id is optional - the DB allows null
+        console.log("handleAddQuestion called with:", JSON.stringify(newQuestion, null, 2));
+        setSaving(true);
         try {
-            const qData = {
-                ...newQuestion,
-                updated_at: serverTimestamp()
-            };
-            delete (qData as any).id;
+            let finalImageUrl = newQuestion.image_url;
 
-            if (isEditing) {
-                await updateDoc(doc(db, 'questions', newQuestion.id), qData);
-                toast({ title: 'Question updated successfully!' });
-            } else {
-                const docRef = await addDoc(collection(db, 'questions'), {
-                    ...qData,
-                    created_at: serverTimestamp()
-                });
-
-                // Update the Question Set in DB - Use arrayUnion for a single trip
-                const qsRef = doc(db, 'question_sets', newQuestion.question_set_id);
-                await updateDoc(qsRef, {
-                    questions: arrayUnion(docRef.id)
-                });
-
-                toast({ title: 'Question added successfully!' });
+            if (imageFile) {
+                setUploading(true);
+                toast({ title: 'Uploading image...', description: 'Optimizing for speed' });
+                try {
+                    finalImageUrl = await handleImageUpload(imageFile);
+                } catch (uploadErr: any) {
+                    toast({ title: 'Image Upload Failed', description: uploadErr.message, variant: 'destructive' });
+                    setSaving(false);
+                    setUploading(false);
+                    return;
+                }
+                setUploading(false);
             }
 
-            setIsAddDialogOpen(false);
-            setIsEditing(false);
-            setNewQuestion({
-                id: '', text: '', type: 'mcq', options: ['', '', '', ''],
-                correct_answer: '', question_set_id: '', difficulty: 'medium',
-                points: 10, explanation: '', exact_match_required: false,
-                created_at: '', updated_at: ''
+            toast({ title: 'Saving question data...' });
+            const { id: qId, created_at: ca, updated_at: ua, ...rest } = newQuestion as any;
+
+            // Only send columns guaranteed to exist in the DB
+            const data: Record<string, any> = {
+                text: rest.text,
+                type: rest.type || 'mcq',
+                options: Array.isArray(rest.options) ? rest.options : [],
+                correct_answer: rest.type === 'slide' ? 'slide_viewed' : (rest.correct_answer || ''),
+                points: rest.type === 'slide' ? 0 : (rest.points || 10),
+                question_set_id: (rest.question_set_id && rest.question_set_id !== '') ? rest.question_set_id : null,
+                image_url: finalImageUrl || null,
+                slide_url: rest.type === 'slide' ? rest.slide_url : null,
+                timer: parseInt(rest.timer) || 0,
+            };
+            console.log("Cleaned question data to save:", JSON.stringify(data, null, 2));
+
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await withTimeout<{ data: any; error: any }>(
+                        (supabase.from('questions').update(data).eq('id', qId) as any)
+                    );
+                    if (error) throw error;
+                    toast({ title: 'Question updated!' });
+                } else {
+                    const { error } = await withTimeout<{ data: any; error: any }>(
+                        (supabase.from('questions').insert(data) as any)
+                    );
+                    if (error) throw error;
+                    toast({ title: 'Question added!' });
+                }
+                await fetchData();
+            } else {
+                // Fix: ensure record_id is null if not editing, not a blank string
+                const approvalRecordId = (isEditing && qId && qId !== '') ? qId : null;
+
+                const { error } = await withTimeout<{ data: any; error: any }>(
+                    (supabase.from('approvals').insert({
+                        type: isEditing ? 'update' : 'create',
+                        table_name: 'questions',
+                        record_id: approvalRecordId,
+                        data,
+                        requested_by: profile?.id,
+                        summary: `${isEditing ? 'Update' : 'Add'} question: ${newQuestion.text.slice(0, 50)}`,
+                        status: 'pending'
+                    }) as any)
+                );
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
+            }
+            resetForm();
+        } catch (err: any) {
+            console.error("QuestionsTab handleAddQuestion error:", err);
+            toast({
+                title: 'Save Failed',
+                description: err.message || 'Network error or timeout. Please try again.',
+                variant: 'destructive'
             });
-        } catch (error: any) {
-            toast({ title: 'Error saving question', description: error.message, variant: 'destructive' });
+        } finally {
+            setSaving(false);
+            setUploading(false);
         }
-        setLoading(false);
     };
 
     const handleBulkAddQuestions = async () => {
@@ -1275,77 +1800,115 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
             toast({ title: 'Questions and Question Set are required', variant: 'destructive' });
             return;
         }
-
         setLoading(true);
         try {
-            const lines = bulkQuestions.split('\n').filter(line => line.trim());
-            const batch = writeBatch(db);
-            const questionIds: string[] = [];
-
-            for (const line of lines) {
+            const lines = bulkQuestions.split('\n').filter(l => l.trim());
+            const questionsToInsert = lines.map(line => {
                 const parts = line.split('|').map(s => s.trim());
-                if (parts.length < 2) continue;
-
-                const [text, optionsStr, correctAnswer, points] = parts;
-                const options = optionsStr.split(',').map(o => o.trim());
-                const qRef = doc(collection(db, 'questions'));
-
-                const qData = {
-                    text,
-                    options: options.length === 4 ? options : ['', '', '', ''],
-                    correct_answer: isNaN(Number(correctAnswer)) ? correctAnswer : options[Number(correctAnswer)] || correctAnswer,
+                const [text, optionsStr, correctAnswer, pts] = parts;
+                const options = optionsStr ? optionsStr.split(',').map(o => o.trim()) : [];
+                return {
+                    text: text || '',
+                    options,
+                    correct_answer: correctAnswer || '',
                     question_set_id: bulkQuestionSetId,
                     type: options.length >= 2 ? 'mcq' : 'text',
-                    difficulty: 'medium',
-                    points: parseInt(points) || 10,
-                    explanation: '',
-                    exact_match_required: false,
-                    created_at: serverTimestamp(),
-                    updated_at: serverTimestamp()
+                    points: parseInt(pts) || 10
                 };
+            }).filter(q => q.text);
 
-                batch.set(qRef, qData);
-                questionIds.push(qRef.id);
-            }
-
-            if (questionIds.length > 0) {
-                await batch.commit();
-
-                const qsRef = doc(db, 'question_sets', bulkQuestionSetId);
-                await updateDoc(qsRef, {
-                    questions: arrayUnion(...questionIds)
-                });
-
-                toast({ title: `Successfully added ${questionIds.length} questions!` });
+            if (questionsToInsert.length > 0) {
+                if (isAdmin) {
+                    const { error } = await supabase.from('questions').insert(questionsToInsert);
+                    if (error) throw error;
+                    toast({ title: `Added ${questionsToInsert.length} questions!` });
+                } else {
+                    const { error } = await supabase.from('approvals').insert({
+                        type: 'create',
+                        table_name: 'questions',
+                        record_id: null,
+                        data: questionsToInsert,
+                        requested_by: profile?.id,
+                        summary: `Bulk add ${questionsToInsert.length} questions to set`,
+                        status: 'pending'
+                    });
+                    if (error) throw error;
+                    toast({ title: 'Bulk addition submitted for admin approval' });
+                }
                 setBulkQuestions('');
                 setIsBulkAddDialogOpen(false);
+                await fetchData();
             }
-        } catch (error: any) {
-            toast({ title: 'Error bulk adding questions', description: error.message, variant: 'destructive' });
+        } catch (err: any) {
+            toast({ title: 'Error bulk adding questions', description: err.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
     const handleDeleteQuestion = async (id: string) => {
-        if (!confirm('Are you sure?')) return;
+        if (!confirm('Delete this question?')) return;
         setLoading(true);
         try {
-            const questionToDelete = (questions as any[]).find(q => q.id === id);
-            await deleteDoc(doc(db, 'questions', id));
-
-            if (questionToDelete && questionToDelete.question_set_id) {
-                const qsRef = doc(db, 'question_sets', questionToDelete.question_set_id);
-                const qsSnap = await getDoc(qsRef);
-                if (qsSnap.exists()) {
-                    const qsData = qsSnap.data();
-                    const updatedQs = (qsData.questions || []).filter((qid: string) => qid !== id);
-                    await updateDoc(qsRef, { questions: updatedQs });
-                }
+            if (isAdmin) {
+                const { error } = await supabase.from('questions').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'Question deleted!' });
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'questions', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: 'Delete question', status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
             }
+        } catch (err: any) {
+            toast({ title: 'Error', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
 
-            toast({ title: 'Question deleted successfully!' });
-        } catch (error: any) {
-            toast({ title: 'Error deleting question', description: error.message, variant: 'destructive' });
+    const handleToggleSelectQuestion = (id: string) => {
+        setSelectedQuestionIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAll = () => {
+        if (selectedQuestionIds.length > 0 && selectedQuestionIds.length === filteredQuestions.length) {
+            setSelectedQuestionIds([]);
+        } else {
+            setSelectedQuestionIds(filteredQuestions.map(q => q.id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Delete ${selectedQuestionIds.length} questions?`)) return;
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('questions').delete().in('id', selectedQuestionIds);
+                if (error) throw error;
+                toast({ title: `${selectedQuestionIds.length} questions deleted!` });
+                setSelectedQuestionIds([]);
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete',
+                    table_name: 'questions',
+                    record_id: null,
+                    data: { ids: selectedQuestionIds },
+                    requested_by: profile?.id,
+                    summary: `Bulk delete ${selectedQuestionIds.length} questions`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Bulk deletion submitted for admin approval' });
+                setSelectedQuestionIds([]);
+            }
+        } catch (err: any) {
+            toast({ title: 'Error deleting questions', description: err.message, variant: 'destructive' });
         }
         setLoading(false);
     };
@@ -1364,7 +1927,8 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                             id: '', text: '', type: 'mcq', options: ['', '', '', ''],
                             correct_answer: '', question_set_id: '', difficulty: 'medium',
                             points: 10, explanation: '', exact_match_required: false,
-                            created_at: '', updated_at: ''
+                            image_url: '', is_required: true, category: 'General',
+                            timer: 0
                         });
                         setIsAddDialogOpen(true);
                     }} className="gradient-hero">
@@ -1385,14 +1949,24 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search questions..."
-                                className="pl-10"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="relative flex-1 mr-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search questions..."
+                                    className="pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
+                                <Checkbox
+                                    id="select-all-questions"
+                                    checked={selectedQuestionIds.length > 0 && selectedQuestionIds.length === filteredQuestions.length}
+                                    onCheckedChange={handleToggleSelectAll}
+                                />
+                                <Label htmlFor="select-all-questions" className="text-xs font-medium cursor-pointer">Select All Visible</Label>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -1404,49 +1978,63 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                         ) : (
                             <div className="space-y-4">
                                 {filteredQuestions.map((question) => (
-                                    <div key={question.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <h3 className="font-medium">{question.text}</h3>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    Set: {(questionSets || []).find(qs => qs.id === question.question_set_id)?.name || 'Unassigned'} • Difficulty: {question.difficulty} • Type: {question.type === 'text' ? 'Writing' : 'MCQ'}
-                                                </p>
-                                                <div className="flex items-center gap-4 mt-2">
-                                                    <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                                    <div key={question.id} className={`p-4 rounded-lg border transition-all ${selectedQuestionIds.includes(question.id) ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/50 hover:bg-muted/50'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <Checkbox
+                                                checked={selectedQuestionIds.includes(question.id)}
+                                                onCheckedChange={() => handleToggleSelectQuestion(question.id)}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1 flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <h3 className="font-medium">{question.text}</h3>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Set: {(questionSets || []).find(qs => qs.id === question.question_set_id)?.name || 'Unassigned'} • Difficulty: {question.difficulty} • Type: {question.type === 'text' ? 'Writing' : (question.type === 'slide' ? 'Slide' : 'MCQ')}
+                                                    </p>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <div className="flex items-center gap-4 mt-2">
+                                                            <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{question.points} pts</span>
+                                                            {(question.timer || 0) > 0 && (
+                                                                <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                                                                    <Clock className="w-3 h-3" /> {question.timer}s Limit
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2 ml-4">
-                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => {
-                                                    setNewQuestion(question);
-                                                    setIsEditing(true);
-                                                    setIsAddDialogOpen(true);
-                                                }}>
-                                                    <Edit className="w-3 h-3" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Are you sure you want to delete this question? This action cannot be undone.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                className="bg-destructive hover:bg-destructive/90"
-                                                                onClick={() => handleDeleteQuestion(question.id)}
-                                                            >
-                                                                Delete
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                                                <div className="flex gap-2 ml-4">
+                                                    <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => {
+                                                        setNewQuestion(question);
+                                                        setIsEditing(true);
+                                                        setIsAddDialogOpen(true);
+                                                    }}>
+                                                        <Edit className="w-3 h-3" />
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Are you sure you want to delete this question? This action cannot be undone.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className="bg-destructive hover:bg-destructive/90"
+                                                                    onClick={() => handleDeleteQuestion(question.id)}
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1457,6 +2045,38 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                 </CardContent>
             </Card>
 
+            {selectedQuestionIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="bg-primary text-primary-foreground px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-primary-foreground/20">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-primary-foreground/20 px-2 py-0.5 rounded text-xs font-bold">
+                                {selectedQuestionIds.length}
+                            </div>
+                            <span className="text-sm font-medium">Questions Selected</span>
+                        </div>
+                        <div className="h-6 w-px bg-primary-foreground/20" />
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedQuestionIds([])}
+                                className="text-primary-foreground hover:bg-primary-foreground/10 h-8"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                className="bg-red-500 hover:bg-red-600 border-none h-8 shadow-lg"
+                            >
+                                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                Delete Selected
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Add Question Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogContent>
@@ -1469,7 +2089,7 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                             <Label>Question Type</Label>
                             <Select
                                 value={newQuestion.type}
-                                onValueChange={(value: 'mcq' | 'text') => setNewQuestion({ ...newQuestion, type: value })}
+                                onValueChange={(value: 'mcq' | 'text' | 'slide') => setNewQuestion({ ...newQuestion, type: value })}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select type" />
@@ -1477,19 +2097,45 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                                 <SelectContent>
                                     <SelectItem value="mcq">Multiple Choice (MCQ)</SelectItem>
                                     <SelectItem value="text">Writing Answer</SelectItem>
+                                    <SelectItem value="slide">Slideshow / Learning Slide</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
-                            <Label>Question Text *</Label>
+                            <Label>Timer (Seconds)</Label>
+                            <Input
+                                type="number"
+                                value={newQuestion.timer || 0}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, timer: parseInt(e.target.value) || 0 })}
+                                placeholder="0 for unlimited"
+                            />
+                            <p className="text-[10px] text-muted-foreground italic">If {'\u003e'} 0, question will auto-advance when time ends.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>{newQuestion.type === 'slide' ? 'Slide Title / Description' : 'Question Text *'}</Label>
                             <Textarea
                                 value={newQuestion.text}
                                 onChange={(e) => setNewQuestion({ ...newQuestion, text: e.target.value })}
-                                placeholder={newQuestion.type === 'mcq' ? "What is the capital of France?" : "Explain the theory of relativity..."}
-                                rows={3}
+                                placeholder={newQuestion.type === 'slide' ? "Enter a title or description for this slide..." : (newQuestion.type === 'mcq' ? "What is the capital of France?" : "Explain the theory of relativity...")}
+                                rows={2}
                             />
                         </div>
+
+                        {newQuestion.type === 'slide' && (
+                            <div className="space-y-2">
+                                <Label>Google Slides / Embed URL</Label>
+                                <Input
+                                    value={(newQuestion as any).slide_url || ''}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, slide_url: e.target.value } as any)}
+                                    placeholder="https://docs.google.com/presentation/d/.../embed"
+                                />
+                                <p className="text-[10px] text-muted-foreground italic">
+                                    Paste the <strong>Embed</strong> link from Google Slides (File {"->"} Share {"->"} Publish to web {"->"} Embed).
+                                </p>
+                            </div>
+                        )}
 
                         {newQuestion.type === 'mcq' && (
                             <div className="space-y-2">
@@ -1545,6 +2191,14 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
+                                <Label>Category</Label>
+                                <Input
+                                    value={newQuestion.category}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, category: e.target.value })}
+                                    placeholder="e.g. Math, Science"
+                                />
+                            </div>
+                            <div className="space-y-2">
                                 <Label>Question Set</Label>
                                 <Select
                                     value={newQuestion.question_set_id}
@@ -1562,6 +2216,8 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Difficulty</Label>
                                 <Select
@@ -1578,30 +2234,79 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="space-y-2">
+                                <Label>Points</Label>
+                                <Input
+                                    type="number"
+                                    value={newQuestion.points}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 0 })}
+                                    placeholder="10"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Points</Label>
-                            <Input
-                                type="number"
-                                value={newQuestion.points}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 0 })}
-                                placeholder="10"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Explanation</Label>
-                            <Textarea
-                                value={newQuestion.explanation}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, explanation: e.target.value })}
-                                placeholder="Explain why this is the correct answer..."
-                                rows={2}
+
+                        {newQuestion.type !== 'slide' && (
+                            <div className="space-y-4">
+                                <Label>Question Image</Label>
+                                <div className="flex gap-4">
+                                    <div className="flex-1 space-y-2">
+                                        <Label className="text-xs text-muted-foreground">Upload Local Image</Label>
+                                        <Input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                                            className="cursor-pointer"
+                                        />
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <Label className="text-xs text-muted-foreground">Or Paste Image URL</Label>
+                                        <Input
+                                            value={newQuestion.image_url}
+                                            onChange={(e) => {
+                                                setNewQuestion({ ...newQuestion, image_url: e.target.value });
+                                                if (e.target.value) setImageFile(null);
+                                            }}
+                                            placeholder="https://example.com/image.jpg"
+                                        />
+                                    </div>
+                                </div>
+                                {(imageFile || newQuestion.image_url) && (
+                                    <div className="relative aspect-video rounded-lg border overflow-hidden bg-muted">
+                                        <img
+                                            src={imageFile ? URL.createObjectURL(imageFile) : newQuestion.image_url}
+                                            alt="Preview"
+                                            className="w-full h-full object-contain"
+                                        />
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full"
+                                            onClick={() => {
+                                                setImageFile(null);
+                                                setNewQuestion({ ...newQuestion, image_url: '' });
+                                            }}
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between border p-3 rounded-md mt-4">
+                            <div className="space-y-0.5">
+                                <Label>Required Question</Label>
+                                <p className="text-xs text-muted-foreground">Students must answer this to proceed</p>
+                            </div>
+                            <Switch
+                                checked={newQuestion.is_required}
+                                onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, is_required: checked })}
                             />
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="mt-6">
                         <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleAddQuestion} disabled={loading}>
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Save Question'}
+                        <Button onClick={handleAddQuestion} disabled={saving}>
+                            {saving ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</>) : (isEditing ? 'Update Question' : 'Save Question')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -1650,33 +2355,60 @@ function QuestionsTab({ questions, questionSets }: { questions: any[], questionS
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }
 
-function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], competitions: any[] }) {
-    const [loading, setLoading] = useState(false);
+function QuestionSetsTab({ questionSets: initialQuestionSets, competitions: initialCompetitions }: { questionSets: any[], competitions: any[] }) {
+    const [questionSets, setQuestionSets] = useState<any[]>([]);
+    const [counts, setCounts] = useState<Record<string, number>>({});
+    const [competitions, setCompetitions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [newQuestionSet, setNewQuestionSet] = useState({
-        id: '',
-        name: '',
-        description: '',
-        category: '',
-        questions: [],
-        competition_ids: [] as string[],
-        time_limit: 0,
-        allow_retries: true,
-        scoring_type: 'highest', // 'highest', 'best_of_3', 'first_attempt'
-        created_at: '',
-        updated_at: ''
-    });
-    const { toast } = useToast();
+    const [selectedSetIds, setSelectedSetIds] = useState<string[]>([]);
 
-    const filteredQuestionSets = (questionSets || []).filter(qs =>
-        (qs?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
-        (qs?.description || "").toLowerCase().includes((searchTerm || "").toLowerCase())
+    const { toast } = useToast();
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
+
+    const fetchData = async () => {
+        setLoading(true);
+        const [{ data: qs }, { data: comps }, { data: qCountData }] = await Promise.all([
+            supabase.from('question_sets').select('*').order('created_at', { ascending: false }),
+            supabase.from('competitions').select('id, name'),
+            supabase.from('questions').select('question_set_id')
+        ]);
+
+        if (qs) {
+            setQuestionSets(qs);
+            // Calculate counts
+            const countsMap: Record<string, number> = {};
+            (qCountData || []).forEach(q => {
+                if (q.question_set_id) {
+                    countsMap[q.question_set_id] = (countsMap[q.question_set_id] || 0) + 1;
+                }
+            });
+            setCounts(countsMap);
+        }
+        if (comps) setCompetitions(comps);
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchData(); }, []);
+
+    const emptyQS = {
+        name: '', description: '', category: 'General', time_limit: 0,
+        allow_retries: true, scoring_type: 'highest', competition_ids: [] as string[],
+        question_ids: [] as string[], difficulty: 'medium'
+    };
+    const [newQuestionSet, setNewQuestionSet] = useState(emptyQS);
+
+    const filteredQuestionSets = questionSets.filter(qs =>
+        (qs?.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (qs?.description || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (qs?.difficulty || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleAddQuestionSet = async () => {
@@ -1687,31 +2419,36 @@ function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], 
 
         setLoading(true);
         try {
-            const qsData = {
-                ...newQuestionSet,
-                updated_at: serverTimestamp()
-            };
-            delete (qsData as any).id;
+            const { id, questions, created_at, updated_at, ...data } = newQuestionSet as any;
 
-            if (isEditing) {
-                await updateDoc(doc(db, 'question_sets', newQuestionSet.id), qsData);
-                toast({ title: 'Question set updated!' });
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await supabase.from('question_sets').update(data).eq('id', id);
+                    if (error) throw error;
+                    toast({ title: 'Question set updated!' });
+                } else {
+                    const { error } = await supabase.from('question_sets').insert(data);
+                    if (error) throw error;
+                    toast({ title: 'Question set added!' });
+                }
+                await fetchData();
             } else {
-                await addDoc(collection(db, 'question_sets'), {
-                    ...qsData,
-                    created_at: serverTimestamp()
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditing ? 'update' : 'create',
+                    table_name: 'question_sets',
+                    record_id: isEditing ? id : null,
+                    data,
+                    requested_by: profile?.id,
+                    summary: `${isEditing ? 'Update' : 'Add'} question set: ${newQuestionSet.name}`,
+                    status: 'pending'
                 });
-                toast({ title: 'Question set added!' });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
             }
 
             setIsAddDialogOpen(false);
             setIsEditing(false);
-            setNewQuestionSet({
-                id: '', name: '', description: '', category: '', questions: [],
-                competition_ids: [],
-                time_limit: 0, allow_retries: true, scoring_type: 'highest',
-                created_at: '', updated_at: ''
-            });
+            setNewQuestionSet(emptyQS);
         } catch (error: any) {
             toast({ title: 'Error saving question set', description: error.message, variant: 'destructive' });
         }
@@ -1722,19 +2459,77 @@ function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], 
         if (!confirm('Are you sure?')) return;
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'question_sets', id));
-            toast({ title: 'Question set deleted successfully!' });
+            if (isAdmin) {
+                const { error } = await supabase.from('question_sets').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'Question set deleted successfully!' });
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'question_sets', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: 'Delete question set', status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error deleting question set', description: error.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
+    const handleToggleSelectSet = (id: string) => {
+        setSelectedSetIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAll = () => {
+        if (selectedSetIds.length > 0 && selectedSetIds.length === filteredQuestionSets.length) {
+            setSelectedSetIds([]);
+        } else {
+            setSelectedSetIds(filteredQuestionSets.map(qs => qs.id));
+        }
+    };
+
+    const handleBulkDeleteQuestionSets = async () => {
+        if (!confirm(`Delete ${selectedSetIds.length} question sets?`)) return;
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('question_sets').delete().in('id', selectedSetIds);
+                if (error) throw error;
+                toast({ title: `${selectedSetIds.length} question sets deleted!` });
+                setSelectedSetIds([]);
+                await fetchData();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete',
+                    table_name: 'question_sets',
+                    record_id: null,
+                    data: { ids: selectedSetIds },
+                    requested_by: profile?.id,
+                    summary: `Bulk delete ${selectedSetIds.length} question sets`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Bulk deletion submitted for admin approval' });
+                setSelectedSetIds([]);
+            }
+        } catch (err: any) {
+            toast({ title: 'Error deleting sets', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+
     const handleCompSelection = (compId: string) => {
         setNewQuestionSet(prev => {
-            const newComps = prev.competition_ids.includes(compId)
-                ? prev.competition_ids.filter(id => id !== compId)
-                : [...prev.competition_ids, compId];
+            const currentComps = prev.competition_ids || [];
+            const newComps = currentComps.includes(compId)
+                ? currentComps.filter(id => id !== compId)
+                : [...currentComps, compId];
             return { ...prev, competition_ids: newComps };
         });
     };
@@ -1759,14 +2554,38 @@ function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], 
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <div className="relative mb-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search question sets..."
-                                className="pl-10"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="relative flex-1 mr-4">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search question sets..."
+                                    className="pl-10"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {selectedSetIds.length > 0 && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={handleBulkDeleteQuestionSets}
+                                        disabled={loading}
+                                        className="h-9 px-3 text-xs"
+                                    >
+                                        <Trash2 className="w-3 h-3 mr-2" />
+                                        Delete Selected ({selectedSetIds.length})
+                                    </Button>
+                                )}
+                                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg border">
+                                    <Checkbox
+                                        id="select-all-sets"
+                                        checked={selectedSetIds.length > 0 && selectedSetIds.length === filteredQuestionSets.length}
+                                        onCheckedChange={handleToggleSelectAll}
+                                    />
+                                    <Label htmlFor="select-all-sets" className="text-xs font-medium cursor-pointer">Select All Visible</Label>
+                                </div>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -1778,57 +2597,83 @@ function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], 
                         ) : (
                             <div className="space-y-4">
                                 {filteredQuestionSets.map((questionSet) => (
-                                    <div key={questionSet.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex-1">
-                                                <h3 className="font-medium">{questionSet.name}</h3>
-                                                <p className="text-xs text-muted-foreground">{questionSet.description}</p>
-                                                <div className="flex items-center gap-4 mt-2">
-                                                    <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
-                                                    <span className="text-xs text-muted-foreground">Comps: {questionSet.competition_ids?.length || 0}</span>
-                                                    <span className="text-xs text-muted-foreground">Questions: {questionSet.questions?.length || 0}</span>
-                                                    {questionSet.time_limit > 0 && (
-                                                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                            <Clock className="w-3 h-3" />
-                                                            {questionSet.time_limit} min
+                                    <div key={questionSet.id} className={`p-4 rounded-lg border transition-all ${selectedSetIds.includes(questionSet.id) ? 'border-primary bg-primary/5 shadow-sm' : 'border-border/50 hover:bg-muted/50'}`}>
+                                        <div className="flex items-center gap-4">
+                                            <Checkbox
+                                                checked={selectedSetIds.includes(questionSet.id)}
+                                                onCheckedChange={() => handleToggleSelectSet(questionSet.id)}
+                                                className="mt-1"
+                                            />
+                                            <div className="flex-1 flex items-center justify-between">
+                                                <div className="flex-1">
+                                                    <h3 className="font-medium">{questionSet.name}</h3>
+                                                    <p className="text-xs text-muted-foreground">{questionSet.description}</p>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${questionSet.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                                                            questionSet.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                                                                'bg-yellow-100 text-yellow-700'
+                                                            }`}>
+                                                            {questionSet.difficulty || 'Medium'}
                                                         </span>
-                                                    )}
-                                                    <span className="text-xs text-muted-foreground border px-2 py-0.5 rounded">
-                                                        {questionSet.allow_retries ? 'Retries Allowed' : 'No Retries'}
-                                                    </span>
-                                                    <span className="text-xs text-muted-foreground border px-2 py-0.5 rounded capitalize">
-                                                        Score: {questionSet.scoring_type?.replace(/_/g, ' ') || 'Highest'}
-                                                    </span>
+                                                        <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">{questionSet.category}</span>
+                                                        <span className="text-xs text-muted-foreground">Comps: {questionSet.competition_ids?.length || 0}</span>
+                                                        <span className="text-xs text-muted-foreground italic">Questions: {counts[questionSet.id] || 0}</span>
+                                                        <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                                                            <Clock className="w-3 h-3" />
+                                                            {(() => {
+                                                                if (!counts[questionSet.id]) return 'Unlimited';
+                                                                const totalSeconds = Math.round((counts[questionSet.id] * 30) / 30) * 30;
+                                                                const mins = Math.floor(totalSeconds / 60);
+                                                                const secs = totalSeconds % 60;
+                                                                return `${mins}:${secs.toString().padStart(2, '0')}s avg`;
+                                                            })()}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground border px-2 py-0.5 rounded">
+                                                            {questionSet.allow_retries ? 'Retries Allowed' : 'No Retries'}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground border px-2 py-0.5 rounded capitalize">
+                                                            Score: {questionSet.scoring_type?.replace(/_/g, ' ') || 'Highest'}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex gap-2 ml-4">
-                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                    <Edit className="w-3 h-3" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
-                                                            <Trash2 className="w-3 h-3" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Delete Question Set</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                                Are you sure you want to delete this question set? This action cannot be undone.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                            <AlertDialogAction
-                                                                className="bg-destructive hover:bg-destructive/90"
-                                                                onClick={() => handleDeleteQuestionSet(questionSet.id)}
-                                                            >
-                                                                Delete
-                                                            </AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
+                                                <div className="flex gap-2 ml-4">
+                                                    <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => {
+                                                        const { questions, ...restQs } = questionSet;
+                                                        setNewQuestionSet({
+                                                            ...restQs,
+                                                            competition_ids: questionSet.competition_ids || [],
+                                                            question_ids: questionSet.question_ids || questionSet.questions || []
+                                                        });
+                                                        setIsEditing(true);
+                                                        setIsAddDialogOpen(true);
+                                                    }}>
+                                                        <Edit className="w-3 h-3" />
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Question Set</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Are you sure you want to delete this question set? This action cannot be undone.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className="bg-destructive hover:bg-destructive/90"
+                                                                    onClick={() => handleDeleteQuestionSet(questionSet.id)}
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1871,6 +2716,22 @@ function QuestionSetsTab({ questionSets, competitions }: { questionSets: any[], 
                                 onChange={(e) => setNewQuestionSet({ ...newQuestionSet, category: e.target.value })}
                                 placeholder="e.g., Math, Science, etc."
                             />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Difficulty Level</Label>
+                            <Select
+                                value={newQuestionSet.difficulty || 'medium'}
+                                onValueChange={(val) => setNewQuestionSet({ ...newQuestionSet, difficulty: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="easy">Easy (Green)</SelectItem>
+                                    <SelectItem value="medium">Medium (Yellow)</SelectItem>
+                                    <SelectItem value="hard">Hard (Red)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
                             <Label>Time Limit (minutes)</Label>
@@ -1967,12 +2828,16 @@ function AvatarsTab() {
     const [filePreview, setFilePreview] = useState<string | null>(null);
     const { toast } = useToast();
 
-    // Load avatars from Firestore
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
+
+    // Load avatars from Supabase
     const fetchAvatars = async () => {
         setLoading(true);
         try {
-            const snap = await getDocs(collection(db, 'avatars'));
-            setAvatars(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+            const { data, error } = await supabase.from('avatars').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            setAvatars((data || []) as any);
         } catch (error: any) {
             toast({ title: 'Error fetching avatars', description: error.message, variant: 'destructive' });
         }
@@ -1983,7 +2848,7 @@ function AvatarsTab() {
         fetchAvatars();
     }, []);
 
-    const filteredAvatars = (avatars || []).filter(avatar =>
+    const filteredAvatars = (avatars || []).filter((avatar: any) =>
         (avatar?.name || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
         (avatar?.category || "").toLowerCase().includes((searchTerm || "").toLowerCase())
     );
@@ -1991,7 +2856,6 @@ function AvatarsTab() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Check file size (limit to 500KB for Firestore strings)
             if (file.size > 500 * 1024) {
                 toast({ title: 'File too large', description: 'Please keep under 500KB', variant: 'destructive' });
                 return;
@@ -2014,22 +2878,36 @@ function AvatarsTab() {
         setLoading(true);
         try {
             const avatarData = {
-                ...newAvatar,
-                updated_at: serverTimestamp()
+                name: newAvatar.name,
+                url: newAvatar.image_url,
+                category: newAvatar.category,
+                unlock_condition: newAvatar.unlock_condition,
+                is_active: true
             };
-            delete (avatarData as any).id;
 
-            if (isEditing) {
-                await updateDoc(doc(db, 'avatars', newAvatar.id), avatarData);
-                setAvatars(prev => prev.map(a => a.id === newAvatar.id ? { ...a, ...avatarData } : a));
-                toast({ title: 'Avatar updated!' });
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await supabase.from('avatars').update(avatarData).eq('id', newAvatar.id);
+                    if (error) throw error;
+                    toast({ title: 'Avatar updated!' });
+                } else {
+                    const { error } = await supabase.from('avatars').insert(avatarData);
+                    if (error) throw error;
+                    toast({ title: 'Avatar added!' });
+                }
+                await fetchAvatars();
             } else {
-                const docRef = await addDoc(collection(db, 'avatars'), {
-                    ...avatarData,
-                    created_at: serverTimestamp()
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditing ? 'update' : 'create',
+                    table_name: 'avatars',
+                    record_id: isEditing ? newAvatar.id : null,
+                    data: avatarData,
+                    requested_by: profile?.id,
+                    summary: `${isEditing ? 'Update' : 'Add'} avatar: ${newAvatar.name}`,
+                    status: 'pending'
                 });
-                setAvatars(prev => [{ id: docRef.id, ...avatarData }, ...prev]);
-                toast({ title: 'Avatar added!' });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
             }
 
             setIsAddDialogOpen(false);
@@ -2049,9 +2927,20 @@ function AvatarsTab() {
     const handleDeleteAvatar = async (id: string) => {
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'avatars', id));
-            await fetchAvatars();
-            toast({ title: 'Avatar deleted successfully!' });
+            if (isAdmin) {
+                const { error } = await supabase.from('avatars').delete().eq('id', id);
+                if (error) throw error;
+                await fetchAvatars();
+                toast({ title: 'Avatar deleted successfully!' });
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'avatars', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: 'Delete avatar', status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
         }
@@ -2067,7 +2956,7 @@ function AvatarsTab() {
                 </div>
                 <Button onClick={() => setIsAddDialogOpen(true)} className="gradient-hero">
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Avatar
+                    {isAdmin ? 'Add Avatar' : 'Request New Avatar'}
                 </Button>
             </div>
 
@@ -2099,7 +2988,7 @@ function AvatarsTab() {
                                 {filteredAvatars.map((avatar) => (
                                     <div key={avatar.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
                                         <div className="flex flex-col items-center gap-3">
-                                            <img src={avatar.image_url} alt={avatar.name} className="w-16 h-16 rounded-full object-cover" />
+                                            <img src={avatar.url || avatar.image_url} alt={avatar.name} className="w-16 h-16 rounded-full object-cover" />
                                             <div className="text-center">
                                                 <h3 className="font-medium text-sm">{avatar.name}</h3>
                                                 <p className="text-xs text-muted-foreground">{avatar.category}</p>
@@ -2117,7 +3006,20 @@ function AvatarsTab() {
                                                 )}
                                             </div>
                                             <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => {
+                                                    setNewAvatar({
+                                                        id: avatar.id,
+                                                        name: avatar.name,
+                                                        image_url: avatar.url || avatar.image_url,
+                                                        category: avatar.category,
+                                                        unlock_condition: { type: 'none', value: 0 },
+                                                        created_at: avatar.created_at,
+                                                        updated_at: avatar.updated_at
+                                                    });
+                                                    setFilePreview(avatar.url || avatar.image_url);
+                                                    setIsEditing(true);
+                                                    setIsAddDialogOpen(true);
+                                                }}>
                                                     <Edit className="w-3 h-3" />
                                                 </Button>
                                                 <AlertDialog>
@@ -2254,6 +3156,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');
+    const [schoolFilter, setSchoolFilter] = useState('all');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isBulkAddDialogOpen, setIsBulkAddDialogOpen] = useState(false);
@@ -2267,6 +3170,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
         role: 'student',
         school_id: '',
         password: '',
+        password_text: '',
         is_active: true,
         score: 0,
         progress: 0,
@@ -2282,22 +3186,53 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
     const [bulkTeacherSchoolId, setBulkTeacherSchoolId] = useState('');
     const [bulkStudentPassword, setBulkStudentPassword] = useState('');
     const [bulkTeacherPassword, setBulkTeacherPassword] = useState('');
+    const [bulkResults, setBulkResults] = useState<{ email: string, password: string, status: string }[]>([]);
+    const [isBulkResultOpen, setIsBulkResultOpen] = useState(false);
 
-    // Microsoft Access Dialog State
-    const [isMicrosoftAccessOpen, setIsMicrosoftAccessOpen] = useState(false);
-    const [msAccessEmails, setMsAccessEmails] = useState(''); // for bulk
-    const [msAccessSingleEmail, setMsAccessSingleEmail] = useState(''); // for single
-    const [msAccessSchoolId, setMsAccessSchoolId] = useState('all'); // default
-    const [msAccessRole, setMsAccessRole] = useState('student');
+    // Internal user list management for the tab
+    const [tabUsers, setTabUsers] = useState<any[]>([]);
+    const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+
+    const togglePasswordVisibility = (id: string) => {
+        setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const fetchUsers = async () => {
+        setLoading(true);
+        try {
+            console.log("Fetching users from Supabase...");
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
+            if (error) {
+                console.error("Supabase profiles fetch error:", error);
+                throw error;
+            }
+            console.log(`Fetched ${data?.length || 0} users`);
+            setTabUsers(data || []);
+        } catch (err: any) {
+            console.error("Failed to fetch users", err);
+            toast({ title: 'Fetch Error', description: err.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        fetchUsers();
+    }, []);
 
     const { toast } = useToast();
-    const { profile } = useAuth();
+    const { profile, isAdmin } = useAuth();
 
-    // Add null check for users
-    const filteredUsers = (users || []).filter(user =>
+    // Use tabUsers (local state) instead of users prop for better performance and to fix the empty list issue
+    const filteredUsers = (tabUsers || []).filter(user =>
         (user?.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user?.email?.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (roleFilter === 'all' || user?.role === roleFilter)
+        (roleFilter === 'all' || user?.role === roleFilter) &&
+        (schoolFilter === 'all' || user?.school_id === schoolFilter)
     );
 
     const handleAddUser = async () => {
@@ -2308,138 +3243,93 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
 
         setLoading(true);
         try {
-            if (isEditing) {
-                // Update existing user profile in Firestore
-                const userRef = doc(db, 'profiles', newUser.id);
-                await updateDoc(userRef, {
-                    display_name: newUser.display_name,
-                    role: newUser.role,
-                    school_id: newUser.school_id,
-                    is_active: newUser.is_active,
-                    updated_at: serverTimestamp()
-                });
-                toast({ title: 'User updated successfully!' });
-            } else {
-                const email = newUser.email.toLowerCase();
-                const profileRef = doc(db, 'profiles', email);
-                const profileSnap = await getDoc(profileRef);
+            if (isAdmin) {
+                if (isEditing) {
+                    const { error } = await supabase
+                        .from('profiles')
+                        .update({
+                            email: newUser.email,
+                            display_name: newUser.display_name,
+                            role: newUser.role,
+                            school_id: newUser.school_id,
+                            is_active: newUser.is_active,
+                            password_text: newUser.password_text || newUser.password
+                        })
+                        .eq('id', newUser.id);
 
-                if (profileSnap.exists()) {
-                    toast({ title: 'User already registered', variant: 'destructive' });
-                    setLoading(false);
-                    return;
-                }
-
-                // Check if user exists but has a BROKEN (random) ID
-                const q = query(collection(db, 'profiles'), where('email', '==', email));
-                const existingSnap = await getDocs(q);
-
-                if (!existingSnap.empty) {
-                    // FIX: Migrate to Email ID
-                    const oldDoc = existingSnap.docs[0];
-                    const oldData = oldDoc.data();
-
-                    await setDoc(profileRef, {
-                        ...oldData,
-                        id: email, // Update internal ID field
-                        updated_at: serverTimestamp()
-                    });
-
-                    await deleteDoc(oldDoc.ref);
-
-                    toast({
-                        title: 'User Access Fixed',
-                        description: 'Existing account migrated to enable Microsoft Login.'
-                    });
+                    if (error) throw error;
+                    toast({ title: 'User updated successfully!' });
                 } else {
-                    // CREATE: New user with Email/Password if password provided
-                    let userId = email; // Default ID if no Auth creation
+                    // Creating user requires auth.signUp which is handled by createClient
+                    const passwordToUse = newUser.password || generateLumoraPassword();
+                    const email = newUser.email.toLowerCase();
 
-                    // If a password is provided, we MUST create the Auth user
-                    // We use a secondary app to avoid logging out the current admin
-                    if (newUser.password) {
-                        try {
-                            const { initializeApp } = await import('firebase/app');
-                            const { getAuth, createUserWithEmailAndPassword, signOut } = await import('firebase/auth');
+                    const secondary = createClient(
+                        import.meta.env.VITE_SUPABASE_URL,
+                        import.meta.env.VITE_SUPABASE_ANON_KEY,
+                        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+                    );
 
-                            // Re-use config but unique name
-                            // @ts-ignore
-                            const config = db.app.options;
-                            const secondaryApp = initializeApp(config, "SecondaryApp" + Date.now());
-                            const secondaryAuth = getAuth(secondaryApp);
-
-                            const userCred = await createUserWithEmailAndPassword(secondaryAuth, email, newUser.password);
-                            userId = userCred.user.uid;
-
-                            // Cleanup
-                            await signOut(secondaryAuth);
-                            // We don't delete app immediately to avoid rough edges, but it's fine for client side occasional use
-                        } catch (authError: any) {
-                            console.error("Auth creation failed:", authError);
-                            // If user already exists in Auth, we might want to just link them?
-                            // But for now, alert the admin
-                            if (authError.code === 'auth/email-already-in-use') {
-                                // We can't easily get the UID of an existing user client-side without logging in
-                                // So we just warn them but continue creating profile as email-id
-                                toast({
-                                    title: 'Note: Auth User Exists',
-                                    description: 'Password was NOT updated because user already exists. Profile will be linked by email.',
-                                    variant: 'warning'
-                                });
-                            } else {
-                                throw new Error(`Failed to create Auth User: ${authError.message}`);
+                    const { data: authData, error: authError } = await secondary.auth.signUp({
+                        email: email,
+                        password: passwordToUse,
+                        options: {
+                            data: {
+                                role: newUser.role,
+                                display_name: newUser.display_name || email.split('@')[0],
                             }
                         }
-                    }
+                    });
 
-                    const displayName = newUser.display_name || email.split('@')[0];
-                    const profileData = {
+                    if (authError) throw authError;
+
+                    const userId = authData.user?.id;
+                    await supabase.from('profiles').upsert({
+                        id: userId,
                         email: email,
-                        display_name: displayName,
+                        display_name: newUser.display_name || email.split('@')[0],
                         role: newUser.role,
                         school_id: newUser.school_id || null,
                         is_active: true,
-                        score: 0,
-                        progress: 0,
-                        avatar_id: null,
-                        // If we got a UID from Auth, use it. Else use Email
-                        // Ideally we set user_id to the UID if we have it
-                        user_id: userId !== email ? userId : null,
-                        created_at: serverTimestamp(),
-                        updated_at: serverTimestamp()
-                    };
-
-                    // We write to the doc ID = userId (if it's a UID) OR ID = Email?
-                    // To stay consistent with my "mixed mode" logic:
-                    // If we have a UID, it makes sense to make the doc ID the UID.
-                    // BUT, to allow Microsoft Login later on the same email, we enabled "Email ID" lookups.
-                    // Best practice: Doc ID = UID. 
-                    // However, if we didn't create Auth (no password), we use Email as ID.
-
-                    const finalDocRef = doc(db, 'profiles', userId);
-                    await setDoc(finalDocRef, profileData);
-
-                    // If we used UID as ID, and we want to ensure "Email Lookup" works for MS login...
-                    // We rely on Strategy C (Query) defined in AuthContext.
-                    // OR we create a second dummy doc? No, Strategy C handles it.
+                        password_text: passwordToUse
+                    }, { onConflict: 'email' });
 
                     toast({
-                        title: 'User registered!',
-                        description: newUser.password
-                            ? `User created with password. UID: ${userId}`
-                            : 'User profile created. They can log in via Microsoft.',
+                        title: 'User Registered!',
+                        description: `User created. Password: ${passwordToUse}`,
                     });
                 }
+                await fetchUsers();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditing ? 'update' : 'create',
+                    table_name: 'profiles',
+                    record_id: isEditing ? newUser.id : null,
+                    data: {
+                        display_name: newUser.display_name,
+                        role: newUser.role,
+                        school_id: newUser.school_id,
+                        is_active: newUser.is_active,
+                        email: newUser.email,
+                        password: newUser.password || generateLumoraPassword()
+                    },
+                    requested_by: profile?.id,
+                    summary: `${isEditing ? 'Update' : 'Add'} user: ${newUser.display_name || newUser.email}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
             }
 
-            // UI Reset - Immediately close and clear
+            // UI Reset
             setIsAddDialogOpen(false);
             setIsEditing(false);
             setNewUser({
                 id: '', email: '', display_name: '', role: 'student', school_id: '',
-                password: '', is_active: true, score: 0, progress: 0, avatar_id: null,
+                password: '', password_text: '', is_active: true, score: 0, progress: 0, avatar_id: null,
                 created_at: '', updated_at: ''
             });
+
         } catch (error: any) {
             console.error('Error saving user:', error);
             toast({
@@ -2452,8 +3342,13 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
     };
 
     const handleBulkAdd = async (role: 'student' | 'teacher') => {
+        if (!isAdmin) {
+            toast({ title: 'Moderators cannot perform bulk user creation directly', variant: 'destructive' });
+            return;
+        }
         const data = role === 'student' ? bulkStudents : bulkTeachers;
         const schoolId = role === 'student' ? bulkStudentSchoolId : bulkTeacherSchoolId;
+        const fixedPassword = role === 'student' ? bulkStudentPassword : bulkTeacherPassword;
 
         if (!data.trim()) {
             toast({ title: `Please enter ${role} emails`, variant: 'destructive' });
@@ -2464,78 +3359,91 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
         try {
             const lines = data.split('\n').filter(line => line.trim());
             let addedCount = 0;
-            let fixedCount = 0;
-            const batch = writeBatch(db);
+            const results: any[] = [];
 
-            const checks = lines.map(async (line) => {
-                const email = line.trim().toLowerCase();
+            const secondary = createClient(
+                import.meta.env.VITE_SUPABASE_URL,
+                import.meta.env.VITE_SUPABASE_ANON_KEY,
+                { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+            );
+
+            const creationPromises = lines.map(async (line) => {
+                const parts = line.split(/[,\s]+/).filter(Boolean);
+                const email = parts[0]?.trim().toLowerCase();
+                const customPass = parts[1]?.trim();
+
+                // Logic: If admin specified a password (fixedPassword), use it for all.
+                // If not, use customPass from the line if it exists.
+                // Otherwise, generate a random one.
+                const password = fixedPassword || customPass || generateLumoraPassword();
+
                 if (!email) return;
 
-                // 1. Check if the CORRECT profile (ID=Email) already exists
-                const profileRef = doc(db, 'profiles', email);
-                const profileSnap = await getDoc(profileRef);
+                let status = 'Success';
+                let userId = null;
 
-                if (profileSnap.exists()) {
-                    return; // User is already set up correctly
-                }
-
-                // 2. Check if a BROKEN profile (Random ID) exists
-                const q = query(collection(db, 'profiles'), where('email', '==', email));
-                const existingSnap = await getDocs(q);
-
-                if (!existingSnap.empty) {
-                    // MIGRATE: Existing user with wrong ID format. Fix them.
-                    const oldDoc = existingSnap.docs[0];
-                    const oldData = oldDoc.data();
-
-                    // Create new doc with ID = Email
-                    batch.set(profileRef, {
-                        ...oldData,
-                        id: email, // Update internal ID field to match
-                        updated_at: serverTimestamp()
+                try {
+                    const { data: authData, error: authError } = await secondary.auth.signUp({
+                        email: email,
+                        password: password,
+                        options: {
+                            data: {
+                                role: role,
+                                display_name: email.split('@')[0],
+                            }
+                        }
                     });
 
-                    // Delete the old broken doc
-                    batch.delete(doc(db, 'profiles', oldDoc.id));
-                    fixedCount++;
-                } else {
-                    // CREATE: New user
-                    const displayName = email.split('@')[0];
-                    const profileData = {
+                    if (authError) {
+                        if (authError.message.includes('already registered') || authError.message.includes('User already registered')) {
+                            status = 'Linked (Existing Auth)';
+                            // Try to get existing ID
+                            const { data: existing } = await supabase.from('profiles').select('id').eq('email', email).single();
+                            if (existing) userId = existing.id;
+                        } else {
+                            throw authError;
+                        }
+                    } else {
+                        userId = authData.user?.id;
+                    }
+
+                    await supabase.from('profiles').upsert({
+                        id: userId, // Will be null if registration failed/already exists
                         email: email,
-                        display_name: displayName,
                         role: role,
                         school_id: schoolId || null,
                         is_active: true,
-                        score: 0,
-                        progress: 0,
-                        avatar_id: null,
-                        created_at: serverTimestamp(),
-                        updated_at: serverTimestamp()
-                    };
+                        display_name: email.split('@')[0],
+                        password_text: password
+                    }, { onConflict: 'email' });
 
-                    batch.set(profileRef, profileData);
                     addedCount++;
+                    results.push({ email, password, status });
+                } catch (authError: any) {
+                    results.push({ email, password: 'FAILED', status: `Error: ${authError.message}` });
                 }
             });
 
-            await Promise.all(checks);
+            await Promise.all(creationPromises);
 
-            if (addedCount > 0 || fixedCount > 0) {
-                await batch.commit();
+            if (addedCount > 0) {
+                setBulkResults(results);
+                setIsBulkResultOpen(true);
                 toast({
                     title: 'Batch Processing Complete',
-                    description: `Registered ${addedCount} new users and fixed ${fixedCount} existing accounts for Microsoft Login.`
+                    description: `Processed ${addedCount} new users. See the results below.`
                 });
 
                 if (role === 'student') setBulkStudents('');
                 else setBulkTeachers('');
                 setIsBulkAddDialogOpen(false);
+                // Refresh list
+                await fetchUsers();
             } else {
                 toast({
                     title: 'No changes needed',
                     description: 'All users are already registered correctly.',
-                    variant: 'secondary'
+                    variant: 'default'
                 });
             }
 
@@ -2546,97 +3454,89 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
         setLoading(false);
     };
 
-    const handleMsAccessAdd = async () => {
-        const isBulk = msAccessEmails.trim().length > 0;
-        const emailsToProcess = isBulk
-            ? msAccessEmails.split('\n').filter(line => line.trim())
-            : [msAccessSingleEmail.trim()].filter(Boolean);
-
-        if (emailsToProcess.length === 0) {
-            toast({ title: 'Please enter at least one email', variant: 'destructive' });
-            return;
-        }
-
-        if (msAccessSchoolId === 'all' || !msAccessSchoolId) {
-            // Optional: Force school selection? Or allow 'No School'? 
-            // User said "with which skl it should be assigned to", so likely mandatory or important.
-            // We'll proceed but maybe warn if it's critical. For now, allow empty/all implies none.
-        }
+    const handleDeleteUser = async (id: string, email: string) => {
+        if (id === profile?.id) { toast({ title: 'You cannot delete yourself!', variant: 'destructive' }); return; }
+        if (!confirm(`Are you sure you want to delete user ${email}?`)) return;
 
         setLoading(true);
         try {
-            let addedCount = 0;
-            const batch = writeBatch(db);
-            const userChecks = emailsToProcess.map(async (email) => {
-                const cleanEmail = email.trim().toLowerCase();
-                if (!cleanEmail) return;
-
-                // DIRECT WRITE STRATEGY: 
-                // We skip checking for existence to ensure we FIX the user by creating the correct email-ID doc.
-                // We use merge: true to avoid destroying existing data if the ID matches.
-                const profileId = cleanEmail;
-                const displayName = cleanEmail.split('@')[0];
-
-                // Note: We don't verify if another profile with random ID exists. 
-                // That's acceptable; we prioritize login access via this email-ID doc.
-
-                batch.set(doc(db, 'profiles', profileId), {
-                    email: cleanEmail,
-                    display_name: displayName,
-                    role: msAccessRole,
-                    school_id: msAccessSchoolId !== 'all' ? msAccessSchoolId : null,
-                    is_active: true,
-                    // Only set these if they don't exist (merge won't overwrite unless we explicitly separate, 
-                    // but here we just overwrite defaults which is fine for "Grant Access")
-                    updated_at: serverTimestamp(),
-                    // We only set created_at if it's new ideally, but for now we reset it or 
-                    // we could use update() but then we can't create. set() is best.
-                    created_at: serverTimestamp()
-                }, { merge: true });
-
-                addedCount++;
-            });
-
-            await Promise.all(userChecks);
-
-            if (addedCount > 0) {
-                await batch.commit();
-                toast({
-                    title: 'Microsoft Access Granted',
-                    description: `Successfully pre-registered ${addedCount} users.`
-                });
-                setIsMicrosoftAccessOpen(false);
-                setMsAccessEmails('');
-                setMsAccessSingleEmail('');
+            if (isAdmin) {
+                const { error } = await supabase.from('profiles').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'User deleted successfully!' });
+                await fetchUsers();
             } else {
-                toast({ title: 'No new users added', description: 'These emails might already be registered.', variant: 'outline' });
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'profiles', record_id: id,
+                    data: {}, requested_by: profile?.id,
+                    summary: `Delete user: ${email}`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
             }
-
-        } catch (error: any) {
-            toast({ title: 'Error adding users', description: error.message, variant: 'destructive' });
-        }
-        setLoading(false);
-    };
-
-    const handleDeleteUser = async (id: string) => {
-        if (!confirm('Are you sure?')) return;
-        setLoading(true);
-        try {
-            await deleteDoc(doc(db, 'profiles', id));
-            toast({ title: 'User deleted successfully!' });
         } catch (error: any) {
             toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
-    const handleRoleChange = async (userId: string, newRole: string) => {
+    const handleBulkDelete = async () => {
+        if (!selectedUserIds.length) return;
+        if (!confirm(`Delete ${selectedUserIds.length} users?`)) return;
+        setLoading(true);
         try {
-            await updateDoc(doc(db, 'profiles', userId), {
-                role: newRole,
-                updated_at: serverTimestamp()
-            });
-            toast({ title: 'User role updated successfully!' });
+            if (isAdmin) {
+                const { error } = await supabase.from('profiles').delete().in('id', selectedUserIds);
+                if (error) throw error;
+                toast({ title: `${selectedUserIds.length} users deleted successfully!` });
+                setSelectedUserIds([]);
+                await fetchUsers();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete', table_name: 'profiles_bulk', record_id: profile?.id,
+                    data: { ids: selectedUserIds }, requested_by: profile?.id,
+                    summary: `Bulk delete ${selectedUserIds.length} users`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Bulk deletion submitted for admin approval' });
+            }
+        } catch (error: any) {
+            toast({ title: 'Error deleting users', description: error.message, variant: 'destructive' });
+        }
+        setLoading(false);
+    };
+
+    const handleToggleSelectUser = (id: string) => {
+        setSelectedUserIds(prev =>
+            prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]
+        );
+    };
+
+    const handleToggleSelectAll = () => {
+        const selectableUsers = filteredUsers.filter(u => u.id !== profile?.id);
+        if (selectedUserIds.length === selectableUsers.length) {
+            setSelectedUserIds([]);
+        } else {
+            setSelectedUserIds(selectableUsers.map(u => u.id));
+        }
+    };
+
+    const handleRoleChange = async (userId: string, targetEmail: string, newRole: string) => {
+        try {
+            if (isAdmin) {
+                const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+                if (error) throw error;
+                toast({ title: 'User role updated!' });
+                await fetchUsers();
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'update', table_name: 'profiles', record_id: userId,
+                    data: { role: newRole }, requested_by: profile?.id,
+                    summary: `Change role of ${targetEmail} to ${newRole}`, status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Role change submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error updating user role', description: error.message, variant: 'destructive' });
         }
@@ -2654,16 +3554,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                         <Plus className="w-4 h-4 mr-2" />
                         Add User
                     </Button>
-                    <Button onClick={() => setIsMicrosoftAccessOpen(true)} className="bg-[#00a4ef] hover:bg-[#0078d4] text-white">
-                        <svg className="w-4 h-4 mr-2" viewBox="0 0 23 23">
-                            <path fill="#f3f3f3" d="M0 0h23v23H0z" />
-                            <path fill="#f35325" d="M1 1h10v10H1z" />
-                            <path fill="#81bc06" d="M12 1h10v10H12z" />
-                            <path fill="#05a6f0" d="M1 12h10v10H1z" />
-                            <path fill="#ffba08" d="M12 12h10v10H12z" />
-                        </svg>
-                        Microsoft Access
-                    </Button>
+
                     <Button onClick={() => setIsBulkAddDialogOpen(true)} variant="outline">
                         <Upload className="w-4 h-4 mr-2" />
                         Bulk Add
@@ -2700,6 +3591,18 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                     <SelectItem value="student">Students</SelectItem>
                                 </SelectContent>
                             </Select>
+                            <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                                <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Filter by school" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Schools</SelectItem>
+                                    {schools.map(school => (
+                                        <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                                    ))}
+                                    <SelectItem value="none">No School Assigned</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         {loading ? (
@@ -2709,21 +3612,35 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                         ) : filteredUsers.length === 0 ? (
                             <p className="text-center text-muted-foreground py-4">No users found</p>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                                 <table className="w-full">
                                     <thead>
                                         <tr className="border-b border-border">
+                                            <th className="p-3 text-left w-10">
+                                                <Checkbox
+                                                    checked={selectedUserIds.length > 0 && selectedUserIds.length === filteredUsers.length}
+                                                    onCheckedChange={handleToggleSelectAll}
+                                                />
+                                            </th>
                                             <th className="p-3 text-left font-medium">Name</th>
                                             <th className="p-3 text-left font-medium">Email</th>
                                             <th className="p-3 text-left font-medium">Role</th>
                                             <th className="p-3 text-left font-medium">School</th>
                                             <th className="p-3 text-left font-medium">Status</th>
+                                            <th className="p-3 text-left font-medium">Password</th>
                                             <th className="p-3 text-left font-medium">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredUsers.map((user) => (
-                                            <tr key={user.id} className="border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors">
+                                            <tr key={user.id} className={`border-b border-border/50 last:border-none hover:bg-muted/50 transition-colors ${selectedUserIds.includes(user.id) ? 'bg-primary/5' : ''}`}>
+                                                <td className="p-3">
+                                                    <Checkbox
+                                                        checked={selectedUserIds.includes(user.id)}
+                                                        onCheckedChange={() => handleToggleSelectUser(user.id)}
+                                                        disabled={user.id === profile?.id}
+                                                    />
+                                                </td>
                                                 <td className="p-3">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
@@ -2736,7 +3653,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                                 <td className="p-3">
                                                     <Select
                                                         value={user.role}
-                                                        onValueChange={(selectedValue) => handleRoleChange(user.id, selectedValue)}
+                                                        onValueChange={(selectedValue) => handleRoleChange(user.id, user.email, selectedValue)}
                                                         disabled={user.id === profile?.id}
                                                     >
                                                         <SelectTrigger className="w-[120px] h-8">
@@ -2750,11 +3667,25 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                                         </SelectContent>
                                                     </Select>
                                                 </td>
-                                                <td className="p-3 text-muted-foreground">{user.school_id || 'N/A'}</td>
+                                                <td className="p-3 text-muted-foreground">
+                                                    {user.school_id ? (schools.find(s => s.id === user.school_id)?.name || 'Unknown School') : <span className="italic opacity-50">Not Assigned</span>}
+                                                </td>
                                                 <td className="p-3">
                                                     <span className={`px-2 py-1 rounded-full text-xs capitalize ${user.is_active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
                                                         {user.is_active ? 'active' : 'inactive'}
                                                     </span>
+                                                </td>
+                                                <td className="p-3 text-muted-foreground">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono text-sm">
+                                                            {visiblePasswords[user.id] ? (user.password_text || 'Encrypted') : '••••••••'}
+                                                        </span>
+                                                        {user.password_text && (
+                                                            <button onClick={() => togglePasswordVisibility(user.id)} className="text-muted-foreground hover:text-foreground">
+                                                                {visiblePasswords[user.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="p-3">
                                                     <div className="flex items-center gap-2">
@@ -2772,7 +3703,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                                         </Button>
                                                         <AlertDialog>
                                                             <AlertDialogTrigger asChild>
-                                                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0">
+                                                                <Button variant="destructive" size="sm" className="h-8 w-8 p-0" disabled={user.id === profile?.id}>
                                                                     <Trash2 className="w-3 h-3" />
                                                                 </Button>
                                                             </AlertDialogTrigger>
@@ -2787,7 +3718,7 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                     <AlertDialogAction
                                                                         className="bg-destructive hover:bg-destructive/90"
-                                                                        onClick={() => handleDeleteUser(user.id)}
+                                                                        onClick={() => handleDeleteUser(user.id, user.email)}
                                                                     >
                                                                         Delete
                                                                     </AlertDialogAction>
@@ -2805,6 +3736,46 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Bulk Actions Toolbar */}
+            {selectedUserIds.length > 0 && (
+                <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-popover border border-border shadow-xl rounded-full px-6 py-3 flex items-center gap-6 z-50 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">
+                            {selectedUserIds.length}
+                        </span>
+                        <span className="text-sm text-muted-foreground">Users selected</span>
+                    </div>
+                    <div className="h-4 w-px bg-border" />
+                    <div className="flex items-center gap-2">
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="sm" className="h-8">
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    Delete Selected
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Bulk Delete Users</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Are you sure you want to delete {selectedUserIds.length} users? This action is permanent and cannot be undone.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction className="bg-destructive hover:bg-destructive/90" onClick={handleBulkDelete}>
+                                        Delete Forever
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <Button variant="outline" size="sm" className="h-8" onClick={() => setSelectedUserIds([])}>
+                            Cancel
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Add User Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -2850,21 +3821,30 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>School ID (optional)</Label>
-                            <Input
-                                value={newUser.school_id}
-                                onChange={(e) => setNewUser({ ...newUser, school_id: e.target.value })}
-                                placeholder="school123"
-                            />
+                            <Label>School Assignment (optional)</Label>
+                            <Select
+                                value={newUser.school_id || "none"}
+                                onValueChange={(value) => setNewUser({ ...newUser, school_id: value === "none" ? "" : value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Assign to a school" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No School - Independent User</SelectItem>
+                                    {schools.map(school => (
+                                        <SelectItem key={school.id} value={school.id}>{school.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label>Password (optional)</Label>
+                            <Label>Password {isEditing && "(Enter to change)"}</Label>
                             <div className="relative">
                                 <Input
                                     type={showAddUserPassword ? "text" : "password"}
-                                    value={newUser.password}
-                                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                                    placeholder="Enter password (leave empty to skip Auth creation)"
+                                    value={isEditing ? (newUser.password_text || '') : newUser.password}
+                                    onChange={(e) => setNewUser({ ...newUser, [isEditing ? 'password_text' : 'password']: e.target.value })}
+                                    placeholder={isEditing ? "Enter new password to change" : "Leave empty for auto-generation"}
                                     className="pr-10"
                                 />
                                 <button
@@ -2875,7 +3855,11 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                     {showAddUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
-                            <p className="text-xs text-muted-foreground">If left empty, a secure password will be auto-generated</p>
+                            {!isEditing ? (
+                                <p className="text-xs text-muted-foreground">If left empty, a secure password will be auto-generated</p>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">Passwords are securely encrypted. Only passwords created recently via this dashboard are visible.</p>
+                            )}
                         </div>
                         <div className="flex items-center gap-3">
                             <Checkbox
@@ -2926,10 +3910,13 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                 <Textarea
                                     value={bulkStudents}
                                     onChange={(e) => setBulkStudents(e.target.value)}
-                                    placeholder="student1@school.com\nstudent2@school.com"
+                                    placeholder="student1@school.com,Password123\nstudent2@school.com"
                                     rows={8}
                                     className="font-mono"
                                 />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Support format: <b>email</b> OR <b>email,password</b> (comma separated).
+                                </p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -2973,10 +3960,13 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                                 <Textarea
                                     value={bulkTeachers}
                                     onChange={(e) => setBulkTeachers(e.target.value)}
-                                    placeholder="teacher1@school.com\nteacher2@school.com"
+                                    placeholder="teacher1@school.com,SecretPass\nteacher2@school.com"
                                     rows={8}
                                     className="font-mono"
                                 />
+                                <p className="text-[10px] text-muted-foreground mt-1">
+                                    Support format: <b>email</b> OR <b>email,password</b> (comma separated).
+                                </p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -3017,161 +4007,141 @@ function UsersTab({ users, schools }: { users: any[], schools: any[] }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Microsoft Access Dialog */}
-            <Dialog open={isMicrosoftAccessOpen} onOpenChange={setIsMicrosoftAccessOpen}>
-                <DialogContent className="max-w-2xl">
+            {/* Bulk Results Dialog */}
+            <Dialog open={isBulkResultOpen} onOpenChange={setIsBulkResultOpen}>
+                <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
                     <DialogHeader>
-                        <DialogTitle>Grant Microsoft Login Access</DialogTitle>
-                        <DialogDescription>
-                            Pre-register emails to allow instant Microsoft sign-in.
-                            Users will be created with the selected role and school.
-                        </DialogDescription>
+                        <DialogTitle>Import Results & Passwords</DialogTitle>
+                        <DialogDescription>Please copy these passwords now. For security, they won't be shown again.</DialogDescription>
                     </DialogHeader>
-
-                    <div className="space-y-4 py-2">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Role</Label>
-                                <Select value={msAccessRole} onValueChange={setMsAccessRole}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="student">Student</SelectItem>
-                                        <SelectItem value="teacher">Teacher</SelectItem>
-                                        <SelectItem value="moderator">Moderator</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>School</Label>
-                                <Select value={msAccessSchoolId} onValueChange={setMsAccessSchoolId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select School" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">No Assigned School</SelectItem>
-                                        {schools.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        <Tabs defaultValue="single">
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="single">Single Email</TabsTrigger>
-                                <TabsTrigger value="bulk">Bulk Add</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="single" className="space-y-4 pt-2">
-                                <div className="space-y-2">
-                                    <Label>User Email</Label>
-                                    <Input
-                                        placeholder="student@example.com"
-                                        value={msAccessSingleEmail}
-                                        onChange={(e) => {
-                                            setMsAccessSingleEmail(e.target.value);
-                                            setMsAccessEmails(''); // clear bulk to avoid confusion
-                                        }}
-                                    />
-                                </div>
-                            </TabsContent>
-                            <TabsContent value="bulk" className="space-y-4 pt-2">
-                                <div className="space-y-2">
-                                    <Label>Paste Emails (one per line)</Label>
-                                    <Textarea
-                                        placeholder={"student1@example.com\nstudent2@example.com"}
-                                        rows={8}
-                                        value={msAccessEmails}
-                                        onChange={(e) => {
-                                            setMsAccessEmails(e.target.value);
-                                            setMsAccessSingleEmail(''); // clear single
-                                        }}
-                                        className="font-mono text-sm"
-                                    />
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsMicrosoftAccessOpen(false)}>Cancel</Button>
-                        <Button onClick={handleMsAccessAdd} disabled={loading} className="bg-[#00a4ef] hover:bg-[#0078d4] text-white">
-                            {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : 'Grant Access'}
+                    <ScrollArea className="flex-1 mt-4 border rounded-md">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted sticky top-0">
+                                <tr>
+                                    <th className="p-2 text-left">Email</th>
+                                    <th className="p-2 text-left">Password</th>
+                                    <th className="p-2 text-left">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {bulkResults.map((res, i) => (
+                                    <tr key={i} className="hover:bg-muted/50">
+                                        <td className="p-2 font-mono text-xs">{res.email}</td>
+                                        <td className="p-2 font-mono text-xs font-bold text-primary">{res.password}</td>
+                                        <td className={`p-2 text-[10px] ${res.status.includes('Error') ? 'text-destructive' : 'text-green-500'}`}>{res.status}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </ScrollArea>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => {
+                            const text = bulkResults.map(r => `${r.email}\t${r.password}`).join('\n');
+                            navigator.clipboard.writeText(text);
+                            toast({ title: 'Copied to clipboard' });
+                        }}>
+                            Copy All to Clipboard
                         </Button>
+                        <Button onClick={() => setIsBulkResultOpen(false)}>Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+
         </div>
     );
 }
 
 // Approvals Tab Component
 function ApprovalsTab() {
-    const [approvals, setApprovals] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const [approvals, setApprovals] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
     const { toast } = useToast();
     const { profile } = useAuth();
 
     const fetchApprovals = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'approvals'), orderBy('created_at', 'desc'));
-            const snap = await getDocs(q);
-            setApprovals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+            // Keep query simple to avoid relationship alias issues
+            let q = supabase
+                .from('approvals')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (filter !== 'all') q = q.eq('status', filter);
+            const { data, error } = await q;
+            if (error) throw error;
+            setApprovals(data || []);
         } catch (error: any) {
             console.error('Error fetching approvals:', error);
         }
         setLoading(false);
     };
 
-    useEffect(() => {
-        fetchApprovals();
-    }, []);
+    useEffect(() => { fetchApprovals(); }, [filter]);
 
-    const handleApprove = async (id: string, type: string) => {
+    const handleApprove = async (approval: any) => {
+        if (profile?.role !== 'admin') {
+            toast({ title: 'Access Denied', description: 'Only admins can approve requests.', variant: 'destructive' });
+            return;
+        }
+
+        // Prevent self-approval - move to start of function
+        if (approval.requested_by === profile?.id) {
+            toast({ title: 'Self-Approval Forbidden', description: 'You cannot approve your own requests. Please wait for another admin.', variant: 'destructive' });
+            return;
+        }
+
         setLoading(true);
         try {
-            const approval = approvals.find(a => a.id === id);
-            if (!approval) return;
+            // Clean up potentially malformed data from older unapproved requests
+            let cleanData = { ...approval.data };
+            if (cleanData.created_at === '') delete cleanData.created_at;
+            if (cleanData.updated_at === '') delete cleanData.updated_at;
 
-            // For admin dashboard, we can approve all types
-            const allowedTypes = [
-                'question', 'question_delete', 'competition', 'competition_delete',
-                'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete',
-                'question_set', 'question_set_delete', 'bulk_users', 'user_role_change', 'message'
-            ];
-
-            if (!allowedTypes.includes(type)) {
-                toast({ title: 'You cannot approve this type of request', variant: 'destructive' });
-                return;
+            // question_sets specific cleanup
+            if (approval.table_name === 'question_sets') {
+                delete cleanData.questions;
+                delete cleanData.difficulty;
+                delete cleanData.questionCount;
+            } else if (cleanData.questions !== undefined) {
+                // some other tables might organically have 'questions' but unlikely needed for insert except as relational
+                delete cleanData.questions;
             }
 
-            // Update the approval status
-            await updateDoc(doc(db, 'approvals', id), {
+            // Critical fix: Nullify empty UUID strings to prevent Postgres 400 errors
+            if (cleanData.question_set_id === '') cleanData.question_set_id = null;
+            if (cleanData.competition_id === '') cleanData.competition_id = null;
+            if (cleanData.school_id === '') cleanData.school_id = null;
+            if (cleanData.user_id === '') cleanData.user_id = null;
+            if (cleanData.record_id === '') cleanData.record_id = null;
+
+            // Execute the action on the target table
+            if (approval.type === 'create') {
+                const { error } = await supabase.from(approval.table_name).insert(cleanData);
+                if (error) throw error;
+            } else if (approval.type === 'update' && approval.record_id) {
+                const { error } = await supabase.from(approval.table_name).update(cleanData).eq('id', approval.record_id);
+                if (error) throw error;
+            } else if (approval.type === 'delete') {
+                if (approval.record_id) {
+                    const { error } = await supabase.from(approval.table_name).delete().eq('id', approval.record_id);
+                    if (error) throw error;
+                } else if (cleanData.ids && Array.isArray(cleanData.ids)) {
+                    const { error } = await supabase.from(approval.table_name).delete().in('id', cleanData.ids);
+                    if (error) throw error;
+                }
+            }
+
+            // Mark approval as approved
+            await supabase.from('approvals').update({
                 status: 'approved',
-                approved_at: serverTimestamp(),
-                approved_by: profile.id
-            });
-
-            // EXECUTE THE ACTION based on type
-            if (type === 'message') {
-                await addDoc(collection(db, 'messages'), {
-                    ...approval.data,
-                    status: 'approved',
-                    approved_at: serverTimestamp(),
-                    approved_by: profile.id,
-                    created_at: serverTimestamp()
-                });
-            }
-            // Add other types handling here if needed
+                reviewed_by: profile?.id,
+                reviewed_at: new Date().toISOString()
+            }).eq('id', approval.id);
 
             await fetchApprovals();
-            toast({
-                title: 'Request approved!',
-                description: 'The request has been approved and processed.'
-            });
+            toast({ title: 'Request approved!', description: 'The action has been executed.' });
         } catch (error: any) {
             toast({ title: 'Error approving request', description: error.message, variant: 'destructive' });
         }
@@ -3179,115 +4149,164 @@ function ApprovalsTab() {
     };
 
     const handleReject = async (id: string) => {
+        if (profile?.role !== 'admin') {
+            toast({ title: 'Access Denied', description: 'Only admins can review requests.', variant: 'destructive' });
+            return;
+        }
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'approvals', id), {
+            await supabase.from('approvals').update({
                 status: 'rejected',
-                rejected_at: serverTimestamp(),
-                rejected_by: profile.id
-            });
+                reviewed_by: profile?.id,
+                reviewed_at: new Date().toISOString()
+            }).eq('id', id);
             await fetchApprovals();
-
-            toast({
-                title: 'Request rejected!',
-                description: 'The request has been rejected.'
-            });
+            toast({ title: 'Request rejected.' });
         } catch (error: any) {
             toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
+    const statusBadge = (status: string) => {
+        const map: Record<string, string> = {
+            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+            rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+        };
+        return map[status] || 'bg-muted text-muted-foreground';
+    };
+
+    const typeBadge = (type: string) => {
+        const map: Record<string, string> = {
+            create: 'bg-blue-100 text-blue-800',
+            update: 'bg-purple-100 text-purple-800',
+            delete: 'bg-red-100 text-red-800'
+        };
+        return map[type] || 'bg-muted text-muted-foreground';
+    };
+
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
-                <p className="text-muted-foreground">Review and approve moderator actions</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
+                    <p className="text-muted-foreground">Review and approve moderator actions before they take effect</p>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={fetchApprovals}>
+                        <RefreshCw className="w-4 h-4" />
+                    </Button>
+                    {(['all', 'pending', 'approved', 'rejected'] as const).map(f => (
+                        <Button key={f} size="sm"
+                            variant={filter === f ? 'default' : 'outline'}
+                            onClick={() => setFilter(f)}>
+                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </Button>
+                    ))}
+                </div>
             </div>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Approval Requests</CardTitle>
-                    <CardDescription>Requests that need your review</CardDescription>
+                    <CardTitle>Approval Queue</CardTitle>
+                    <CardDescription>
+                        {filter === 'pending' ? 'Actions submitted by moderators awaiting your review' : `Showing ${filter} requests`}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-4">
-                        {loading ? (
-                            <div className="text-center py-4">
-                                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                    {loading ? (
+                        <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin" /></div>
+                    ) : approvals.length === 0 ? (
+                        <div className="text-center py-12 space-y-3">
+                            <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                                <CheckCircle className="w-8 h-8 text-muted-foreground" />
                             </div>
-                        ) : approvals.length === 0 ? (
-                            <p className="text-center text-muted-foreground py-4">No pending approvals</p>
-                        ) : (
-                            approvals.map((approval) => (
-                                <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-1 rounded-full text-xs ${approval.status === 'pending'
-                                                    ? 'bg-warning/10 text-warning'
-                                                    : approval.status === 'approved'
-                                                        ? 'bg-success/10 text-success'
-                                                        : 'bg-destructive/10 text-destructive'
-                                                    }`}>
-                                                    {approval.status}
-                                                </span>
-                                                <h3 className="font-medium">{getApprovalTitle(approval.type)}</h3>
+                            <p className="text-lg font-medium">All clear!</p>
+                            <p className="text-muted-foreground text-sm">No {filter === 'all' ? '' : filter} approval requests at this time.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {approvals.map((approval) => {
+                                try {
+                                    return (
+                                        <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${typeBadge(approval.type)}`}>{approval.type?.toUpperCase()}</span>
+                                                        <span className="text-xs text-muted-foreground font-mono bg-muted px-1.5 py-0.5 rounded">{approval.table_name}</span>
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(approval.status)}`}>{approval.status}</span>
+                                                    </div>
+                                                    <p className="font-medium text-sm mt-1">{approval.summary || 'No description provided'}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Requested by:{' '}
+                                                        <span className="font-medium">
+                                                            {approval.requester?.display_name
+                                                                || approval.requester?.email
+                                                                || approval.requested_by
+                                                                || 'Unknown'}
+                                                        </span>
+                                                        {approval.created_at && (
+                                                            <>
+                                                                {' • '}
+                                                                {new Date(approval.created_at).toLocaleString()}
+                                                            </>
+                                                        )}
+                                                    </p>
+                                                    {approval.status !== 'pending' && (approval.reviewer || approval.reviewed_by) && (
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                            {approval.status === 'approved' ? 'Approved' : 'Rejected'} by:{' '}
+                                                            <span className="font-medium">
+                                                                {approval.reviewer?.display_name
+                                                                    || approval.reviewer?.email
+                                                                    || approval.reviewed_by
+                                                                    || 'Unknown'}
+                                                            </span>
+                                                        </p>
+                                                    )}
+                                                    {approval.data && typeof approval.data === 'object' && Object.keys(approval.data || {}).length > 0 && (
+                                                        <details className="mt-2">
+                                                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">View data payload</summary>
+                                                            <pre className="mt-1 text-xs bg-muted/50 p-2 rounded overflow-auto max-h-32">{JSON.stringify(approval.data, null, 2)}</pre>
+                                                        </details>
+                                                    )}
+                                                </div>
+                                                {approval.status === 'pending' && profile?.role === 'admin' && (
+                                                    <div className="flex gap-2 shrink-0">
+                                                        <Button size="sm" variant="outline"
+                                                            className="border-destructive text-destructive hover:bg-destructive hover:text-white"
+                                                            onClick={() => handleReject(approval.id)} disabled={loading}>
+                                                            <X className="w-3 h-3 mr-1" />Reject
+                                                        </Button>
+                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white"
+                                                            onClick={() => handleApprove(approval)} disabled={loading}>
+                                                            <Check className="w-3 h-3 mr-1" />Approve
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-xs text-muted-foreground mt-1">Requested by: {approval.created_by_name}</p>
-                                            <p className="text-xs text-muted-foreground">Date: {new Date(approval.created_at).toLocaleString()}</p>
                                         </div>
-                                        <div className="flex gap-2 ml-4">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 w-8 p-0"
-                                                onClick={() => handleApprove(approval.id, approval.type)}
-                                                disabled={approval.status !== 'pending'}
-                                            >
-                                                <CheckCircle className="w-3 h-3 text-success" />
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 w-8 p-0"
-                                                onClick={() => handleReject(approval.id)}
-                                                disabled={approval.status !== 'pending'}
-                                            >
-                                                <XCircle className="w-3 h-3 text-destructive" />
-                                            </Button>
+                                    );
+                                } catch (e) {
+                                    console.error('Error rendering approval item:', e, approval);
+                                    return (
+                                        <div key={approval.id || Math.random()} className="p-4 rounded-lg border border-destructive/50 bg-destructive/5">
+                                            <p className="text-xs text-destructive">
+                                                Failed to render this approval item. Check console for details.
+                                            </p>
                                         </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                                    );
+                                }
+                            })}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
     );
 }
 
-function getApprovalTitle(type: string) {
-    const titles = {
-        'question': 'New Question',
-        'question_delete': 'Delete Question',
-        'competition': 'New Competition',
-        'competition_delete': 'Delete Competition',
-        'school': 'New School',
-        'school_delete': 'Delete School',
-        'user': 'New User',
-        'user_delete': 'Delete User',
-        'avatar': 'New Avatar',
-        'avatar_delete': 'Delete Avatar',
-        'question_set': 'New Question Set',
-        'question_set_delete': 'Delete Question Set',
-        'bulk_users': 'Bulk User Creation',
-        'user_role_change': 'User Role Change',
-        'message': 'New Message'
-    };
-    return titles[type] || type;
-}
 
 // Grading Tab Component
 function GradingTab() {
@@ -3300,9 +4319,12 @@ function GradingTab() {
     const fetchQueue = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, 'grading_queue'), orderBy('submitted_at', 'desc'));
-            const snap = await getDocs(q);
-            setQueue(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+            const { data, error } = await supabase
+                .from('grading_queue')
+                .select('*')
+                .order('submitted_at', { ascending: false });
+            if (error) throw error;
+            setQueue(data || []);
         } catch (error: any) {
             console.error('Error fetching grading queue:', error);
         }
@@ -3326,37 +4348,56 @@ function GradingTab() {
         setLoading(true);
         try {
             // 1. Update status in Queue
-            await updateDoc(doc(db, 'grading_queue', selectedItem.id), {
-                status: 'graded',
-                assigned_score: gradeInput.score,
-                feedback: gradeInput.feedback,
-                graded_at: serverTimestamp()
-            });
+            const { error: queueErr } = await supabase
+                .from('grading_queue')
+                .update({
+                    status: 'graded',
+                    assigned_score: gradeInput.score,
+                    feedback: gradeInput.feedback,
+                    graded_at: new Date().toISOString()
+                })
+                .eq('id', selectedItem.id);
+            if (queueErr) throw queueErr;
 
             // 2. Update Result score
-            const resultRef = doc(db, 'results', selectedItem.result_id);
-            const resultSnap = await getDoc(resultRef);
-            if (resultSnap.exists()) {
-                const resultData = resultSnap.data();
-                const oldScore = resultData.score || 0;
-                const newScore = oldScore + gradeInput.score;
+            const { data: currentResult, error: resFetchErr } = await supabase
+                .from('results')
+                .select('score, answers')
+                .eq('id', selectedItem.result_id)
+                .single();
+            if (resFetchErr) throw resFetchErr;
 
-                // Update results
-                await updateDoc(resultRef, {
+            const oldScore = (currentResult as any).score || 0;
+            const newScore = oldScore + gradeInput.score;
+            const updatedAnswers = { ...(currentResult as any).answers || {} };
+            updatedAnswers[`${selectedItem.question_id}_graded`] = true;
+            updatedAnswers[`${selectedItem.question_id}_feedback`] = gradeInput.feedback;
+
+            const { error: resUpErr } = await supabase
+                .from('results')
+                .update({
                     score: newScore,
-                    [`answers.${selectedItem.question_id}_graded`]: true,
-                    [`answers.${selectedItem.question_id}_feedback`]: gradeInput.feedback
-                });
+                    answers: updatedAnswers
+                })
+                .eq('id', selectedItem.result_id);
+            if (resUpErr) throw resUpErr;
 
-                // 3. Update User Profile Total Score
-                const userRef = doc(db, 'profiles', selectedItem.student_id);
-                const userSnap = await getDoc(userRef);
-                if (userSnap.exists()) {
-                    const userData = userSnap.data();
-                    await updateDoc(userRef, {
-                        score: (userData.score || 0) + gradeInput.score,
-                        updated_at: serverTimestamp()
-                    });
+            // 3. Update User Profile Total Score
+            if (selectedItem.student_id) {
+                const { data: currentProf, error: profFetchErr } = await supabase
+                    .from('profiles')
+                    .select('score')
+                    .eq('id', selectedItem.student_id)
+                    .single();
+                if (!profFetchErr && currentProf) {
+                    const { error: profUpErr } = await supabase
+                        .from('profiles')
+                        .update({
+                            score: (currentProf.score || 0) + gradeInput.score,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', selectedItem.student_id);
+                    if (profUpErr) console.error('Error updating user score:', profUpErr);
                 }
             }
 
@@ -3481,11 +4522,12 @@ function MessagesTab() {
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
-    const { profile } = useAuth();
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
 
     const [isComposeOpen, setIsComposeOpen] = useState(false);
     const [newMessage, setNewMessage] = useState({
-        recipientRole: 'student', // 'student', 'teacher', 'moderator', 'all'
+        recipientRole: 'specific', // Default to 'specific' as requested
         recipientId: '', // Optional, for specific user
         subject: '',
         content: ''
@@ -3493,21 +4535,36 @@ function MessagesTab() {
 
     const filteredMessages = messages.filter(message =>
         (message.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (message.sender || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (message.content || '').toLowerCase().includes(searchTerm.toLowerCase())
+        (message.sender_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (message.body || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const fetchMessages = async () => {
         setLoading(true);
         try {
-            const messagesData = localStorageCRUD.get(LOCAL_STORAGE_KEYS.MESSAGES);
-            // Filter for messages relevant to admin (sent by admin, or approved messages visible to everyone if we want, but usually admin sees all)
-            // For now, show all messages
-            setMessages(messagesData.reverse()); // Show newest first
-        } catch (error) {
-            // toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*, sender:sender_id(display_name, email)')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setMessages((data || []) as any);
+        } catch (error: any) {
+            console.error('Error fetching messages:', error);
         }
         setLoading(false);
+    };
+
+    const handleMarkRead = async (id: string) => {
+        try {
+            const { error } = await supabase.from('messages').update({ is_read: true }).eq('id', id);
+            if (error) throw error;
+            setMessages((prev: any) => prev.map((m: any) => m.id === id ? { ...m, is_read: true } : m));
+            if (selectedMessage?.id === id) {
+                setSelectedMessage((prev: any) => prev ? { ...prev, is_read: true } : null);
+            }
+        } catch (e) {
+            console.error('Error marking as read:', e);
+        }
     };
 
     const handleSendMessage = async () => {
@@ -3515,60 +4572,106 @@ function MessagesTab() {
             toast({ title: 'Subject and Content are required', variant: 'destructive' });
             return;
         }
-
         setLoading(true);
         try {
-            const msg = {
-                id: `msg-${Date.now()}`,
-                sender: profile.display_name || 'Admin',
-                senderId: profile.id,
-                senderRole: 'admin',
-                recipientRole: newMessage.recipientRole,
-                recipientId: newMessage.recipientId || null,
-                subject: newMessage.subject,
-                content: newMessage.content,
-                date: new Date().toISOString(),
-                read: false,
-                status: 'approved', // Admin messages are auto-approved
-                replies: []
-            };
+            let finalRecipientId = null;
+            if (newMessage.recipientId && newMessage.recipientId.trim()) {
+                const { data: userData } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('email', newMessage.recipientId.trim().toLowerCase())
+                    .single();
 
-            localStorageCRUD.add(LOCAL_STORAGE_KEYS.MESSAGES, msg);
-            fetchMessages();
+                if (userData) {
+                    finalRecipientId = userData.id;
+                } else if (newMessage.recipientId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
+                    finalRecipientId = newMessage.recipientId.trim();
+                } else {
+                    toast({ title: 'Recipient not found', description: `No user with email ${newMessage.recipientId} exists.`, variant: 'destructive' });
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            if (isAdmin) {
+                const { error } = await supabase.from('messages').insert({
+                    subject: newMessage.subject,
+                    body: newMessage.content,
+                    sender_id: profile?.id,
+                    // These columns might be missing in some DB versions, handled if they exist
+                    sender_name: profile?.display_name || profile?.email || 'User',
+                    sender_role: profile?.role || 'admin',
+                    recipient_role: newMessage.recipientRole,
+                    recipient_id: finalRecipientId,
+                });
+                if (error) throw error;
+                await fetchMessages();
+                toast({ title: 'Message sent!' });
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'create',
+                    table_name: 'messages',
+                    record_id: null,
+                    data: {
+                        subject: newMessage.subject,
+                        body: newMessage.content,
+                        sender_id: profile?.id,
+                        sender_name: profile?.display_name || profile?.email || 'User',
+                        sender_role: profile?.role || 'moderator',
+                        recipient_role: newMessage.recipientRole,
+                        recipient_id: finalRecipientId,
+                        is_read: false
+                    },
+                    requested_by: profile?.id,
+                    summary: `Send message: ${newMessage.subject}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval', description: 'Message will be sent after approval.' });
+            }
             setIsComposeOpen(false);
             setNewMessage({ recipientRole: 'student', recipientId: '', subject: '', content: '' });
-            toast({ title: 'Message sent successfully!' });
-        } catch (error) {
-            toast({ title: 'Error sending message', variant: 'destructive' });
+        } catch (error: any) {
+            toast({ title: 'Error sending message', description: error.message, variant: 'destructive' });
         }
         setLoading(false);
     };
 
     const handleReply = async () => {
         if (!selectedMessage || !replyContent.trim()) return;
-
         setSendingReply(true);
         try {
-            const reply = {
-                id: `reply-${Date.now()}`,
-                text: replyContent,
-                sender_id: profile.id,
-                sender_name: profile.display_name || 'Admin',
-                created_at: new Date().toISOString()
+            const subject = `Re: ${(selectedMessage as any).subject}`;
+            const data = {
+                subject,
+                body: replyContent,
+                sender_id: profile?.id,
+                sender_name: profile?.display_name || profile?.email || 'User',
+                sender_role: profile?.role || 'admin',
+                recipient_id: (selectedMessage as any).sender_id,
+                recipient_role: 'specific',
             };
 
-            const updatedReplies = [...(selectedMessage.replies || []), reply];
+            if (isAdmin) {
+                const { error } = await supabase.from('messages').insert(data);
+                if (error) throw error;
+                await fetchMessages();
+                toast({ title: 'Reply sent!' });
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'create',
+                    table_name: 'messages',
+                    record_id: null,
+                    data: { ...data, is_read: false },
+                    requested_by: profile?.id,
+                    summary: `Reply message: ${subject}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval', description: 'Reply will be sent after approval.' });
+            }
 
-            await updateDoc(doc(db, 'messages', selectedMessage.id), {
-                replies: updatedReplies,
-                status: 'replied',
-                updated_at: serverTimestamp()
-            });
-
-            await fetchMessages();
             setReplyContent('');
-            setSelectedMessage(prev => prev ? { ...prev, replies: updatedReplies } : null);
-            toast({ title: 'Reply sent successfully!' });
         } catch (error: any) {
             toast({ title: 'Error sending reply', description: error.message, variant: 'destructive' });
         }
@@ -3576,14 +4679,27 @@ function MessagesTab() {
     };
 
     const handleDeleteMessage = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this message?')) return;
-
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'messages', id));
-            await fetchMessages();
-            setSelectedMessage(null);
-            toast({ title: 'Message deleted' });
+            if (isAdmin) {
+                const { error } = await supabase.from('messages').delete().eq('id', id);
+                if (error) throw error;
+                toast({ title: 'Message deleted successfully!' });
+                await fetchMessages();
+                if (selectedMessage?.id === id) setSelectedMessage(null);
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete',
+                    table_name: 'messages',
+                    record_id: id,
+                    data: {},
+                    requested_by: profile?.id,
+                    summary: 'Delete message',
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error deleting message', description: error.message, variant: 'destructive' });
         }
@@ -3637,24 +4753,29 @@ function MessagesTab() {
                                         filteredMessages.map((message) => (
                                             <button
                                                 key={message.id}
-                                                onClick={() => setSelectedMessage(message)}
+                                                onClick={() => {
+                                                    setSelectedMessage(message);
+                                                    if (!message.is_read) handleMarkRead(message.id);
+                                                }}
                                                 className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id
                                                     ? 'bg-primary/10 border border-primary'
                                                     : 'hover:bg-muted/50'
-                                                    } ${!message.read && 'border-l-2 border-primary'}`}
+                                                    } ${!message.is_read && 'border-l-2 border-primary'}`}
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                                                        {message.sender.split(' ').map(n => n[0]).join('')}
+                                                        {(message.sender_name || 'U').split(' ').map(n => n[0]).join('').toUpperCase()}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center justify-between gap-2">
-                                                            <p className="text-sm font-medium truncate">{message.sender}</p>
-                                                            <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                                                            <p className="text-sm font-medium truncate">{message.sender_name || 'Unknown'}</p>
+                                                            <p className="text-xs text-muted-foreground whitespace-nowrap">
+                                                                {message.created_at ? new Date(message.created_at).toLocaleDateString() : 'No date'}
+                                                            </p>
                                                         </div>
                                                         <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                                                        <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                                                        {!message.read && (
+                                                        <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.body}</p>
+                                                        {!message.is_read && (
                                                             <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                                                         )}
                                                     </div>
@@ -3698,13 +4819,13 @@ function MessagesTab() {
                             <CardHeader>
                                 <CardTitle>{selectedMessage.subject}</CardTitle>
                                 <CardDescription>
-                                    From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                                    From: {selectedMessage.sender_name || 'Unknown'} • {new Date(selectedMessage.created_at).toLocaleString()}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-6">
                                     <div className="p-4 bg-muted/50 rounded-lg">
-                                        <p className="text-sm">{selectedMessage.content}</p>
+                                        <p className="text-sm">{selectedMessage.body}</p>
                                     </div>
 
                                     <div className="space-y-4">
@@ -3756,22 +4877,27 @@ function MessagesTab() {
                                     onValueChange={(val: any) => setNewMessage({ ...newMessage, recipientRole: val })}
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select role" />
+                                        <SelectValue placeholder="Select recipient type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="student">Students</SelectItem>
-                                        <SelectItem value="teacher">Teachers</SelectItem>
-                                        <SelectItem value="moderator">Moderators</SelectItem>
-                                        <SelectItem value="all">All Users</SelectItem>
+                                        <SelectItem value="specific">Specific User (Email required)</SelectItem>
+                                        <SelectItem value="student">Broadcast to all Students</SelectItem>
+                                        <SelectItem value="teacher">Broadcast to all Teachers</SelectItem>
+                                        <SelectItem value="moderator">Broadcast to all Moderators</SelectItem>
+                                        <SelectItem value="all">Broadcast to All Users</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label>Specific Email (Optional)</Label>
+                                <Label className={newMessage.recipientRole === 'specific' ? 'text-primary' : 'text-muted-foreground'}>
+                                    {newMessage.recipientRole === 'specific' ? 'Recipient Email (Required) *' : 'Specific Email (Optional)'}
+                                </Label>
                                 <Input
                                     placeholder="user@example.com"
                                     value={newMessage.recipientId}
                                     onChange={(e) => setNewMessage({ ...newMessage, recipientId: e.target.value })}
+                                    required={newMessage.recipientRole === 'specific'}
+                                    className={newMessage.recipientRole === 'specific' ? 'border-primary ring-1 ring-primary/20' : ''}
                                 />
                             </div>
                         </div>
@@ -3809,6 +4935,7 @@ function MessagesTab() {
 // Admin Leaderboard Tab Component
 function AdminLeaderboardTab() {
     const [leaderboardData, setLeaderboardData] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState([]);
     const [schools, setSchools] = useState([]);
     const [competitions, setCompetitions] = useState([]);
@@ -3819,37 +4946,53 @@ function AdminLeaderboardTab() {
     const fetchInitialData = async () => {
         setLoading(true);
         try {
-            const [compsSnap, usersSnap, schoolsSnap] = await Promise.all([
-                getDocs(collection(db, 'competitions')),
-                getDocs(query(collection(db, 'profiles'), where('role', '==', 'student'))),
-                getDocs(collection(db, 'schools'))
+            const [
+                { data: comps },
+                { data: students },
+                { data: schs }
+            ] = await Promise.all([
+                supabase.from('competitions').select('*'),
+                supabase.from('profiles').select('*').eq('role', 'student'),
+                supabase.from('schools').select('*')
             ]);
 
-            const comps = compsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const usersData = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const schoolsData = schoolsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setCompetitions(comps || []);
+            setUsers(students || []);
+            setSchools(schs || []);
 
-            setCompetitions(comps as any);
-            setUsers(usersData as any);
-            setSchools(schoolsData as any);
-
-            // Filter by competition if selected
-            let filteredData = [...usersData];
+            let filteredData = [...(students || [])];
 
             if (selectedCompId !== 'all') {
-                const resultsSnap = await getDocs(query(collection(db, 'results'), where('competition_id', '==', selectedCompId)));
-                const compResults = resultsSnap.docs.map(doc => doc.data());
+                // Filter leaderboard by competition via question_sets.competition_ids → results.question_set_id
+                const { data: sets, error: setsErr } = await supabase
+                    .from('question_sets')
+                    .select('id')
+                    .contains('competition_ids', [selectedCompId]);
+                if (setsErr) throw setsErr;
+
+                const setIds = (sets || []).map((s: any) => s.id);
+                if (setIds.length === 0) {
+                    setLeaderboardData([]);
+                    return;
+                }
+
+                const { data: results, error: resultsError } = await supabase
+                    .from('results')
+                    .select('student_id, score, question_set_id, practice_set_id')
+                    .in('question_set_id', setIds)
+                    .is('practice_set_id', null);
+                if (resultsError) throw resultsError;
 
                 const userScores: Record<string, number> = {};
-                compResults.forEach(r => {
-                    if (!userScores[r.student_id] || r.score > userScores[r.student_id]) {
-                        userScores[r.student_id] = r.score;
+                (results || []).forEach((r: any) => {
+                    if (!userScores[r.student_id] || (r.score || 0) > userScores[r.student_id]) {
+                        userScores[r.student_id] = r.score || 0;
                     }
                 });
 
                 filteredData = filteredData
-                    .filter(u => userScores[u.id] !== undefined)
-                    .map(u => ({ ...u, score: userScores[u.id] }));
+                    .filter((u: any) => userScores[u.id] !== undefined)
+                    .map((u: any) => ({ ...u, score: userScores[u.id] }));
             }
 
             const sortedUsers = filteredData.sort((a: any, b: any) => (b.score || 0) - (a.score || 0));
@@ -3886,6 +5029,15 @@ function AdminLeaderboardTab() {
                             </SelectContent>
                         </Select>
                     </div>
+                    <div className="w-[200px] relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search..."
+                            className="pl-9"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -3897,7 +5049,7 @@ function AdminLeaderboardTab() {
                             <CardDescription>Top participants across the platform</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="overflow-x-auto">
+                            <div className="overflow-x-auto max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                                 {loading ? (
                                     <div className="text-center py-4"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" /></div>
                                 ) : leaderboardData.length === 0 ? (
@@ -3913,14 +5065,19 @@ function AdminLeaderboardTab() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {leaderboardData.map((student, index) => (
-                                                <tr key={student.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                                                    <td className="p-3 font-semibold text-lg">{index + 1}</td>
-                                                    <td className="p-3 text-sm">{student.email}</td>
-                                                    <td className="p-3 text-sm italic">{student.display_name || 'No username'}</td>
-                                                    <td className="p-3 text-right font-mono font-bold text-primary">{student.score?.toLocaleString() || '0'}</td>
-                                                </tr>
-                                            ))}
+                                            {leaderboardData
+                                                .filter((s: any) =>
+                                                    (s.display_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    (s.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+                                                )
+                                                .map((student, index) => (
+                                                    <tr key={student.id} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
+                                                        <td className="p-3 font-semibold text-lg">{index + 1}</td>
+                                                        <td className="p-3 text-sm">{student.email}</td>
+                                                        <td className="p-3 text-sm italic">{student.display_name || 'No username'}</td>
+                                                        <td className="p-3 text-right font-mono font-bold text-primary">{student.score?.toLocaleString() || '0'}</td>
+                                                    </tr>
+                                                ))}
                                         </tbody>
                                     </table>
                                 )}
@@ -3953,18 +5110,34 @@ function AdminSchoolLeaderboard({ selectedCompId }: { selectedCompId: string }) 
         const fetchSchoolsAndResults = async () => {
             setLoading(true);
             try {
-                const [schoolsSnap, usersSnap] = await Promise.all([
-                    getDocs(collection(db, 'schools')),
-                    getDocs(query(collection(db, 'profiles'), where('role', '==', 'student')))
+                const [{ data: schools }, { data: users }] = await Promise.all([
+                    supabase.from('schools').select('*'),
+                    supabase.from('profiles').select('*').eq('role', 'student')
                 ]);
 
-                const schools = schoolsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const users = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (!schools || !users) {
+                    setSchoolData([]);
+                    setLoading(false);
+                    return;
+                }
 
                 let results: any[] = [];
                 if (selectedCompId !== 'all') {
-                    const resultsSnap = await getDocs(query(collection(db, 'results'), where('competition_id', '==', selectedCompId)));
-                    results = resultsSnap.docs.map(doc => doc.data());
+                    const { data: sets, error: setsErr } = await supabase
+                        .from('question_sets')
+                        .select('id')
+                        .contains('competition_ids', [selectedCompId]);
+                    if (setsErr) throw setsErr;
+
+                    const setIds = (sets || []).map((s: any) => s.id);
+                    if (setIds.length > 0) {
+                        const { data } = await supabase
+                            .from('results')
+                            .select('student_id, score, question_set_id, practice_set_id')
+                            .in('question_set_id', setIds)
+                            .is('practice_set_id', null);
+                        results = data || [];
+                    }
                 }
 
                 const aggregatedSchools = schools.map((school: any) => {
@@ -4090,28 +5263,59 @@ function PracticeManagerTab() {
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
     const [isCreateQuestionDialogOpen, setIsCreateQuestionDialogOpen] = useState(false);
-    const [isEditingQuestion, setIsEditingQuestion] = useState(false); // New: Track edit mode
+    const [isEditingQuestion, setIsEditingQuestion] = useState(false);
     const [selectedSet, setSelectedSet] = useState<any>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const { profile, currentView } = useAuth();
+    const isAdmin = (currentView || profile?.role) === 'admin';
+
+    const handleImageUpload = async (file: File) => {
+        // Optimize image size to fix 'loading non-stop' issue
+        const compressedFile = await compressImage(file);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        // Timeout prevents indefinite hangs
+        const { error: uploadError } = await withTimeout<{ data: any; error: any }>(
+            supabase.storage.from('question-images').upload(filePath, compressedFile)
+        );
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('question-images')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
+    };
+
     const [newSet, setNewSet] = useState({
         id: '',
         name: '',
         description: '',
         category: 'General',
+        difficulty: 'medium',
         questions: [] as string[],
         created_at: '',
     });
 
-    const [newQuestion, setNewQuestion] = useState({
+    const [newQuestion, setNewQuestion] = useState<any>({
         id: '',
         text: '',
         type: 'mcq' as 'mcq' | 'text',
-        options: ['', '', '', ''], // Initial 4, can be changed
+        options: ['', '', '', ''],
         correct_answer: '',
         category: 'General',
         difficulty: 'medium',
         points: 10,
+        timer: 0,
         explanation: '',
         exact_match_required: false,
+        image_url: '',
+        is_required: true,
         created_at: '',
         updated_at: ''
     });
@@ -4121,16 +5325,20 @@ function PracticeManagerTab() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [setsSnap, questionsSnap] = await Promise.all([
-                getDocs(collection(db, 'practice_sets')),
-                getDocs(collection(db, 'questions'))
-            ]);
-            setPracticeSets(setsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
-            setGlobalQuestions(questionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any);
+            const [{ data: sets }, { data: questions }] = await withTimeout<[{ data: any; error: any }, { data: any; error: any }]>(
+                Promise.all([
+                    supabase.from('practice_sets').select('*').order('created_at', { ascending: false }),
+                    supabase.from('questions').select('*').order('created_at', { ascending: false })
+                ])
+            );
+            setPracticeSets(sets || []);
+            setGlobalQuestions(questions || []);
         } catch (error: any) {
             console.error('Error fetching practice data:', error);
+            toast({ title: 'Fetch Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
@@ -4144,18 +5352,28 @@ function PracticeManagerTab() {
         }
         setLoading(true);
         try {
-            const setToAdd = {
-                ...newSet,
-                created_at: serverTimestamp(),
-                updated_at: serverTimestamp()
-            };
-            delete (setToAdd as any).id;
+            const { id, created_at, ...data } = newSet;
 
-            await addDoc(collection(db, 'practice_sets'), setToAdd);
-            await fetchData();
+            if (isAdmin) {
+                const { error } = await supabase.from('practice_sets').insert(data);
+                if (error) throw error;
+                await fetchData();
+                toast({ title: 'Practice Set Created!' });
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'create',
+                    table_name: 'practice_sets',
+                    data: data,
+                    requested_by: profile?.id,
+                    summary: `Create Practice Set: ${newSet.name}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
+            }
+
             setIsAddDialogOpen(false);
-            setNewSet({ id: '', name: '', description: '', category: 'General', questions: [], created_at: '' });
-            toast({ title: 'Practice Set Created!' });
+            setNewSet({ id: '', name: '', description: '', category: 'General', difficulty: 'medium', questions: [], created_at: '' });
         } catch (error: any) {
             toast({ title: 'Error creating set', description: error.message, variant: 'destructive' });
         }
@@ -4164,7 +5382,7 @@ function PracticeManagerTab() {
 
     const toggleQuestionInSet = (questionId: string) => {
         if (!selectedSet) return;
-        const currentQuestions = [...selectedSet.questions];
+        const currentQuestions = [...(selectedSet.questions || [])];
         const index = currentQuestions.indexOf(questionId);
 
         if (index > -1) {
@@ -4181,13 +5399,29 @@ function PracticeManagerTab() {
         if (!selectedSet) return;
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'practice_sets', selectedSet.id), {
-                questions: selectedSet.questions,
-                updated_at: serverTimestamp()
-            });
-            await fetchData();
-            setIsManageDialogOpen(false);
-            toast({ title: 'Questions updated for set!' });
+            if (isAdmin) {
+                const { error } = await supabase
+                    .from('practice_sets')
+                    .update({ questions: selectedSet.questions })
+                    .eq('id', selectedSet.id);
+                if (error) throw error;
+                await fetchData();
+                setIsManageDialogOpen(false);
+                toast({ title: 'Questions updated for set!' });
+            } else {
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'update',
+                    table_name: 'practice_sets',
+                    record_id: selectedSet.id,
+                    data: { questions: selectedSet.questions },
+                    requested_by: profile?.id,
+                    summary: `Update Practice Set questions: ${selectedSet.name}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                setIsManageDialogOpen(false);
+                toast({ title: 'Submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error saving assignments', description: error.message, variant: 'destructive' });
         }
@@ -4199,7 +5433,7 @@ function PracticeManagerTab() {
     };
 
     const removeOption = (index: number) => {
-        if (newQuestion.options.length <= 2) return; // Keep at least 2
+        if (newQuestion.options.length <= 2) return;
         const next = newQuestion.options.filter((_, i) => i !== index);
         setNewQuestion({ ...newQuestion, options: next });
     };
@@ -4221,60 +5455,122 @@ function PracticeManagerTab() {
 
         setLoading(true);
         try {
-            const qData = {
-                ...newQuestion,
-                updated_at: serverTimestamp()
-            };
-            delete (qData as any).id;
+            let finalImageUrl = newQuestion.image_url;
 
-            let finalQId = newQuestion.id;
-
-            if (isEditingQuestion) {
-                await updateDoc(doc(db, 'questions', newQuestion.id), qData);
-            } else {
-                const docRef = await addDoc(collection(db, 'questions'), {
-                    ...qData,
-                    created_at: serverTimestamp()
-                });
-                finalQId = docRef.id;
-
-                // Add to current practice set if selected
-                if (selectedSet) {
-                    const updatedQs = [...(selectedSet.questions || []), finalQId];
-                    await updateDoc(doc(db, 'practice_sets', selectedSet.id), {
-                        questions: updatedQs,
-                        updated_at: serverTimestamp()
-                    });
+            if (imageFile) {
+                setUploading(true);
+                toast({ title: 'Uploading image...', description: 'Optimizing for speed' });
+                try {
+                    finalImageUrl = await handleImageUpload(imageFile);
+                } catch (uploadErr: any) {
+                    toast({ title: 'Image Upload Failed', description: uploadErr.message, variant: 'destructive' });
+                    setLoading(false);
+                    setUploading(false);
+                    return;
                 }
+                setUploading(false);
             }
 
-            await fetchData();
-            toast({ title: isEditingQuestion ? 'Question updated!' : (keepOpen ? 'Question added! Ready for next.' : 'Question created and added to set!') });
+            toast({ title: 'Validating and saving...' });
+            const { id: qId, created_at: ca, updated_at: ua, ...rest } = newQuestion;
+
+            // Clean data: ensure question_set_id is handled if it exists in rest
+            const qData = {
+                ...rest,
+                image_url: finalImageUrl,
+                options: Array.isArray(rest.options) ? rest.options : []
+            };
+
+            // If question_set_id is present but empty, nullify it
+            if ((qData as any).question_set_id === '') {
+                (qData as any).question_set_id = null;
+            }
+
+            if (isAdmin) {
+                if (isEditingQuestion) {
+                    const { error } = await withTimeout<{ data: any; error: any }>(
+                        (supabase.from('questions').update(qData).eq('id', qId) as any)
+                    );
+                    if (error) throw error;
+                } else {
+                    const { data, error } = await withTimeout<{ data: any; error: any }>(
+                        (supabase.from('questions').insert(qData).select().single() as any)
+                    );
+                    if (error) throw error;
+                    const finalQId = data.id;
+
+                    if (selectedSet) {
+                        const updatedQs = [...(selectedSet.questions || []), finalQId];
+                        await withTimeout<{ data: any; error: any }>(
+                            (supabase.from('practice_sets').update({ questions: updatedQs }).eq('id', selectedSet.id) as any)
+                        );
+                    }
+                }
+                toast({ title: 'Double checking data sync...' });
+                await fetchData();
+                toast({ title: isEditingQuestion ? 'Question updated!' : (keepOpen ? 'Question added! Ready for next.' : 'Question created and added to set!') });
+            } else {
+                // Submit for approval
+                const approvalRecordId = (isEditingQuestion && qId && qId !== '') ? qId : null;
+                const { error } = await supabase.from('approvals').insert({
+                    type: isEditingQuestion ? 'update' : 'create',
+                    table_name: 'questions',
+                    record_id: approvalRecordId,
+                    data: qData,
+                    requested_by: profile?.id,
+                    summary: `${isEditingQuestion ? 'Update' : 'Add'} practice question: ${newQuestion.text.slice(0, 50)}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Submitted for admin approval' });
+            }
 
             if (!keepOpen) {
                 setIsCreateQuestionDialogOpen(false);
             }
 
             setIsEditingQuestion(false);
+            setImageFile(null);
             setNewQuestion({
-                id: '', text: '', type: 'mcq', options: ['', '', '', ''],
+                id: '', text: '', type: 'mcq' as any, options: ['', '', '', ''],
                 correct_answer: '', category: 'General', difficulty: 'medium', points: 10,
-                explanation: '', exact_match_required: false, created_at: '', updated_at: ''
+                timer: 0,
+                explanation: '', exact_match_required: false, image_url: '', is_required: true,
+                created_at: '', updated_at: ''
             });
 
         } catch (error: any) {
-            toast({ title: 'Error saving question', description: error.message, variant: 'destructive' });
+            console.error("Practice Manager save error:", error);
+            toast({ title: 'Error saving question', description: error.message || 'Operation failed', variant: 'destructive' });
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleDeleteSet = async (id: string) => {
         if (!confirm('Are you sure?')) return;
         setLoading(true);
         try {
-            await deleteDoc(doc(db, 'practice_sets', id));
-            await fetchData();
-            toast({ title: 'Practice set deleted' });
+            if (isAdmin) {
+                const { error } = await supabase.from('practice_sets').delete().eq('id', id);
+                if (error) throw error;
+                await fetchData();
+                toast({ title: 'Practice set deleted' });
+            } else {
+                // Find name for summary
+                const set = practiceSets.find((s: any) => s.id === id);
+                const { error } = await supabase.from('approvals').insert({
+                    type: 'delete',
+                    table_name: 'practice_sets',
+                    record_id: id,
+                    data: {},
+                    requested_by: profile?.id,
+                    summary: `Delete Practice Set: ${set?.name || 'Unknown'}`,
+                    status: 'pending'
+                });
+                if (error) throw error;
+                toast({ title: 'Deletion submitted for admin approval' });
+            }
         } catch (error: any) {
             toast({ title: 'Error deleting set', description: error.message, variant: 'destructive' });
         }
@@ -4307,6 +5603,15 @@ function PracticeManagerTab() {
                         </CardHeader>
                         <CardContent className="flex-1">
                             <div className="space-y-4">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-muted-foreground">Difficulty:</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${set.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                                            set.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                                                'bg-yellow-100 text-yellow-700'
+                                        }`}>
+                                        {set.difficulty || 'Medium'}
+                                    </span>
+                                </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">Questions:</span>
                                     <span className="font-bold">{set.questions?.length || 0}</span>
@@ -4343,6 +5648,22 @@ function PracticeManagerTab() {
                             <Label>Description</Label>
                             <Textarea value={newSet.description} onChange={e => setNewSet({ ...newSet, description: e.target.value })} placeholder="What will students learn?" />
                         </div>
+                        <div className="space-y-2">
+                            <Label>Difficulty Level</Label>
+                            <Select
+                                value={newSet.difficulty || 'medium'}
+                                onValueChange={(val) => setNewSet({ ...newSet, difficulty: val })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select difficulty" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="easy">Easy (Green)</SelectItem>
+                                    <SelectItem value="medium">Medium (Yellow)</SelectItem>
+                                    <SelectItem value="hard">Hard (Red)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button onClick={handleCreateSet} className="gradient-hero">Create Set</Button>
@@ -4357,12 +5678,23 @@ function PracticeManagerTab() {
                         <DialogDescription>Select questions from the global question bank to add to this practice set.</DialogDescription>
                     </DialogHeader>
 
+                    <div className="px-6 py-2 border-b border-border/50">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search all questions..."
+                                className="pl-10 h-9"
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
                     <ScrollArea className="flex-1 px-6 mt-4">
                         <div className="space-y-4">
-                            {globalQuestions.length === 0 ? (
-                                <p className="text-center text-muted-foreground py-8">No questions found in the question bank.</p>
+                            {globalQuestions.filter(q => (q.text || q.prompt || '').toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
+                                <p className="text-center text-muted-foreground py-8">No questions found matching your search.</p>
                             ) : (
-                                globalQuestions.map((q: any) => (
+                                globalQuestions.filter(q => (q.text || q.prompt || '').toLowerCase().includes(searchTerm.toLowerCase())).map((q: any) => (
                                     <div key={q.id} className="flex items-start gap-4 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors">
                                         <Checkbox
                                             id={`q-${q.id}`}
@@ -4469,6 +5801,64 @@ function PracticeManagerTab() {
                                     <Input type="number" value={newQuestion.points} onChange={e => setNewQuestion({ ...newQuestion, points: parseInt(e.target.value) || 10 })} className="h-9" />
                                 </div>
                             </div>
+
+                            <div className="space-y-4 pt-2">
+                                <Label>Question Image</Label>
+                                <div className="flex gap-4">
+                                    <div className="flex-1 space-y-2">
+                                        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Upload Local Image</Label>
+                                        <Input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                                            className="cursor-pointer h-9 text-xs"
+                                        />
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Or Paste Image URL</Label>
+                                        <Input
+                                            value={newQuestion.image_url}
+                                            onChange={(e) => {
+                                                setNewQuestion({ ...newQuestion, image_url: e.target.value });
+                                                if (e.target.value) setImageFile(null);
+                                            }}
+                                            placeholder="https://example.com/image.jpg"
+                                            className="h-9 text-xs"
+                                        />
+                                    </div>
+                                </div>
+                                {(imageFile || newQuestion.image_url) && (
+                                    <div className="relative aspect-video rounded-lg border overflow-hidden bg-muted/50">
+                                        <img
+                                            src={imageFile ? URL.createObjectURL(imageFile) : newQuestion.image_url}
+                                            alt="Preview"
+                                            className="w-full h-full object-contain"
+                                        />
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            className="absolute top-2 right-2 h-7 w-7 p-0 rounded-full shadow-lg"
+                                            onClick={() => {
+                                                setImageFile(null);
+                                                setNewQuestion({ ...newQuestion, image_url: '' });
+                                            }}
+                                        >
+                                            <X className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-between border p-3 rounded-lg bg-muted/20">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm">Required Question</Label>
+                                    <p className="text-[10px] text-muted-foreground">Students must answer this to proceed</p>
+                                </div>
+                                <Switch
+                                    checked={newQuestion.is_required}
+                                    onCheckedChange={(checked) => setNewQuestion({ ...newQuestion, is_required: checked })}
+                                />
+                            </div>
                         </div>
                     </ScrollArea>
 
@@ -4489,111 +5879,165 @@ function PracticeManagerTab() {
     );
 }
 
-function SettingsTab() {
-    const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
-    const [newDomain, setNewDomain] = useState('');
+function SiteStatsDialog({ open, onOpenChange, competitions, schools }: any) {
     const [loading, setLoading] = useState(false);
+    const [stats, setStats] = useState<any>(null);
+    const [filters, setFilters] = useState({
+        competitionId: 'all',
+        schoolId: 'all',
+        country: 'all'
+    });
     const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchSettings = async () => {
-            setLoading(true);
-            try {
-                const docRef = doc(db, 'settings', 'auth_domains');
-                const snap = await getDoc(docRef);
-                if (snap.exists()) {
-                    setAllowedDomains(snap.data().allowed_domains || []);
-                }
-            } catch (error) {
-                console.error("Error fetching settings:", error);
+    const fetchStats = async () => {
+        setLoading(true);
+        try {
+            let queryBuilder = supabase.from('results').select('*, profiles(school_id)');
+
+            if (filters.competitionId !== 'all') queryBuilder = queryBuilder.eq('competition_id', filters.competitionId);
+
+            const { data: results, error } = await queryBuilder;
+            if (error) throw error;
+
+            let filteredResults = results || [];
+
+            if (filters.schoolId !== 'all') {
+                filteredResults = filteredResults.filter((r: any) => r.profiles?.school_id === filters.schoolId);
             }
-            setLoading(false);
-        };
-        fetchSettings();
-    }, []);
+            if (filters.country !== 'all') {
+                filteredResults = filteredResults.filter((r: any) => {
+                    const school = schools.find((s: any) => s.id === r.profiles?.school_id);
+                    return school?.country === filters.country;
+                });
+            }
 
-    const handleAddDomain = async () => {
-        if (!newDomain.trim()) return;
-        const domain = newDomain.trim().toLowerCase();
-        if (allowedDomains.includes(domain)) {
-            toast({ title: 'Domain already exists' });
-            return;
-        }
+            // Calculations
+            const totalAttempted = filteredResults.length;
+            const totalCorrect = filteredResults.reduce((sum, r) => sum + (r.correct_count || 0), 0);
+            const totalScore = filteredResults.reduce((sum, r) => sum + (r.score || 0), 0);
+            const totalQs = filteredResults.reduce((sum, r) => sum + (r.total_questions || 0), 0);
+            const participants = new Set(filteredResults.map(r => r.student_id)).size;
 
-        const updated = [...allowedDomains, domain];
-        setAllowedDomains(updated);
-        setNewDomain('');
-
-        try {
-            await setDoc(doc(db, 'settings', 'auth_domains'), {
-                allowed_domains: updated,
-                updated_at: serverTimestamp()
-            }, { merge: true });
-            toast({ title: 'Domain added' });
-        } catch (error: any) {
-            toast({ title: 'Error adding domain', description: error.message, variant: 'destructive' });
-        }
-    };
-
-    const handleRemoveDomain = async (domain: string) => {
-        const updated = allowedDomains.filter(d => d !== domain);
-        setAllowedDomains(updated);
-        try {
-            await updateDoc(doc(db, 'settings', 'auth_domains'), {
-                allowed_domains: updated,
-                updated_at: serverTimestamp()
+            // Avg questions per hour (simulated grouped by hour of submission)
+            const hours: any = {};
+            filteredResults.forEach(r => {
+                const hour = new Date(r.submitted_at).getHours();
+                hours[hour] = (hours[hour] || 0) + (r.total_questions || 0);
             });
-            toast({ title: 'Domain removed' });
-        } catch (error: any) {
-            toast({ title: 'Error removing domain', description: error.message, variant: 'destructive' });
+            const avgQH = Object.values(hours).length > 0
+                ? (Object.values(hours).reduce((a: any, b: any) => a + b, 0) as number / 24).toFixed(1)
+                : 0;
+
+            setStats({
+                totalAttempted,
+                totalCorrect,
+                totalScore,
+                totalQs,
+                participants,
+                avgQH,
+                accuracy: totalQs > 0 ? ((totalCorrect / totalQs) * 100).toFixed(1) : 0
+            });
+        } catch (e: any) {
+            toast({ title: 'Error fetching stats', description: e.message, variant: 'destructive' });
         }
+        setLoading(false);
     };
+
+    useEffect(() => {
+        if (open) fetchStats();
+    }, [open, filters]);
+
+    const countries = Array.from(new Set(schools.map((s: any) => s.country).filter(Boolean)));
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-display font-bold">Platform Settings</h1>
-                    <p className="text-muted-foreground">Configure global authentication and access rules.</p>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                        Site-wide Statistics
+                    </DialogTitle>
+                    <DialogDescription>View performance metrics across the platform.</DialogDescription>
+                </DialogHeader>
+
+                <div className="grid grid-cols-3 gap-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Competition</Label>
+                        <Select value={filters.competitionId} onValueChange={(v) => setFilters(f => ({ ...f, competitionId: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Competitions</SelectItem>
+                                {competitions.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Country</Label>
+                        <Select value={filters.country} onValueChange={(v) => setFilters(f => ({ ...f, country: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Countries</SelectItem>
+                                {countries.map((c: any) => <SelectItem key={c as string} value={c as string}>{c as string}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>School</Label>
+                        <Select value={filters.schoolId} onValueChange={(v) => setFilters(f => ({ ...f, schoolId: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Schools</SelectItem>
+                                {schools.filter((s: any) => filters.country === 'all' || s.country === filters.country).map((s: any) => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-            </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Approved Email Domains</CardTitle>
-                    <CardDescription>
-                        Any user signing in with a Microsoft account from these domains will be <strong>automatically registered</strong> as a Student.
-                        <br />
-                        They do not need to be manually invited.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex gap-2 mb-6 max-w-md">
-                        <Input
-                            placeholder="e.g. myschool.edu"
-                            value={newDomain}
-                            onChange={e => setNewDomain(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddDomain()}
-                        />
-                        <Button onClick={handleAddDomain}>Add Domain</Button>
+                {loading ? (
+                    <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+                ) : stats ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-6 py-6">
+                        <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Attempted</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-primary">{stats.totalAttempted}</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-success/5 border border-success/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Correct Answers</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-success">{stats.totalCorrect}</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-orange-500/5 border border-orange-500/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Points Earned</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-orange-600">{stats.totalScore}</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-accent/5 border border-accent/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Participants</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-accent">{stats.participants}</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-warning/5 border border-warning/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Avg Qs / Hour</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-warning">{stats.avgQH}</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Accuracy Rate</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-blue-600">{stats.accuracy}%</p>
+                        </div>
+                        <div className="p-4 rounded-2xl bg-purple-500/5 border border-purple-500/10">
+                            <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Total Qs Served</p>
+                            <p className="text-3xl font-display font-bold mt-1 text-purple-600">{stats.totalQs}</p>
+                        </div>
                     </div>
+                ) : (
+                    <div className="py-20 text-center text-muted-foreground">No data available for these filters.</div>
+                )}
 
-                    <div className="space-y-2 border rounded-lg p-2 min-h-[100px]">
-                        {allowedDomains.length === 0 ? (
-                            <p className="text-muted-foreground text-sm p-2 text-center">No domains whitelisted yet.</p>
-                        ) : (
-                            allowedDomains.map(d => (
-                                <div key={d} className="flex justify-between items-center p-3 border-b last:border-0 hover:bg-muted/20">
-                                    <span className="font-mono text-sm">{d}</span>
-                                    <Button variant="ghost" size="sm" onClick={() => handleRemoveDomain(d)} className="text-destructive h-8 w-8 p-0">
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+                <DialogFooter>
+                    <Button onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
+
+

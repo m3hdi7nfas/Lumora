@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { DashboardLayout } from './DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -86,7 +87,6 @@ function ModeratorSidebar({ activeTab, setActiveTab }: { activeTab: string; setA
     { id: 'question-sets', icon: LayoutTemplate, label: 'Question Sets' },
     { id: 'users', icon: Users, label: 'Users' },
     { id: 'avatars', icon: User, label: 'Avatars' },
-    { id: 'approvals', icon: CheckSquare, label: 'Pending Approvals' },
     { id: 'leaderboard', icon: Trophy, label: 'Leaderboard' },
     { id: 'practice-manager', icon: LayoutTemplate, label: 'Practice Manager' },
     { id: 'messages', icon: MessageSquare, label: 'Messages' },
@@ -139,6 +139,7 @@ export default function ModeratorDashboard() {
     <DashboardLayout
       title="Lumora Moderator Dashboard"
       sidebar={<ModeratorSidebar activeTab={activeTab} setActiveTab={setActiveTab} />}
+      onNavItemClick={setActiveTab}
     >
       {activeTab === 'overview' && <ModeratorOverviewTab setActiveTab={setActiveTab} loading={loading} />}
       {activeTab === 'schools' && <SchoolsTab />}
@@ -147,7 +148,6 @@ export default function ModeratorDashboard() {
       {activeTab === 'question-sets' && <QuestionSetsTab />}
       {activeTab === 'users' && <UsersTab />}
       {activeTab === 'avatars' && <AvatarsTab />}
-      {activeTab === 'approvals' && <ApprovalsTab />}
       {activeTab === 'leaderboard' && <ModeratorLeaderboardTab />}
       {activeTab === 'practice-manager' && <PracticeManagerTab />}
       {activeTab === 'messages' && <MessagesTab />}
@@ -157,22 +157,38 @@ export default function ModeratorDashboard() {
 }
 
 // Moderator Overview Component
-function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
+function ModeratorOverviewTab({ setActiveTab, loading: parentLoading }: { setActiveTab: (tab: string) => void, loading: boolean }) {
   const { toast } = useToast();
   const { profile } = useAuth();
+  const [stats, setStats] = useState({ totalUsers: 0, activeCompetitions: 0, totalQuestions: 0, pendingReviews: 0 });
+  const [loading, setLoading] = useState(false);
 
-  // Get stats from local storage
-  const users = localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS);
-  const competitions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS);
-  const questions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
-  const pending = localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS);
-
-  const stats = {
-    totalUsers: users.length,
-    activeCompetitions: competitions.length,
-    totalQuestions: questions.length,
-    pendingReviews: pending.length
-  };
+  useEffect(() => {
+    const fetchStats = async () => {
+      setLoading(true);
+      try {
+        const [
+          { count: usersCount },
+          { count: compsCount },
+          { count: questionsCount },
+          { count: pendingCount }
+        ] = await Promise.all([
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('competitions').select('*', { count: 'exact', head: true }),
+          supabase.from('questions').select('*', { count: 'exact', head: true }),
+          supabase.from('approvals').select('*', { count: 'exact', head: true }).eq('status', 'pending').eq('requested_by', profile?.id)
+        ]);
+        setStats({
+          totalUsers: usersCount || 0,
+          activeCompetitions: compsCount || 0,
+          totalQuestions: questionsCount || 0,
+          pendingReviews: pendingCount || 0
+        });
+      } catch (e) { console.error('Error fetching stats:', e); }
+      setLoading(false);
+    };
+    if (profile?.id) fetchStats();
+  }, [profile?.id]);
 
   const quickActions = [
     { id: 'schools', icon: School, title: 'Manage Schools', description: 'Configure school access' },
@@ -181,7 +197,6 @@ function ModeratorOverviewTab({ setActiveTab, loading }: { setActiveTab: (tab: s
     { id: 'question-sets', icon: LayoutTemplate, title: 'Question Sets', description: 'Organize questions into sets' },
     { id: 'users', icon: Users, label: 'User Management', description: 'Manage user accounts' },
     { id: 'avatars', icon: User, title: 'Manage Avatars', description: 'Upload and manage avatars' },
-    { id: 'approvals', icon: CheckSquare, title: 'Pending Approvals', description: 'Review moderator actions' },
   ];
 
   return (
@@ -289,9 +304,16 @@ function SchoolsTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load schools from local storage
+  // Load schools from Supabase (read-only for moderators)
+  const fetchSchools = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('schools').select('*').order('name');
+    if (!error && data) setSchools(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+    fetchSchools();
   }, []);
 
   const filteredSchools = (schools || []).filter(school =>
@@ -308,25 +330,20 @@ function SchoolsTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.SCHOOLS, newSchool.id, {
-          ...newSchool,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'School updated successfully!' });
-      } else {
-        const newId = `school-${Date.now()}`;
-        const schoolToAdd = {
-          ...newSchool,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.SCHOOLS, schoolToAdd);
-        toast({ title: 'School added successfully!' });
-      }
+      const { id, created_at, updated_at, ...data } = newSchool;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'schools',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} school: ${newSchool.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewSchool({
@@ -334,7 +351,7 @@ function SchoolsTab() {
         contact_email: '', contact_phone: '', is_active: true, created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving school', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -342,27 +359,19 @@ function SchoolsTab() {
   const handleDeleteSchool = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for school deletion
       const schoolToDelete = schools.find(school => school.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'school_delete',
-        data: {
-          school_id: id,
-          school_name: schoolToDelete?.name
-        },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
-      setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
-
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'schools',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete school: ${schoolToDelete?.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
       toast({
-        title: 'School deletion submitted for admin approval!',
+        title: 'Deletion submitted for admin approval!',
         description: 'An admin will review this shortly.'
       });
     } catch (error) {
@@ -597,9 +606,16 @@ function CompetitionsTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load competitions from local storage
+  // Load competitions from Supabase (read-only for moderators)
+  const fetchCompetitions = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('competitions').select('*').order('created_at', { ascending: false });
+    if (!error && data) setCompetitions(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
+    fetchCompetitions();
   }, []);
 
   const filteredCompetitions = (competitions || []).filter(competition =>
@@ -615,25 +631,20 @@ function CompetitionsTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.COMPETITIONS, newCompetition.id, {
-          ...newCompetition,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'Competition updated!' });
-      } else {
-        const newId = `comp-${Date.now()}`;
-        const competitionToAdd = {
-          ...newCompetition,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.COMPETITIONS, competitionToAdd);
-        toast({ title: 'Competition added!' });
-      }
+      const { id, created_at, updated_at, ...data } = newCompetition;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'competitions',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} competition: ${newCompetition.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewCompetition({
@@ -642,7 +653,7 @@ function CompetitionsTab() {
         created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving competition', variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -650,27 +661,19 @@ function CompetitionsTab() {
   const handleDeleteCompetition = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for competition deletion
       const competitionToDelete = competitions.find(competition => competition.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'competition_delete',
-        data: {
-          competition_id: id,
-          competition_name: competitionToDelete?.name
-        },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
-      setCompetitions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.COMPETITIONS));
-
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'competitions',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete competition: ${competitionToDelete?.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
       toast({
-        title: 'Competition deletion submitted for admin approval!',
+        title: 'Deletion submitted for admin approval!',
         description: 'An admin will review this shortly.'
       });
     } catch (error) {
@@ -908,12 +911,17 @@ function QuestionsTab() {
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load questions from local storage safely
+  // Load questions from Supabase (read-only for moderators)
+  const fetchQuestions = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('questions').select('*').order('created_at', { ascending: false });
+    if (!error && data) setQuestions(data);
+    else setQuestions([]);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    try {
-      const q = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
-      setQuestions(Array.isArray(q) ? q : []);
-    } catch (e) { setQuestions([]); }
+    fetchQuestions();
   }, []);
 
   const filteredQuestions = (questions || []).filter(question =>
@@ -929,25 +937,20 @@ function QuestionsTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.QUESTIONS, newQuestion.id, {
-          ...newQuestion,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'Question updated!' });
-      } else {
-        const newId = `question-${Date.now()}`;
-        const questionToAdd = {
-          ...newQuestion,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, questionToAdd);
-        toast({ title: 'Question added!' });
-      }
+      const { id, created_at, updated_at, ...data } = newQuestion;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'questions',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} question: ${newQuestion.text.substring(0, 50)}...`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewQuestion({
@@ -957,7 +960,7 @@ function QuestionsTab() {
         created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving question', variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -965,27 +968,19 @@ function QuestionsTab() {
   const handleDeleteQuestion = async (id: string) => {
     setLoading(true);
     try {
-      // Create pending approval for question deletion
       const questionToDelete = questions.find(question => question.id === id);
-      const approvalItem = {
-        id: `approval-${Date.now()}`,
-        type: 'question_delete',
-        data: {
-          question_id: id,
-          question_text: questionToDelete?.text
-        },
-        created_by: profile?.id,
-        created_by_name: profile?.display_name || profile?.email,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      };
-
-      // Add to approvals
-      localStorageCRUD.add(LOCAL_STORAGE_KEYS.APPROVALS, approvalItem);
-      setQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'questions',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete question: ${questionToDelete?.text?.substring(0, 50)}...`,
+        status: 'pending'
+      });
+      if (error) throw error;
       toast({
-        title: 'Question deletion submitted for admin approval!',
+        title: 'Deletion submitted for admin approval!',
         description: 'An admin will review this shortly.'
       });
     } catch (error) {
@@ -1222,15 +1217,24 @@ function QuestionSetsTab() {
     name: '',
     description: '',
     category: '',
+    difficulty: 'medium',
     questions: [],
     created_at: '',
     updated_at: ''
   });
   const { toast } = useToast();
+  const { profile } = useAuth();
 
-  // Load question sets from local storage
+  // Load question sets from Supabase (read-only for moderators)
+  const fetchQuestionSets = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('question_sets').select('*').order('created_at', { ascending: false });
+    if (!error && data) setQuestionSets(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
+    fetchQuestionSets();
   }, []);
 
   const filteredQuestionSets = (questionSets || []).filter(qs =>
@@ -1247,33 +1251,28 @@ function QuestionSetsTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.QUESTION_SETS, newQuestionSet.id, {
-          ...newQuestionSet,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'Question set updated!' });
-      } else {
-        const newId = `qset-${Date.now()}`;
-        const questionSetToAdd = {
-          ...newQuestionSet,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTION_SETS, questionSetToAdd);
-        toast({ title: 'Question set added!' });
-      }
+      const { id, created_at, updated_at, ...data } = newQuestionSet;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'question_sets',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} question set: ${newQuestionSet.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewQuestionSet({
-        id: '', name: '', description: '', category: '', questions: [],
+        id: '', name: '', description: '', category: '', difficulty: 'medium', questions: [],
         created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving question set', variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1281,12 +1280,20 @@ function QuestionSetsTab() {
   const handleDeleteQuestionSet = async (id: string) => {
     setLoading(true);
     try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.QUESTION_SETS, id);
-      setQuestionSets(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTION_SETS));
-
-      toast({ title: 'Question set deleted successfully!' });
+      const qsToDelete = questionSets.find(qs => qs.id === id);
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'question_sets',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete question set: ${qsToDelete?.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Deletion submitted for admin approval!' });
     } catch (error) {
-      toast({ title: 'Error deleting question set', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1336,6 +1343,12 @@ function QuestionSetsTab() {
                         <div className="flex items-center gap-4 mt-2">
                           <span className="px-2 py-1 rounded-full text-xs bg-primary/10 text-primary">
                             {questionSet.category}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${questionSet.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                              questionSet.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                                'bg-yellow-100 text-yellow-700'
+                            }`}>
+                            {questionSet.difficulty || 'Medium'}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             Questions: {questionSet.questions?.length || 0}
@@ -1421,6 +1434,22 @@ function QuestionSetsTab() {
                 placeholder="e.g., Math, Science, etc."
               />
             </div>
+            <div className="space-y-2">
+              <Label>Difficulty Level</Label>
+              <Select
+                value={newQuestionSet.difficulty || 'medium'}
+                onValueChange={(val) => setNewQuestionSet({ ...newQuestionSet, difficulty: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy (Green)</SelectItem>
+                  <SelectItem value="medium">Medium (Yellow)</SelectItem>
+                  <SelectItem value="hard">Hard (Red)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
@@ -1458,10 +1487,18 @@ function AvatarsTab() {
   });
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
-  // Load avatars from local storage
+  // Load avatars from Supabase (read-only for moderators)
+  const fetchAvatars = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('avatars').select('*').order('created_at', { ascending: false });
+    if (!error && data) setAvatars(data);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
+    fetchAvatars();
   }, []);
 
   const filteredAvatars = (avatars || []).filter(avatar =>
@@ -1489,25 +1526,20 @@ function AvatarsTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.AVATARS, newAvatar.id, {
-          ...newAvatar,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'Avatar updated!' });
-      } else {
-        const newId = `avatar-${Date.now()}`;
-        const avatarToAdd = {
-          ...newAvatar,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.AVATARS, avatarToAdd);
-        toast({ title: 'Avatar added successfully!' });
-      }
+      const { id, created_at, updated_at, ...data } = newAvatar;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'avatars',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} avatar: ${newAvatar.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewAvatar({
@@ -1516,7 +1548,7 @@ function AvatarsTab() {
       });
       setFilePreview(null);
     } catch (error: any) {
-      toast({ title: 'Error saving avatar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1524,12 +1556,20 @@ function AvatarsTab() {
   const handleDeleteAvatar = async (id: string) => {
     setLoading(true);
     try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.AVATARS, id);
-      setAvatars(localStorageCRUD.get(LOCAL_STORAGE_KEYS.AVATARS));
-
-      toast({ title: 'Avatar deleted successfully!' });
+      const avatarToDelete = avatars.find(a => a.id === id);
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'avatars',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete avatar: ${avatarToDelete?.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Deletion submitted for admin approval!' });
     } catch (error) {
-      toast({ title: 'Error deleting avatar', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1725,8 +1765,14 @@ function UsersTab() {
   const { profile } = useAuth();
 
   const fetchUsersAndSchools = async () => {
-    setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
-    setSchools(localStorageCRUD.get(LOCAL_STORAGE_KEYS.SCHOOLS));
+    setLoading(true);
+    const [{ data: userData }, { data: schoolData }] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('schools').select('id, name')
+    ]);
+    if (userData) setUsers(userData);
+    if (schoolData) setSchools(schoolData);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -1747,28 +1793,22 @@ function UsersTab() {
 
     setLoading(true);
     try {
-      if (isEditing) {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.USERS, newUser.id, {
-          ...newUser,
-          updated_at: new Date().toISOString()
-        });
-        toast({ title: 'User updated successfully!' });
-      } else {
-        if (!newUser.password) newUser.password = generateRandomPassword();
-        if (!newUser.display_name) newUser.display_name = newUser.email.split('@')[0];
+      const { id, created_at, updated_at, ...data } = newUser;
+      if (!data.password) data.password = generateRandomPassword();
+      if (!data.display_name) data.display_name = data.email.split('@')[0];
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditing ? 'update' : 'create',
+        table_name: 'profiles',
+        record_id: isEditing ? id : null,
+        data: data,
+        requested_by: profile?.id,
+        summary: `${isEditing ? 'Update' : 'Add'} user: ${data.email}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: 'Your action is pending review.' });
 
-        const newId = `user-${Date.now()}`;
-        const userToAdd = {
-          ...newUser,
-          id: newId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, userToAdd);
-        toast({ title: 'User added!', description: `Password: ${userToAdd.password}` });
-      }
-
-      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
       setIsAddDialogOpen(false);
       setIsEditing(false);
       setNewUser({
@@ -1777,7 +1817,7 @@ function UsersTab() {
         created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving user', variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1795,33 +1835,33 @@ function UsersTab() {
     setLoading(true);
     try {
       const lines = data.split('\n').filter(line => line.trim());
-      const usersToAdd = [];
       const commonPassword = password || generateRandomPassword();
+      const usersToAdd = lines.map(line => ({
+        email: line.trim(),
+        display_name: line.trim().split('@')[0],
+        role: role,
+        school_id: schoolId || null,
+        password: commonPassword,
+        is_active: true
+      }));
 
-      for (const line of lines) {
-        const email = line.trim();
-        if (!email) continue;
-        const displayName = email.split('@')[0];
-
-        usersToAdd.push({
-          id: `user-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-          email, display_name: displayName, role: role, school_id: schoolId || null,
-          password: commonPassword, is_active: true, score: 0, progress: 0,
-          avatar_id: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-        });
-      }
-
-      usersToAdd.forEach(user => localStorageCRUD.add(LOCAL_STORAGE_KEYS.USERS, user));
-      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
-
-      toast({ title: `Bulk ${role}s added!`, description: `${usersToAdd.length} accounts created.` });
+      // Moderator: bulk add through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: 'create',
+        table_name: 'profiles',
+        data: { users: usersToAdd, count: usersToAdd.length },
+        requested_by: profile?.id,
+        summary: `Bulk add ${usersToAdd.length} ${role}(s)`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Bulk add submitted for admin approval!', description: `${usersToAdd.length} accounts pending review.` });
 
       if (role === 'student') { setBulkStudents(''); setBulkStudentPassword(''); }
       else { setBulkTeachers(''); setBulkTeacherPassword(''); }
-
       setIsBulkAddDialogOpen(false);
     } catch (error) {
-      toast({ title: 'Error adding users', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1829,11 +1869,20 @@ function UsersTab() {
   const handleDeleteUser = async (id: string) => {
     setLoading(true);
     try {
-      localStorageCRUD.remove(LOCAL_STORAGE_KEYS.USERS, id);
-      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
-      toast({ title: 'User deleted successfully!' });
+      const userToDelete = users.find(u => u.id === id);
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'profiles',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete user: ${userToDelete?.email}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Deletion submitted for admin approval!' });
     } catch (error) {
-      toast({ title: 'Error deleting user', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -1843,12 +1892,19 @@ function UsersTab() {
     try {
       const userToUpdate = users.find(user => user.id === userId);
       if (!userToUpdate) return;
-      const updatedUser = { ...userToUpdate, role: newRole, updated_at: new Date().toISOString() };
-      localStorageCRUD.update(LOCAL_STORAGE_KEYS.USERS, userId, updatedUser);
-      setUsers(localStorageCRUD.get(LOCAL_STORAGE_KEYS.USERS));
-      toast({ title: 'User role updated!' });
+      const { error } = await supabase.from('approvals').insert({
+        type: 'update',
+        table_name: 'profiles',
+        record_id: userId,
+        data: { role: newRole },
+        requested_by: profile?.id,
+        summary: `Change role of ${userToUpdate.email} to ${newRole}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Role change submitted for admin approval!' });
     } catch (error) {
-      toast({ title: 'Error updating role', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting role change', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
@@ -2255,72 +2311,43 @@ function ModeratorSchoolLeaderboard({ selectedCompId }: { selectedCompId: string
   );
 }
 
-// Approvals Tab Component
+// Approvals Tab Component — Moderators can only VIEW their own submissions (read-only)
 function ApprovalsTab() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
 
-  // Load approvals from local storage
+  // Load own approvals from Supabase (moderators can only read their own)
+  const fetchApprovals = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .eq('requested_by', profile?.id)
+        .order('created_at', { ascending: false });
+      if (!error && data) setApprovals(data);
+    } catch (e) {
+      console.error('Error fetching approvals:', e);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
-  }, []);
-
-  const handleApprove = async (id: string, type: string) => {
-    setLoading(true);
-    try {
-      const approval = approvals.find(a => a.id === id);
-      if (!approval) return;
-
-      // For moderator dashboard, we can only approve certain types
-      const allowedTypes = [
-        'question', 'question_delete', 'competition', 'competition_delete',
-        'school', 'school_delete', 'user', 'user_delete', 'avatar', 'avatar_delete',
-        'question_set', 'question_set_delete', 'bulk_users', 'user_role_change'
-      ];
-
-      if (!allowedTypes.includes(type)) {
-        toast({ title: 'You cannot approve this type of request', variant: 'destructive' });
-        return;
-      }
-
-      // Update the approval status
-      localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'approved' });
-      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
-
-      toast({
-        title: 'Request approved!',
-        description: 'The request has been approved and will be processed.'
-      });
-    } catch (error) {
-      toast({ title: 'Error approving request', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
-
-  const handleReject = async (id: string) => {
-    setLoading(true);
-    try {
-      localStorageCRUD.update(LOCAL_STORAGE_KEYS.APPROVALS, id, { status: 'rejected' });
-      setApprovals(localStorageCRUD.get(LOCAL_STORAGE_KEYS.APPROVALS));
-      toast({ title: 'Request rejected!' });
-    } catch (error: any) {
-      toast({ title: 'Error rejecting request', description: error.message, variant: 'destructive' });
-    }
-    setLoading(false);
-  };
+    if (profile?.id) fetchApprovals();
+  }, [profile?.id]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-display font-bold">Pending Approvals</h1>
-        <p className="text-muted-foreground">Review and approve moderator actions</p>
+        <h1 className="text-2xl font-display font-bold">My Submissions</h1>
+        <p className="text-muted-foreground">Track the status of your approval requests. Only admins can approve or reject.</p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Approval Requests</CardTitle>
-          <CardDescription>Requests that need your review</CardDescription>
+          <CardTitle>Your Approval Requests</CardTitle>
+          <CardDescription>Requests you have submitted for admin review</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -2329,45 +2356,37 @@ function ApprovalsTab() {
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
             ) : approvals.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">No pending approvals</p>
+              <p className="text-center text-muted-foreground py-4">No submissions yet</p>
             ) : (
               approvals.map((approval) => (
                 <div key={approval.id} className="p-4 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${approval.status === 'pending'
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${approval.status === 'pending'
                           ? 'bg-warning/10 text-warning'
                           : approval.status === 'approved'
                             ? 'bg-success/10 text-success'
                             : 'bg-destructive/10 text-destructive'
                           }`}>
-                          {approval.status}
+                          {approval.status === 'pending' ? '⏳ Pending' : approval.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
                         </span>
-                        <h3 className="font-medium">{getApprovalTitle(approval.type)}</h3>
+                        <h3 className="font-medium">{approval.summary || getApprovalTitle(approval.type)}</h3>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Requested by: {approval.created_by_name}</p>
-                      <p className="text-xs text-muted-foreground">Date: {new Date(approval.created_at).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Table: {approval.table_name} • Type: {approval.type}</p>
+                      <p className="text-xs text-muted-foreground">Submitted: {new Date(approval.created_at).toLocaleString()}</p>
+                      {approval.reviewed_at && (
+                        <p className="text-xs text-muted-foreground">Reviewed: {new Date(approval.reviewed_at).toLocaleString()}</p>
+                      )}
                     </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleApprove(approval.id, approval.type)}
-                        disabled={approval.status !== 'pending'}
-                      >
-                        <CheckCircle className="w-3 h-3 text-success" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 w-8 p-0"
-                        onClick={() => handleReject(approval.id)}
-                        disabled={approval.status !== 'pending'}
-                      >
-                        <XCircle className="w-3 h-3 text-destructive" />
-                      </Button>
+                    <div className="ml-4">
+                      {approval.status === 'pending' ? (
+                        <Clock className="w-5 h-5 text-warning" />
+                      ) : approval.status === 'approved' ? (
+                        <CheckCircle className="w-5 h-5 text-success" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-destructive" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2421,8 +2440,8 @@ function MessagesTab() {
 
   const filteredMessages = messages.filter(message =>
     (message.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (message.sender || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (message.content || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (message.sender_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (message.body || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleSendMessage = async () => {
@@ -2462,32 +2481,26 @@ function MessagesTab() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
-      // Mock data for messages
-      const mockMessages = [
-        {
-          id: '1',
-          sender: 'John Doe',
-          senderEmail: 'john@example.com',
-          subject: 'Question about competition',
-          content: 'Hello, I have a question about the upcoming math competition...',
-          date: '2025-06-01',
-          read: false
-        },
-        {
-          id: '2',
-          sender: 'Jane Smith',
-          senderEmail: 'jane@example.com',
-          subject: 'Technical issue',
-          content: 'I am having trouble accessing the practice questions...',
-          date: '2025-05-30',
-          read: true
-        }
-      ];
-      setMessages(mockMessages);
-    } catch (error) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`recipient_id.eq.${profile?.id},recipient_role.eq.moderator,recipient_role.eq.all`)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setMessages((data || []) as any);
+    } catch (error: any) {
       toast({ title: 'Error fetching messages', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      await supabase.from('messages').update({ is_read: true }).eq('id', id);
+      setMessages((prev: any) => prev.map((m: any) => m.id === id ? { ...m, is_read: true } : m));
+    } catch (e) {
+      console.error('Error marking as read:', e);
+    }
   };
 
   const handleSendReply = async () => {
@@ -2563,24 +2576,27 @@ function MessagesTab() {
                     filteredMessages.map((message) => (
                       <button
                         key={message.id}
-                        onClick={() => setSelectedMessage(message)}
+                        onClick={() => {
+                          setSelectedMessage(message);
+                          if (!message.is_read) handleMarkRead(message.id);
+                        }}
                         className={`w-full text-left p-3 rounded-lg transition-colors ${selectedMessage?.id === message.id
                           ? 'bg-primary/10 border border-primary'
                           : 'hover:bg-muted/50'
-                          } ${!message.read && 'border-l-2 border-primary'}`}
+                          } ${!message.is_read && 'border-l-2 border-primary'}`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold flex-shrink-0">
-                            {message.sender.split(' ').map(n => n[0]).join('')}
+                            {(message.sender_name || '??').split(' ').map((n: any) => n[0]).join('')}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-medium truncate">{message.sender}</p>
-                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.date}</p>
+                              <p className="text-sm font-medium truncate">{message.sender_name}</p>
+                              <p className="text-xs text-muted-foreground whitespace-nowrap">{message.created_at ? new Date(message.created_at).toLocaleDateString() : ''}</p>
                             </div>
                             <p className="text-xs text-muted-foreground truncate">{message.subject}</p>
-                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.content}</p>
-                            {!message.read && (
+                            <p className="text-xs text-muted-foreground/60 truncate mt-1">{message.body}</p>
+                            {!message.is_read && (
                               <span className="inline-block mt-1 w-2 h-2 bg-primary rounded-full" />
                             )}
                           </div>
@@ -2623,13 +2639,13 @@ function MessagesTab() {
               <CardHeader>
                 <CardTitle>{selectedMessage.subject}</CardTitle>
                 <CardDescription>
-                  From: {selectedMessage.sender} &lt;{selectedMessage.senderEmail}&gt; • {selectedMessage.date}
+                  From: {selectedMessage.sender_name} • {selectedMessage.created_at ? new Date(selectedMessage.created_at).toLocaleString() : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
                   <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedMessage.content}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedMessage.body}</p>
                   </div>
 
                   <div className="space-y-4 pt-4 border-t">
@@ -2744,6 +2760,7 @@ function PracticeManagerTab() {
     name: '',
     description: '',
     category: 'General',
+    difficulty: 'medium',
     questions: [] as string[],
     created_at: '',
   });
@@ -2764,13 +2781,16 @@ function PracticeManagerTab() {
   });
 
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const fetchData = async () => {
     setLoading(true);
-    const sets = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
-    const questions = localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS);
-    setPracticeSets(sets);
-    setGlobalQuestions(questions);
+    const [{ data: setsData }, { data: questionsData }] = await Promise.all([
+      supabase.from('practice_sets').select('*').order('created_at', { ascending: false }),
+      supabase.from('questions').select('*')
+    ]);
+    if (setsData) setPracticeSets(setsData);
+    if (questionsData) setGlobalQuestions(questionsData);
     setLoading(false);
   };
 
@@ -2778,23 +2798,29 @@ function PracticeManagerTab() {
     fetchData();
   }, []);
 
-  const handleCreateSet = () => {
+  const handleCreateSet = async () => {
     if (!newSet.name) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
     }
-    const setToAdd = {
-      ...newSet,
-      id: `p-set-${Date.now()}`,
-      created_at: new Date().toISOString()
-    };
-    const current = localStorage.getItem('lumora_practice_sets') ? JSON.parse(localStorage.getItem('lumora_practice_sets')) : [];
-    const updated = [...current, setToAdd];
-    localStorage.setItem('lumora_practice_sets', JSON.stringify(updated));
-    setPracticeSets(updated);
-    setIsAddDialogOpen(false);
-    setNewSet({ id: '', name: '', description: '', category: 'General', questions: [], created_at: '' });
-    toast({ title: 'Practice Set Created!' });
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('approvals').insert({
+        type: 'create',
+        table_name: 'practice_sets',
+        data: { name: newSet.name, description: newSet.description, category: newSet.category, difficulty: newSet.difficulty || 'medium', questions: [] },
+        requested_by: profile?.id,
+        summary: `Create practice set: ${newSet.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval' });
+      setIsAddDialogOpen(false);
+      setNewSet({ id: '', name: '', description: '', category: 'General', difficulty: 'medium', questions: [], created_at: '' });
+    } catch (error) {
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
   };
 
   const toggleQuestionInSet = (questionId: string) => {
@@ -2831,7 +2857,7 @@ function PracticeManagerTab() {
     setIsCreateQuestionDialogOpen(true);
   };
 
-  const handleCreateAndAddQuestion = (keepOpen: boolean = false) => {
+  const handleCreateAndAddQuestion = async (keepOpen: boolean = false) => {
     if (!newQuestion.text || !newQuestion.correct_answer) {
       toast({ title: 'Question text and correct answer are required', variant: 'destructive' });
       return;
@@ -2839,32 +2865,19 @@ function PracticeManagerTab() {
 
     setLoading(true);
     try {
-      const qId = isEditingQuestion ? newQuestion.id : `question-${Date.now()}`;
-      const questionToAdd = {
-        ...newQuestion,
-        id: qId,
-        updated_at: new Date().toISOString()
-      };
-
-      if (!isEditingQuestion) {
-        questionToAdd.created_at = new Date().toISOString();
-        localStorageCRUD.add(LOCAL_STORAGE_KEYS.QUESTIONS, questionToAdd);
-      } else {
-        localStorageCRUD.update(LOCAL_STORAGE_KEYS.QUESTIONS, qId, questionToAdd);
-      }
-
-      if (!isEditingQuestion && selectedSet) {
-        const updatedSet = {
-          ...selectedSet,
-          questions: [...(selectedSet.questions || []), qId]
-        };
-        const updatedSets = practiceSets.map((s: any) => s.id === selectedSet.id ? updatedSet : s);
-        localStorage.setItem('lumora_practice_sets', JSON.stringify(updatedSets));
-        setPracticeSets(updatedSets);
-      }
-
-      setGlobalQuestions(localStorageCRUD.get(LOCAL_STORAGE_KEYS.QUESTIONS));
-      toast({ title: isEditingQuestion ? 'Question updated!' : (keepOpen ? 'Question added! Ready for next.' : 'Question created and added to set!') });
+      const { id, created_at, updated_at, ...data } = newQuestion;
+      // Moderator: ALL writes go through approvals
+      const { error } = await supabase.from('approvals').insert({
+        type: isEditingQuestion ? 'update' : 'create',
+        table_name: 'questions',
+        record_id: isEditingQuestion ? id : null,
+        data: { ...data, practice_set_id: selectedSet?.id },
+        requested_by: profile?.id,
+        summary: `${isEditingQuestion ? 'Update' : 'Add'} practice question: ${newQuestion.text.substring(0, 50)}...`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Submitted for admin approval', description: isEditingQuestion ? 'Question update pending.' : 'Question addition pending.' });
 
       if (!keepOpen) {
         setIsCreateQuestionDialogOpen(false);
@@ -2877,25 +2890,52 @@ function PracticeManagerTab() {
         explanation: '', exact_match_required: false, created_at: '', updated_at: ''
       });
     } catch (error) {
-      toast({ title: 'Error saving question', description: error.message, variant: 'destructive' });
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
     }
     setLoading(false);
   };
 
-  const handleSaveQuestions = () => {
+  const handleSaveQuestions = async () => {
     if (!selectedSet) return;
-    const updatedSets = practiceSets.map((s: any) => s.id === selectedSet.id ? selectedSet : s);
-    localStorage.setItem('lumora_practice_sets', JSON.stringify(updatedSets));
-    setPracticeSets(updatedSets);
-    setIsManageDialogOpen(false);
-    toast({ title: 'Questions updated for set!' });
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('approvals').insert({
+        type: 'update',
+        table_name: 'practice_sets',
+        record_id: selectedSet.id,
+        data: { questions: selectedSet.questions },
+        requested_by: profile?.id,
+        summary: `Update questions in practice set: ${selectedSet.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      setIsManageDialogOpen(false);
+      toast({ title: 'Question changes submitted for approval!' });
+    } catch (error) {
+      toast({ title: 'Error submitting request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
   };
 
-  const handleDeleteSet = (id: string) => {
-    const updated = practiceSets.filter((s: any) => s.id !== id);
-    localStorage.setItem('lumora_practice_sets', JSON.stringify(updated));
-    setPracticeSets(updated);
-    toast({ title: 'Practice set deleted' });
+  const handleDeleteSet = async (id: string) => {
+    setLoading(true);
+    try {
+      const setToDelete = practiceSets.find((s: any) => s.id === id);
+      const { error } = await supabase.from('approvals').insert({
+        type: 'delete',
+        table_name: 'practice_sets',
+        record_id: id,
+        data: {},
+        requested_by: profile?.id,
+        summary: `Delete practice set: ${setToDelete?.name}`,
+        status: 'pending'
+      });
+      if (error) throw error;
+      toast({ title: 'Deletion submitted for admin approval!' });
+    } catch (error) {
+      toast({ title: 'Error submitting deletion request', description: error.message, variant: 'destructive' });
+    }
+    setLoading(false);
   };
 
   return (
@@ -2924,6 +2964,15 @@ function PracticeManagerTab() {
             </CardHeader>
             <CardContent className="flex-1">
               <div className="space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Difficulty:</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${set.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                      set.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                        'bg-yellow-100 text-yellow-700'
+                    }`}>
+                    {set.difficulty || 'Medium'}
+                  </span>
+                </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Questions:</span>
                   <span className="font-bold">{set.questions?.length || 0}</span>
@@ -2959,6 +3008,22 @@ function PracticeManagerTab() {
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea value={newSet.description} onChange={e => setNewSet({ ...newSet, description: e.target.value })} placeholder="What will students learn?" />
+            </div>
+            <div className="space-y-2">
+              <Label>Difficulty Level</Label>
+              <Select
+                value={newSet.difficulty || 'medium'}
+                onValueChange={(val) => setNewSet({ ...newSet, difficulty: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy (Green)</SelectItem>
+                  <SelectItem value="medium">Medium (Yellow)</SelectItem>
+                  <SelectItem value="hard">Hard (Red)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

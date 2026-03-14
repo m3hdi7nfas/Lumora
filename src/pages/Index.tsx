@@ -49,22 +49,27 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen relative">
-      <Navbar isEditingGlobal={isEditing} updateContent={updateContent} />
-      <Hero
-        content={content.hero}
-        isEditingGlobal={isEditing}
-        updateContent={(field, val) => updateContent(`hero.${field}`, val)}
-      />
-      <Features
-        content={content.features}
-        isEditingGlobal={isEditing}
-        updateContent={(val) => updateContent('features', val)}
-      />
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      <Navbar isEditingGlobal={isEditing} updateContent={updateContent} profile={profile} />
+      <main className="flex-1">
+        <Hero
+          content={content.hero}
+          isEditingGlobal={isEditing}
+          updateContent={(field, val) => updateContent(`hero.${field}`, val)}
+        />
+        <Features
+          content={content.features}
+          isEditingGlobal={isEditing}
+          updateContent={(val) => updateContent('features', val)}
+        />
+      </main>
       <Footer isEditingGlobal={isEditing} updateContent={updateContent} />
 
-      {/* Floating Ad Box */}
-      <AdBox />
+      {/* Floating Ad Boxes on the left, centered below header */}
+      <div className="hidden lg:flex fixed left-4 top-[calc(50%+32px)] -translate-y-1/2 z-40 flex-col gap-4">
+        <AdBox />
+        <AdBox />
+      </div>
 
       {/* Moderator Controls - REMOVED */}
       {/* {profile?.role === 'moderator' && (

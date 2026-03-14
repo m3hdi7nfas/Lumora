@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 export function AdToggle() {
-  const [showAds, setShowAds] = useState(true);
+  const [showAds, setShowAds] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { profile } = useAuth();
@@ -19,12 +19,13 @@ export function AdToggle() {
     const channel = supabase
       .channel('system_settings_changes')
       .on('postgres_changes', { 
-        event: 'UPDATE', 
+        event: '*', 
         schema: 'public', 
         table: 'system_settings',
         filter: "key=eq.show_ads"
       }, (payload) => {
-        setShowAds(payload.new.value === true || payload.new.value === 'true');
+        const val = (payload.new as any)?.value;
+        setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
       })
       .subscribe();
 
@@ -34,40 +35,51 @@ export function AdToggle() {
   }, []);
 
   const fetchAdSetting = async () => {
-    const { data, error } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'show_ads')
-      .single();
-    
-    if (!error && data) {
-      setShowAds(data.value === true || data.value === 'true');
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'show_ads')
+        .maybeSingle(); // Use maybeSingle to avoid 406 errors if empty
+      
+      if (!error && data) {
+        setShowAds(data.value === true || data.value === 'true' || String(data.value).toLowerCase() === 'true');
+      } else if (error) {
+        console.error('Error fetching ad setting:', error);
+      }
+    } catch (e) {
+      console.error('Error in fetchAdSetting:', e);
     }
   };
 
   const handleToggle = async (checked: boolean) => {
     setLoading(true);
     try {
+      // First, try to just upsert
       const { error } = await supabase
         .from('system_settings')
-        .update({ 
+        .upsert({ 
+          key: 'show_ads',
           value: checked,
           updated_at: new Date().toISOString(),
           updated_by: profile?.id
-        })
-        .eq('key', 'show_ads');
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Upsert error:', error);
+        throw error;
+      }
 
       setShowAds(checked);
       toast({
         title: 'Ad visibility updated',
         description: `Ads are now ${checked ? 'visible' : 'hidden'} for all users`
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Toggle error:', error);
       toast({
         title: 'Error updating ad settings',
-        description: error.message,
+        description: error.message || 'Check if you have database permissions (RLS)',
         variant: 'destructive'
       });
     } finally {

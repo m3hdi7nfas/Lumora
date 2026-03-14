@@ -6,7 +6,7 @@ export function AdBanner() {
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [showAds, setShowAds] = useState(true);
+    const [showAds, setShowAds] = useState(false);
     const bannerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -17,12 +17,12 @@ export function AdBanner() {
         const channel = supabase
             .channel('ad_banner_listener')
             .on('postgres_changes', { 
-                event: 'UPDATE', 
+                event: '*', 
                 schema: 'public', 
                 table: 'system_settings',
                 filter: "key=eq.show_ads"
             }, (payload) => {
-                const val = payload.new.value;
+                const val = (payload.new as any)?.value;
                 setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
             })
             .subscribe();
@@ -33,15 +33,22 @@ export function AdBanner() {
     }, []);
 
     const fetchAdSetting = async () => {
-        const { data, error } = await supabase
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'show_ads')
-            .single();
-        
-        if (!error && data) {
-            const val = data.value;
-            setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
+        try {
+            const { data, error } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'show_ads')
+                .maybeSingle();
+            
+            if (!error && data) {
+                const val = data.value;
+                setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
+            } else if (!error && !data) {
+                // Default to false if not found
+                setShowAds(false);
+            }
+        } catch (e) {
+            console.error('Error fetching ad setting in AdBanner:', e);
         }
     };
 

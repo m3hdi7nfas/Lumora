@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export function AdBox() {
-    const [showAds, setShowAds] = useState(true);
+    const [showAds, setShowAds] = useState(false);
 
     useEffect(() => {
         // Load initial ad setting from Supabase
@@ -12,12 +12,13 @@ export function AdBox() {
         const channel = supabase
             .channel('ad_settings_listener')
             .on('postgres_changes', { 
-                event: 'UPDATE', 
+                event: '*', 
                 schema: 'public', 
                 table: 'system_settings',
                 filter: "key=eq.show_ads"
             }, (payload) => {
-                setShowAds(payload.new.value === true || payload.new.value === 'true');
+                const val = (payload.new as any)?.value;
+                setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
             })
             .subscribe();
 
@@ -27,14 +28,22 @@ export function AdBox() {
     }, []);
 
     const fetchAdSetting = async () => {
-        const { data, error } = await supabase
-            .from('system_settings')
-            .select('value')
-            .eq('key', 'show_ads')
-            .single();
-        
-        if (!error && data) {
-            setShowAds(data.value === true || data.value === 'true');
+        try {
+            const { data, error } = await supabase
+                .from('system_settings')
+                .select('value')
+                .eq('key', 'show_ads')
+                .maybeSingle();
+            
+            if (!error && data) {
+                const val = data.value;
+                setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
+            } else if (!error && !data) {
+                // If empty, keep ads hidden by default until configured
+                setShowAds(false);
+            }
+        } catch (e) {
+            console.error('Error fetching ad setting in AdBox:', e);
         }
     };
 

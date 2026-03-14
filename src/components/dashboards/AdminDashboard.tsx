@@ -55,27 +55,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AdToggle } from '@/components/ads/AdToggle';
-// Firebase module kept for legacy compatibility — all active data access now uses Supabase
-import {
-    db,
-    collection,
-    query,
-    getDocs,
-    doc,
-    setDoc,
-    updateDoc,
-    deleteDoc,
-    orderBy,
-    serverTimestamp,
-    addDoc,
-    getDoc,
-    where,
-    writeBatch,
-    getCountFromServer,
-    onSnapshot,
-    limit,
-    arrayUnion
-} from '@/lib/firebase';
+
 
 // Local storage utilities
 const LOCAL_STORAGE_KEYS = {

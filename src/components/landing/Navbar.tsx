@@ -13,7 +13,7 @@ export function Navbar({ isEditingGlobal = false, updateContent }: { isEditingGl
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
-      <div className="container grid grid-cols-3 items-center h-16">
+      <div className="container grid grid-cols-2 md:grid-cols-3 items-center h-16">
         {/* Logo aligned with container */}
         <div className="flex justify-start">
           <Link to="/" className="flex items-center">

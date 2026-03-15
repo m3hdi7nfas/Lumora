@@ -185,7 +185,7 @@ function TeacherOverview({ setActiveTab }: { setActiveTab: (tab: string) => void
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold">Teacher Dashboard</h1>
+          <h1 className="text-2xl font-display font-bold">Teacher Dashboard - Hello {profile?.display_name || 'Teacher'} 👋</h1>
           <p className="text-muted-foreground">Overview of your class performance and activities</p>
           {isAdminOrModerator && currentView && (
             <div className="mt-2 flex items-center gap-2 text-sm text-primary">

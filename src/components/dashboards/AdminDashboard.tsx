@@ -487,7 +487,7 @@ function AdminOverviewTab({
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-display font-bold">Admin Dashboard</h1>
+                    <h1 className="text-2xl font-display font-bold">Admin Dashboard - Hello {profile?.display_name || 'Admin'} 👋</h1>
                     <p className="text-muted-foreground">Full control over platform activity and settings</p>
                 </div>
             </div>

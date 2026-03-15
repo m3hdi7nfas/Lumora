@@ -172,10 +172,10 @@ export default function Dashboard() {
           </ErrorBoundary>
         );
       case 'moderator':
-        console.log('Rendering AdminDashboard (for moderator)');
+        console.log('Rendering ModeratorDashboard');
         return (
           <ErrorBoundary>
-            <AdminDashboard />
+            <ModeratorDashboard />
           </ErrorBoundary>
         );
       case 'teacher':

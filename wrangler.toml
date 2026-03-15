@@ -1,0 +1,7 @@
+name = "lumora"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-03-15"
+
+[vars]
+VITE_SUPABASE_URL = "https://vqbzgtcbynezeouuosbo.supabase.co"
+VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxYnpndGNieW5lemVvdXVvc2JvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjI2OTIsImV4cCI6MjA4ODUzODY5Mn0.uVLo4j3jQUlD0HGSzqGhKZ2Hcu74_HXLsPc_Cknyv3k"

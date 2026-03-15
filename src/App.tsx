@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import { SystemSettingsProvider } from "@/contexts/SystemSettingsContext";
 import { futureConfig } from "./routerConfig";
 import { initializeLocalStorage } from "./lib/initializeLocalStorage";
 import { useEffect } from "react";
@@ -26,19 +27,21 @@ const App = () => {
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Sonner />
-            <BrowserRouter future={futureConfig}>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-            <ThemeToggle />
-          </TooltipProvider>
+          <SystemSettingsProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter future={futureConfig}>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+              <ThemeToggle />
+            </TooltipProvider>
+          </SystemSettingsProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

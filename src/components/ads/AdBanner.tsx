@@ -1,60 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
 import { GripVertical } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { useSystemSettings } from '@/contexts/SystemSettingsContext';
 
 export function AdBanner() {
+    const { settings } = useSystemSettings();
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [showAds, setShowAds] = useState(false);
     const bannerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        // Load initial ad setting from Supabase
-        fetchAdSetting();
-
-        // Listen for realtime updates from Supabase
-        const channel = supabase
-            .channel('ad_banner_listener')
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'system_settings',
-                filter: "key=eq.show_ads"
-            }, (payload) => {
-                const val = (payload.new as any)?.value;
-                setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
-
-    const fetchAdSetting = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'show_ads')
-                .maybeSingle();
-            
-            if (!error && data) {
-                const val = data.value;
-                setShowAds(val === true || val === 'true' || String(val).toLowerCase() === 'true');
-            } else if (!error && !data) {
-                // Default to false if not found
-                setShowAds(false);
-            }
-        } catch (e) {
-            console.error('Error fetching ad setting in AdBanner:', e);
-        }
-    };
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (!isDragging || !bannerRef.current) return;
+// ... (rest of the code remains same)
 
             const deltaX = e.clientX - dragStart.x;
             const deltaY = e.clientY - dragStart.y;
@@ -154,7 +112,7 @@ export function AdBanner() {
         setDragStart({ x: touch.clientX, y: touch.clientY });
     };
 
-    if (!showAds) {
+    if (!settings.show_ads) {
         return null;
     }
 
